@@ -7,7 +7,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$PSNativeCommandUseErrorActionPreference = $false
+$PSNativeCommandUseErrorActionPreference = $true
 
 Write-Output "[1/7] Verificando GitHub CLI..."
 $null = gh --version
@@ -44,12 +44,36 @@ if (-not $saJson) {
 }
 
 Write-Output "[6/7] Publicando GitHub Secrets en $Repo..."
+# Verifica acceso al endpoint de secrets antes de intentar escribir.
+gh api "repos/$Repo/actions/secrets/public-key" | Out-Null
+if ($LASTEXITCODE -ne 0) {
+    throw "No hay permisos para gestionar secrets en $Repo. Revisa el token (repo/workflow/read:org para classic, o Secrets RW + Actions RW para fine-grained)."
+}
+
 $saJson | gh secret set GCP_SA_KEY --repo $Repo
+if ($LASTEXITCODE -ne 0) {
+    throw "Fallo al crear GCP_SA_KEY en $Repo"
+}
+
 $ProjectId | gh secret set GCP_PROJECT --repo $Repo
+if ($LASTEXITCODE -ne 0) {
+    throw "Fallo al crear GCP_PROJECT en $Repo"
+}
+
 $GcsBucket | gh secret set GCS_BUCKET --repo $Repo
+if ($LASTEXITCODE -ne 0) {
+    throw "Fallo al crear GCS_BUCKET en $Repo"
+}
+
 $VertexRegion | gh secret set VERTEX_REGION --repo $Repo
+if ($LASTEXITCODE -ne 0) {
+    throw "Fallo al crear VERTEX_REGION en $Repo"
+}
 
 Write-Output "[7/7] Verificacion final de nombres de secrets..."
 gh secret list --repo $Repo | Select-String -Pattern "GCP_SA_KEY|GCP_PROJECT|GCS_BUCKET|VERTEX_REGION" | ForEach-Object { $_.Line }
+if ($LASTEXITCODE -ne 0) {
+    throw "No se pudieron listar los secrets en $Repo tras la carga"
+}
 
 Write-Output "OK: GitHub Secrets cargados correctamente en $Repo."
