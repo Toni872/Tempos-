@@ -7,25 +7,21 @@ if (-not (Test-Path $scriptPath)) {
   exit 1
 }
 
-# Requiere elevacion para evitar errores de permisos con schtasks en algunos entornos.
-$isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
-if (-not $isAdmin) {
-  Write-Output "Solicitando elevacion UAC para crear la tarea programada..."
-  $self = $MyInvocation.MyCommand.Path
-  if (-not $self) {
-    Write-Error "No se pudo resolver la ruta del script para autoelevacion."
-    exit 1
-  }
-  Start-Process PowerShell -Verb RunAs -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$self`""
+$taskCommand = "PowerShell.exe -NoProfile -ExecutionPolicy Bypass -File `"$scriptPath`""
+
+# Intenta crear para el usuario actual sin elevacion (modo interactivo).
+schtasks /Create /SC ONLOGON /TN $taskName /TR $taskCommand /RL LIMITED /F | Out-Null
+if ($LASTEXITCODE -eq 0) {
+  Write-Output "Scheduled task '$taskName' created for current user."
   exit 0
 }
 
-$taskCommand = "PowerShell.exe -NoProfile -ExecutionPolicy Bypass -File `"$scriptPath`""
-
-schtasks /Create /SC ONLOGON /TN $taskName /TR $taskCommand /RL LIMITED /F | Out-Null
-if ($LASTEXITCODE -ne 0) {
-  Write-Error "No se pudo crear la tarea '$taskName'."
-  exit $LASTEXITCODE
+# Si falla, intenta autoelevacion como fallback.
+Write-Output "Creacion sin elevacion fallo. Intentando con UAC..."
+$self = $MyInvocation.MyCommand.Path
+if (-not $self) {
+  Write-Error "No se pudo resolver la ruta del script para autoelevacion."
+  exit 1
 }
-
-Write-Output "Scheduled task '$taskName' created."
+Start-Process PowerShell -Verb RunAs -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$self`""
+exit 0
