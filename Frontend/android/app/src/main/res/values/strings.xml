@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Tempos</string>
+    <string name="title_activity_main">Tempos</string>
+    <string name="package_name">es.tempos.app</string>
+    <string name="custom_url_scheme">es.tempos.app</string>
+</resources>

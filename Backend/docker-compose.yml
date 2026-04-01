@@ -1,0 +1,40 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: tempos-postgres
+    environment:
+      POSTGRES_USER: tempos_user
+      POSTGRES_PASSWORD: tempos_password_dev
+      POSTGRES_DB: tempos_db
+    ports:
+      # Mapear a 5433 en el host para evitar conflictos con Postgres local en Windows
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tempos_user -d tempos_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build: .
+    container_name: tempos-api
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://tempos_user:tempos_password_dev@postgres:5432/tempos_db
+      PORT: 8080
+      FIREBASE_PROJECT_ID: tempos-app
+      GOOGLE_APPLICATION_CREDENTIALS: /app/firebase-key.json
+    ports:
+      - "8080:8080"
+    volumes:
+      - .:/app
+      - /app/node_modules
+    command: node dist/index.js
+
+volumes:
+  postgres_data:

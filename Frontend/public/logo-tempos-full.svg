@@ -1,0 +1,32 @@
+<svg width="1200" height="1200" viewBox="0 0 1200 1200" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style>
+      .brand-text { font-family: 'Space Grotesk', 'Inter', 'Segoe UI', Arial, sans-serif; font-weight: 700; letter-spacing: 0.01em; }
+    </style>
+  </defs>
+
+  <!-- Lockup horizontal centrado en lienzo cuadrado para exportar tamaños uniformes -->
+  <g transform="translate(152 600)">
+    <!-- Reloj -->
+    <g transform="translate(0 -108)">
+      <circle cx="108" cy="108" r="96" fill="none" stroke="#2563eb" stroke-width="6" opacity="0.18"/>
+      <circle cx="108" cy="108" r="88" fill="none" stroke="#2563eb" stroke-width="7"/>
+
+      <circle cx="108" cy="24" r="4.8" fill="#2563eb"/>
+      <circle cx="192" cy="108" r="4.8" fill="#2563eb"/>
+      <circle cx="108" cy="192" r="4.8" fill="#2563eb"/>
+      <circle cx="24" cy="108" r="4.8" fill="#2563eb"/>
+
+      <line x1="108" y1="108" x2="108" y2="58" stroke="#2563eb" stroke-width="6" stroke-linecap="round" opacity="0.9"/>
+      <line x1="108" y1="108" x2="149" y2="93" stroke="#60a5fa" stroke-width="5" stroke-linecap="round" opacity="0.8"/>
+
+      <circle cx="108" cy="108" r="8" fill="#2563eb"/>
+    </g>
+
+    <!-- Texto -->
+    <g transform="translate(255 22)">
+      <text x="0" y="0" class="brand-text" font-size="178" fill="#f2f2f0" dominant-baseline="middle">Tem</text>
+      <text x="336" y="0" class="brand-text" font-size="178" fill="#2563eb" dominant-baseline="middle">pos</text>
+    </g>
+  </g>
+</svg>

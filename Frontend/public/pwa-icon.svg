@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Background -->
+  <rect width="512" height="512" rx="108" fill="#0a0a0c"/>
+  <!-- Blue accent bar top -->
+  <rect x="80" y="68" width="352" height="6" rx="3" fill="#2563eb"/>
+  <!-- T letter -->
+  <text x="256" y="330" font-family="system-ui, -apple-system, sans-serif" font-size="260" font-weight="700" text-anchor="middle" fill="#f5f5f3" letter-spacing="-8">T</text>
+  <!-- Blue dot -->
+  <circle cx="330" cy="350" r="28" fill="#2563eb"/>
+</svg>

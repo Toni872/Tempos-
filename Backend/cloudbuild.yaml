@@ -1,0 +1,57 @@
+steps:
+  - name: gcr.io/cloud-builders/docker
+    id: Build image
+    args:
+      - build
+      - -t
+      - ${_IMAGE}:${COMMIT_SHA}
+      - -t
+      - ${_IMAGE}:latest
+      - .
+
+  - name: gcr.io/cloud-builders/docker
+    id: Push image
+    args:
+      - push
+      - --all-tags
+      - ${_IMAGE}
+
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    id: Deploy Cloud Run
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        set -euo pipefail
+
+        DEPLOY_ARGS=(
+          run deploy "${_SERVICE_NAME}"
+          --image "${_IMAGE}:${COMMIT_SHA}"
+          --platform managed
+          --region "${_REGION}"
+          --allow-unauthenticated
+          --port 8080
+          --set-env-vars "NODE_ENV=production,FIREBASE_PROJECT_ID=${_FIREBASE_PROJECT_ID}"
+        )
+
+        if [[ "${_DATABASE_SECRET}" != "REPLACE_ME" ]]; then
+          DEPLOY_ARGS+=(--set-secrets "DATABASE_URL=${_DATABASE_SECRET}:latest")
+        fi
+
+        if [[ "${_CLOUD_SQL_INSTANCE}" != "REPLACE_ME" ]]; then
+          DEPLOY_ARGS+=(--add-cloudsql-instances "${_CLOUD_SQL_INSTANCE}")
+        fi
+
+        gcloud "${DEPLOY_ARGS[@]}"
+
+images:
+  - ${_IMAGE}:${COMMIT_SHA}
+  - ${_IMAGE}:latest
+
+substitutions:
+  _SERVICE_NAME: tempos-api
+  _REGION: europe-west1
+  _IMAGE: gcr.io/$PROJECT_ID/tempos-api
+  _FIREBASE_PROJECT_ID: tempos-app
+  _DATABASE_SECRET: REPLACE_ME
+  _CLOUD_SQL_INSTANCE: REPLACE_ME

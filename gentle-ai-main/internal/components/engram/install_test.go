@@ -1,0 +1,60 @@
+package engram
+
+import (
+	"reflect"
+	"testing"
+
+	"github.com/gentleman-programming/gentle-ai/internal/system"
+)
+
+func TestInstallCommandByProfile(t *testing.T) {
+	tests := []struct {
+		name    string
+		profile system.PlatformProfile
+		want    [][]string
+		wantErr bool
+	}{
+		{
+			name:    "darwin uses brew tap and install",
+			profile: system.PlatformProfile{OS: "darwin", PackageManager: "brew"},
+			want:    [][]string{{"brew", "tap", "Gentleman-Programming/homebrew-tap"}, {"brew", "install", "engram"}},
+		},
+		{
+			name:    "ubuntu uses go install with correct module path",
+			profile: system.PlatformProfile{OS: "linux", LinuxDistro: system.LinuxDistroUbuntu, PackageManager: "apt"},
+			want:    [][]string{{"env", "CGO_ENABLED=0", "go", "install", "github.com/Gentleman-Programming/engram/cmd/engram@latest"}},
+		},
+		{
+			name:    "arch uses go install with correct module path",
+			profile: system.PlatformProfile{OS: "linux", LinuxDistro: system.LinuxDistroArch, PackageManager: "pacman"},
+			want:    [][]string{{"env", "CGO_ENABLED=0", "go", "install", "github.com/Gentleman-Programming/engram/cmd/engram@latest"}},
+		},
+		{
+			name:    "fedora uses go install with correct module path",
+			profile: system.PlatformProfile{OS: "linux", LinuxDistro: system.LinuxDistroFedora, PackageManager: "dnf"},
+			want:    [][]string{{"env", "CGO_ENABLED=0", "go", "install", "github.com/Gentleman-Programming/engram/cmd/engram@latest"}},
+		},
+		{
+			name:    "unsupported package manager returns error",
+			profile: system.PlatformProfile{OS: "linux", PackageManager: "zypper"},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			command, err := InstallCommand(tt.profile)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("InstallCommand() error = %v, wantErr %v", err, tt.wantErr)
+			}
+
+			if tt.wantErr {
+				return
+			}
+
+			if !reflect.DeepEqual(command, tt.want) {
+				t.Fatalf("InstallCommand() = %v, want %v", command, tt.want)
+			}
+		})
+	}
+}

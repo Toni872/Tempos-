@@ -1,0 +1,29 @@
+name: Vertex AutoML Training
+
+on:
+  workflow_dispatch:
+
+jobs:
+  train:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v1
+        with:
+          version: 'latest'
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v1
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+      - name: Install Python deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r Backend/scripts/requirements.txt
+      - name: Export data to GCS and start AutoML training
+        env:
+          PROJECT_ID: tempos-project
+          BUCKET: bucket-quickstart_tempos-project
+        run: |
+          python Backend/scripts/export_fichas_to_gcs.py --bucket gs://${{ env.BUCKET }}
+          python Backend/scripts/vertex_automl_train.py --project ${{ env.PROJECT_ID }} --bucket ${{ env.BUCKET }}
