@@ -1,19 +1,80 @@
 import { Router, Request, Response } from 'express';
 import { AppDataSource } from '../database.js';
 import { Ficha } from '../entities/Ficha.js';
+import { User } from '../entities/User.js';
 import { firebaseAuthMiddleware } from '../middleware/auth.middleware.js';
 import { asyncHandler } from '../middleware/errorHandler.js';
-import { Between, LessThanOrEqual, MoreThanOrEqual } from 'typeorm';
+import { logAction } from '../utils/auditLog.js';
+import { appUserContextMiddleware, getAuthContext, requirePermission } from '../middleware/request-context.middleware.js';
 import {
   buildValidationError,
+  closeFichaPeriodSchema,
   createFichaSchema,
   dailyStatsQuerySchema,
   listFichasQuerySchema,
+  requestFichaCorrectionSchema,
+  reviewFichaCorrectionSchema,
   toMinutes,
   updateFichaSchema,
 } from '../utils/validation.js';
+import { getMadridDateTimeParts, toUtcMidnightDate } from '../utils/timezone.js';
+import { applyFichaCorrection, buildFichaCorrectionChanges, type FichaCorrectionChanges } from '../utils/ficha-correction.js';
 
 const router = Router();
+
+type FichaCorrectionRequestRecord = {
+  status: 'pending' | 'approved' | 'rejected';
+  reason: string;
+  requestedAt: string;
+  requestedBy: string;
+  proposedChanges: FichaCorrectionChanges;
+  reviewedAt?: string;
+  reviewedBy?: string;
+  reviewComment?: string;
+};
+
+/**
+ * Returns a ficha only if it belongs to the authenticated user AND to their company.
+ * Defense-in-depth: prevents cross-tenant access even if UIDs were ever reused.
+ */
+async function findScopedFicha(id: string, uid: string, companyId: string): Promise<Ficha | null> {
+  return AppDataSource.getRepository(Ficha)
+    .createQueryBuilder('ficha')
+    .innerJoin(User, 'user', 'user.uid = ficha.userId')
+    .where('ficha.id = :id', { id })
+    .andWhere('ficha.userId = :uid', { uid })
+    .andWhere('user.companyId = :companyId', { companyId })
+    .getOne();
+}
+
+function getFichaCorrectionRequest(ficha: Ficha): FichaCorrectionRequestRecord | undefined {
+  const correctionRequest = ficha.metadata?.correctionRequest;
+  if (!correctionRequest || typeof correctionRequest !== 'object') {
+    return undefined;
+  }
+
+  return correctionRequest as FichaCorrectionRequestRecord;
+}
+
+function buildFichaBaseState(ficha: Ficha) {
+  return {
+    startTime: ficha.startTime,
+    endTime: ficha.endTime,
+    description: ficha.description,
+    projectCode: ficha.projectCode,
+    hoursWorked: ficha.hoursWorked,
+  };
+}
+
+function upsertFichaCorrectionMetadata(
+  ficha: Ficha,
+  correctionRequest: FichaCorrectionRequestRecord,
+): void {
+  ficha.metadata = {
+    ...(ficha.metadata ?? {}),
+    correctionRequest,
+  };
+}
 
 /**
  * POST /api/v1/fichas
@@ -22,8 +83,9 @@ const router = Router();
 router.post(
   '/',
   firebaseAuthMiddleware,
+  appUserContextMiddleware,
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
-    const firebaseUser = (req as any).firebaseUser;
+    const auth = getAuthContext(req);
     const parseBody = createFichaSchema.safeParse(req.body);
 
     if (!parseBody.success) {
@@ -44,7 +106,7 @@ router.post(
     }
 
     const ficha = fichaRepository.create({
-      userId: firebaseUser.uid,
+      userId: auth.uid,
       date: new Date(date),
       startTime,
       endTime: endTime || undefined,
@@ -77,8 +139,9 @@ router.post(
 router.get(
   '/',
   firebaseAuthMiddleware,
+  appUserContextMiddleware,
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
-    const firebaseUser = (req as any).firebaseUser;
+    const auth = getAuthContext(req);
     const parseQuery = listFichasQuerySchema.safeParse(req.query);
 
     if (!parseQuery.success) {
@@ -88,30 +151,28 @@ router.get(
 
     const { startDate, endDate, status, limit, offset } = parseQuery.data;
 
-    const fichaRepository = AppDataSource.getRepository(Ficha);
-
-    // Construir where clause
-    const where: any = { userId: firebaseUser.uid };
+    const qb = AppDataSource.getRepository(Ficha)
+      .createQueryBuilder('ficha')
+      .innerJoin(User, 'user', 'user.uid = ficha.userId')
+      .where('ficha.userId = :uid', { uid: auth.uid })
+      .andWhere('user.companyId = :companyId', { companyId: auth.companyId })
+      .orderBy('ficha.date', 'DESC')
+      .addOrderBy('ficha.startTime', 'DESC')
+      .take(limit)
+      .skip(offset);
 
     if (status) {
-      where.status = status;
+      qb.andWhere('ficha.status = :status', { status });
     }
-
-    // Date range filter
     if (startDate && endDate) {
-      where.date = Between(new Date(startDate as string), new Date(endDate as string));
+      qb.andWhere('ficha.date BETWEEN :startDate AND :endDate', { startDate, endDate });
     } else if (startDate) {
-      where.date = MoreThanOrEqual(new Date(startDate as string));
+      qb.andWhere('ficha.date >= :startDate', { startDate });
     } else if (endDate) {
-      where.date = LessThanOrEqual(new Date(endDate as string));
+      qb.andWhere('ficha.date <= :endDate', { endDate });
     }
 
-    const [fichas, total] = await fichaRepository.findAndCount({
-      where,
-      order: { date: 'DESC', startTime: 'DESC' },
-      take: limit,
-      skip: offset,
-    });
+    const [fichas, total] = await qb.getManyAndCount();
 
     res.json({
       data: fichas.map((f) => ({
@@ -140,15 +201,12 @@ router.get(
 router.get(
   '/:id',
   firebaseAuthMiddleware,
+  appUserContextMiddleware,
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
-    const firebaseUser = (req as any).firebaseUser;
+    const auth = getAuthContext(req);
     const { id } = req.params;
 
-    const fichaRepository = AppDataSource.getRepository(Ficha);
-
-    const ficha = await fichaRepository.findOne({
-      where: { id, userId: firebaseUser.uid },
-    });
+    const ficha = await findScopedFicha(id, auth.uid, auth.companyId);
 
     if (!ficha) {
       res.status(404).json({ error: 'Ficha no encontrada' });
@@ -177,8 +235,9 @@ router.get(
 router.put(
   '/:id',
   firebaseAuthMiddleware,
+  appUserContextMiddleware,
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
-    const firebaseUser = (req as any).firebaseUser;
+    const auth = getAuthContext(req);
     const { id } = req.params;
     const parseBody = updateFichaSchema.safeParse(req.body);
 
@@ -189,11 +248,7 @@ router.put(
 
     const { endTime, description, projectCode, status, metadata } = parseBody.data;
 
-    const fichaRepository = AppDataSource.getRepository(Ficha);
-
-    let ficha = await fichaRepository.findOne({
-      where: { id, userId: firebaseUser.uid },
-    });
+    const ficha = await findScopedFicha(id, auth.uid, auth.companyId);
 
     if (!ficha) {
       res.status(404).json({ error: 'Ficha no encontrada' });
@@ -228,7 +283,7 @@ router.put(
       ficha.metadata = metadata;
     }
 
-    await fichaRepository.save(ficha);
+    await AppDataSource.getRepository(Ficha).save(ficha);
 
     res.json({
       message: 'Ficha actualizada',
@@ -247,21 +302,279 @@ router.put(
 );
 
 /**
+ * POST /api/v1/fichas/:id/request-correction
+ * Solicita una correccion sobre una ficha propia ya registrada.
+ */
+router.post(
+  '/:id/request-correction',
+  firebaseAuthMiddleware,
+  appUserContextMiddleware,
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const auth = getAuthContext(req);
+    const { id } = req.params;
+    const parsed = requestFichaCorrectionSchema.safeParse(req.body);
+
+    if (!parsed.success) {
+      res.status(400).json(buildValidationError(parsed.error));
+      return;
+    }
+
+    const ficha = await findScopedFicha(id, auth.uid, auth.companyId);
+    if (!ficha) {
+      res.status(404).json({ error: 'Ficha no encontrada' });
+      return;
+    }
+
+    if (ficha.status === 'archived') {
+      res.status(409).json({ error: 'No se pueden solicitar correcciones sobre fichas archivadas.' });
+      return;
+    }
+
+    const activeRequest = getFichaCorrectionRequest(ficha);
+    if (activeRequest?.status === 'pending') {
+      res.status(409).json({ error: 'Ya existe una solicitud de corrección pendiente para esta ficha.' });
+      return;
+    }
+
+    let proposedChanges: FichaCorrectionChanges;
+    try {
+      proposedChanges = buildFichaCorrectionChanges(buildFichaBaseState(ficha), {
+        startTime: parsed.data.startTime,
+        endTime: parsed.data.endTime,
+        description: parsed.data.description,
+        projectCode: parsed.data.projectCode,
+      });
+    } catch (error) {
+      res.status(400).json({ error: error instanceof Error ? error.message : 'Solicitud de corrección inválida.' });
+      return;
+    }
+
+    const correctionRequest: FichaCorrectionRequestRecord = {
+      status: 'pending',
+      reason: parsed.data.reason,
+      requestedAt: new Date().toISOString(),
+      requestedBy: auth.uid,
+      proposedChanges,
+    };
+
+    upsertFichaCorrectionMetadata(ficha, correctionRequest);
+    ficha.status = 'disputed';
+    await AppDataSource.getRepository(Ficha).save(ficha);
+
+    await logAction({
+      userId: auth.uid,
+      companyId: auth.companyId,
+      action: 'ficha_correction_requested',
+      metadata: { fichaId: ficha.id, proposedChanges },
+      ip: req.ip,
+      userAgent: req.get('user-agent') || undefined,
+    });
+
+    res.status(202).json({
+      message: 'Solicitud de corrección registrada',
+      correctionRequest,
+      ficha: {
+        id: ficha.id,
+        status: ficha.status,
+        metadata: ficha.metadata,
+      },
+    });
+  })
+);
+
+/**
+ * POST /api/v1/fichas/:id/review-correction
+ * Revisa una solicitud de corrección pendiente dentro de la empresa.
+ */
+router.post(
+  '/:id/review-correction',
+  firebaseAuthMiddleware,
+  appUserContextMiddleware,
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const auth = getAuthContext(req);
+    if (!requirePermission(req, res, 'review_ficha_correction')) {
+      return;
+    }
+
+    const { id } = req.params;
+    const parsed = reviewFichaCorrectionSchema.safeParse(req.body);
+
+    if (!parsed.success) {
+      res.status(400).json(buildValidationError(parsed.error));
+      return;
+    }
+
+    const ficha = await AppDataSource.getRepository(Ficha)
+      .createQueryBuilder('ficha')
+      .innerJoin(User, 'user', 'user.uid = ficha.userId')
+      .where('ficha.id = :id', { id })
+      .andWhere('user.companyId = :companyId', { companyId: auth.companyId })
+      .getOne();
+
+    if (!ficha) {
+      res.status(404).json({ error: 'Ficha no encontrada' });
+      return;
+    }
+
+    const correctionRequest = getFichaCorrectionRequest(ficha);
+    if (!correctionRequest || correctionRequest.status !== 'pending') {
+      res.status(409).json({ error: 'La ficha no tiene una solicitud de corrección pendiente.' });
+      return;
+    }
+
+    const reviewedRequest: FichaCorrectionRequestRecord = {
+      ...correctionRequest,
+      status: parsed.data.decision,
+      reviewedAt: new Date().toISOString(),
+      reviewedBy: auth.uid,
+      reviewComment: parsed.data.comment,
+    };
+
+    if (parsed.data.decision === 'approved') {
+      const nextState = applyFichaCorrection(buildFichaBaseState(ficha), correctionRequest.proposedChanges);
+      ficha.startTime = nextState.startTime;
+      ficha.endTime = nextState.endTime;
+      ficha.description = nextState.description;
+      ficha.projectCode = nextState.projectCode;
+      ficha.hoursWorked = nextState.hoursWorked;
+      ficha.status = ficha.endTime ? 'confirmed' : 'draft';
+    } else {
+      ficha.status = ficha.endTime ? 'confirmed' : 'draft';
+    }
+
+    upsertFichaCorrectionMetadata(ficha, reviewedRequest);
+    await AppDataSource.getRepository(Ficha).save(ficha);
+
+    await logAction({
+      userId: auth.uid,
+      companyId: auth.companyId,
+      action: parsed.data.decision === 'approved' ? 'ficha_correction_approved' : 'ficha_correction_rejected',
+      metadata: { fichaId: ficha.id, requestedBy: correctionRequest.requestedBy },
+      ip: req.ip,
+      userAgent: req.get('user-agent') || undefined,
+    });
+
+    res.json({
+      message: parsed.data.decision === 'approved'
+        ? 'Corrección aplicada sobre la ficha'
+        : 'Corrección rechazada',
+      ficha: {
+        id: ficha.id,
+        date: ficha.date,
+        startTime: ficha.startTime,
+        endTime: ficha.endTime,
+        hoursWorked: ficha.hoursWorked,
+        description: ficha.description,
+        projectCode: ficha.projectCode,
+        status: ficha.status,
+        metadata: ficha.metadata,
+      },
+    });
+  })
+);
+
+/**
+ * POST /api/v1/fichas/close-period
+ * Cierra un periodo archivando fichas confirmadas (tenant-aware).
+ */
+router.post(
+  '/close-period',
+  firebaseAuthMiddleware,
+  appUserContextMiddleware,
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const auth = getAuthContext(req);
+    if (!requirePermission(req, res, 'close_ficha_period')) {
+      return;
+    }
+
+    const parsed = closeFichaPeriodSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json(buildValidationError(parsed.error));
+      return;
+    }
+
+    const { startDate, endDate, userId } = parsed.data;
+
+    const qbDisputed = AppDataSource.getRepository(Ficha)
+      .createQueryBuilder('ficha')
+      .innerJoin(User, 'user', 'user.uid = ficha.userId')
+      .where('user.companyId = :companyId', { companyId: auth.companyId })
+      .andWhere('ficha.date BETWEEN :startDate AND :endDate', { startDate, endDate })
+      .andWhere('ficha.status = :status', { status: 'disputed' });
+
+    if (userId) {
+      qbDisputed.andWhere('ficha.userId = :userId', { userId });
+    }
+
+    const disputedCount = await qbDisputed.getCount();
+    if (disputedCount > 0) {
+      res.status(409).json({
+        error: 'No se puede cerrar el periodo mientras existan fichas en disputa.',
+        disputedCount,
+      });
+      return;
+    }
+
+    const qbConfirmed = AppDataSource.getRepository(Ficha)
+      .createQueryBuilder('ficha')
+      .innerJoin(User, 'user', 'user.uid = ficha.userId')
+      .where('user.companyId = :companyId', { companyId: auth.companyId })
+      .andWhere('ficha.date BETWEEN :startDate AND :endDate', { startDate, endDate })
+      .andWhere('ficha.status = :status', { status: 'confirmed' })
+      .select('ficha.id', 'id');
+
+    if (userId) {
+      qbConfirmed.andWhere('ficha.userId = :userId', { userId });
+    }
+
+    const rows = await qbConfirmed.getRawMany<{ id: string }>();
+    const ids = rows.map((row) => row.id);
+
+    if (ids.length > 0) {
+      await AppDataSource.getRepository(Ficha)
+        .createQueryBuilder()
+        .update(Ficha)
+        .set({ status: 'archived' })
+        .whereInIds(ids)
+        .execute();
+    }
+
+    await logAction({
+      userId: auth.uid,
+      companyId: auth.companyId,
+      action: 'ficha_period_closed',
+      metadata: {
+        startDate,
+        endDate,
+        userId: userId ?? null,
+        archivedCount: ids.length,
+      },
+      ip: req.ip,
+      userAgent: req.get('user-agent') || undefined,
+    });
+
+    res.json({
+      message: 'Periodo cerrado correctamente',
+      archivedCount: ids.length,
+      scope: userId ? 'user' : 'company',
+      range: { startDate, endDate },
+    });
+  })
+);
+
+/**
  * DELETE /api/v1/fichas/:id
  * Soft delete (archive) ficha
  */
 router.delete(
   '/:id',
   firebaseAuthMiddleware,
+  appUserContextMiddleware,
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
-    const firebaseUser = (req as any).firebaseUser;
+    const auth = getAuthContext(req);
     const { id } = req.params;
 
-    const fichaRepository = AppDataSource.getRepository(Ficha);
-
-    let ficha = await fichaRepository.findOne({
-      where: { id, userId: firebaseUser.uid },
-    });
+    const ficha = await findScopedFicha(id, auth.uid, auth.companyId);
 
     if (!ficha) {
       res.status(404).json({ error: 'Ficha no encontrada' });
@@ -270,7 +583,7 @@ router.delete(
 
     // Soft delete: cambiar status a archived
     ficha.status = 'archived';
-    await fichaRepository.save(ficha);
+    await AppDataSource.getRepository(Ficha).save(ficha);
 
     res.json({
       message: 'Ficha archivada',
@@ -286,8 +599,9 @@ router.delete(
 router.get(
   '/stats/daily',
   firebaseAuthMiddleware,
+  appUserContextMiddleware,
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
-    const firebaseUser = (req as any).firebaseUser;
+    const auth = getAuthContext(req);
     const parseQuery = dailyStatsQuerySchema.safeParse(req.query);
 
     if (!parseQuery.success) {
@@ -297,18 +611,18 @@ router.get(
 
     const { startDate, endDate } = parseQuery.data;
 
-    const fichaRepository = AppDataSource.getRepository(Ficha);
-
-    const where: any = {
-      userId: firebaseUser.uid,
-      status: 'confirmed',
-    };
+    const qbStats = AppDataSource.getRepository(Ficha)
+      .createQueryBuilder('ficha')
+      .innerJoin(User, 'user', 'user.uid = ficha.userId')
+      .where('ficha.userId = :uid', { uid: auth.uid })
+      .andWhere('user.companyId = :companyId', { companyId: auth.companyId })
+      .andWhere('ficha.status = :status', { status: 'confirmed' });
 
     if (startDate && endDate) {
-      where.date = Between(new Date(startDate), new Date(endDate));
+      qbStats.andWhere('ficha.date BETWEEN :startDate AND :endDate', { startDate, endDate });
     }
 
-    const fichas = await fichaRepository.find({ where });
+    const fichas = await qbStats.getMany();
 
     // Agrupar por día
     const dailyStats = fichas.reduce(
@@ -333,6 +647,106 @@ router.get(
     res.json({
       data: Object.values(dailyStats).sort((a, b) => a.date.localeCompare(b.date)),
       total: Object.keys(dailyStats).length,
+    });
+  })
+);
+
+/**
+ * POST /api/v1/fichas/clockin
+ * Registrar hora de entrada (crea ficha con startTime = ahora)
+ */
+router.post(
+  '/clockin',
+  firebaseAuthMiddleware,
+  appUserContextMiddleware,
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const auth = getAuthContext(req);
+    const { dateIso, timeHHMM } = getMadridDateTimeParts(new Date());
+    const startTime = timeHHMM;
+    const todayDate = toUtcMidnightDate(dateIso);
+
+    const fichaRepository = AppDataSource.getRepository(Ficha);
+
+    // Evitar fichas duplicadas si ya hay una entrada activa hoy
+    const openFicha = await fichaRepository
+      .createQueryBuilder('ficha')
+      .innerJoin(User, 'user', 'user.uid = ficha.userId')
+      .where('ficha.userId = :uid', { uid: auth.uid })
+      .andWhere('user.companyId = :companyId', { companyId: auth.companyId })
+      .andWhere('ficha.date = :todayDate', { todayDate: dateIso })
+      .andWhere('ficha.endTime IS NULL')
+      .getOne();
+
+    if (openFicha) {
+      res.status(409).json({ error: 'Ya hay una jornada activa. Cierra la sesión actual antes de fichar de nuevo.' });
+      return;
+    }
+
+    const { description, projectCode } = req.body as { description?: string; projectCode?: string };
+
+    const ficha = fichaRepository.create({
+      userId: auth.uid,
+      date: todayDate,
+      startTime,
+      description,
+      projectCode,
+      status: 'draft',
+    });
+
+    await fichaRepository.save(ficha);
+
+    res.status(201).json({
+      message: 'Entrada registrada',
+      ficha: { id: ficha.id, date: ficha.date, startTime: ficha.startTime, status: ficha.status },
+    });
+  })
+);
+
+/**
+ * POST /api/v1/fichas/clockout
+ * Registrar hora de salida (cierra la ficha abierta de hoy)
+ */
+router.post(
+  '/clockout',
+  firebaseAuthMiddleware,
+  appUserContextMiddleware,
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const auth = getAuthContext(req);
+    const { dateIso, timeHHMM } = getMadridDateTimeParts(new Date());
+    const endTime = timeHHMM;
+
+    const fichaRepository = AppDataSource.getRepository(Ficha);
+
+    const openFicha = await fichaRepository
+      .createQueryBuilder('ficha')
+      .innerJoin(User, 'user', 'user.uid = ficha.userId')
+      .where('ficha.userId = :uid', { uid: auth.uid })
+      .andWhere('user.companyId = :companyId', { companyId: auth.companyId })
+      .andWhere('ficha.date = :todayDate', { todayDate: dateIso })
+      .andWhere('ficha.endTime IS NULL')
+      .getOne();
+
+    if (!openFicha) {
+      res.status(404).json({ error: 'No hay jornada activa para hoy.' });
+      return;
+    }
+
+    openFicha.endTime = endTime;
+    openFicha.hoursWorked = parseFloat(((toMinutes(endTime) - toMinutes(openFicha.startTime)) / 60).toFixed(2));
+    openFicha.status = 'confirmed';
+
+    await fichaRepository.save(openFicha);
+
+    res.json({
+      message: 'Salida registrada',
+      ficha: {
+        id: openFicha.id,
+        date: openFicha.date,
+        startTime: openFicha.startTime,
+        endTime: openFicha.endTime,
+        hoursWorked: openFicha.hoursWorked,
+        status: openFicha.status,
+      },
     });
   })
 );

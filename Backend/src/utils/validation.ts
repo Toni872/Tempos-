@@ -104,6 +104,46 @@ export const dailyStatsQuerySchema = z.object({
   }
 });
 
+export const requestFichaCorrectionSchema = z.object({
+  startTime: timeStringSchema.optional(),
+  endTime: timeStringSchema.optional(),
+  description: z.string().trim().max(500, 'description admite maximo 500 caracteres.').optional(),
+  projectCode: z.string().trim().max(80, 'projectCode admite maximo 80 caracteres.').optional(),
+  reason: z.string().trim().min(10, 'reason debe tener al menos 10 caracteres.').max(500, 'reason admite maximo 500 caracteres.'),
+}).superRefine((value, ctx) => {
+  const hasAnyChange = value.startTime !== undefined
+    || value.endTime !== undefined
+    || value.description !== undefined
+    || value.projectCode !== undefined;
+
+  if (!hasAnyChange) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['reason'],
+      message: 'Debes proponer al menos un cambio sobre la ficha.',
+    });
+  }
+});
+
+export const reviewFichaCorrectionSchema = z.object({
+  decision: z.enum(['approved', 'rejected']),
+  comment: z.string().trim().max(500, 'comment admite maximo 500 caracteres.').optional(),
+});
+
+export const closeFichaPeriodSchema = z.object({
+  startDate: dateStringSchema,
+  endDate: dateStringSchema,
+  userId: z.string().uuid('userId debe ser un UUID válido.').optional(),
+}).superRefine((value, ctx) => {
+  if (value.startDate > value.endDate) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['startDate'],
+      message: 'startDate no puede ser mayor que endDate.',
+    });
+  }
+});
+
 export const createAbsenceSchema = z.object({
   type: absenceTypeSchema,
   startDate: dateStringSchema,
