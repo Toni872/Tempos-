@@ -40,40 +40,26 @@ function App() {
   return (
     <>
     {showBanner && (
-      <div style={{
-        position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 9999,
-        background: 'rgba(10,10,12,0.97)', backdropFilter: 'blur(20px)',
-        borderTop: '1px solid rgba(37,99,235,0.3)',
-        padding: '14px 20px',
-        display: 'flex', alignItems: 'center', gap: 12,
-        fontFamily: 'system-ui, -apple-system, sans-serif',
-      }}>
-        <img src="/pwa-icon.svg" alt="Tempos" width="36" height="36" style={{ borderRadius: 8, flexShrink: 0 }} />
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <p style={{ margin: 0, fontSize: 13.5, fontWeight: 600, color: '#f5f5f3', lineHeight: 1.3 }}>
+      <div className="tp-pwa-banner">
+        <img src="/pwa-icon.svg" alt="Tempos" width="36" height="36" className="tp-pwa-banner__icon" />
+        <div className="tp-pwa-banner__text">
+          <p className="tp-pwa-banner__title">
             Instala Tempos
           </p>
-          <p style={{ margin: 0, fontSize: 12, color: '#8e8e89', lineHeight: 1.4 }}>
+          <p className="tp-pwa-banner__subtitle">
             Acceso rápido desde tu pantalla de inicio
           </p>
         </div>
         <button
           onClick={handleInstall}
-          style={{
-            background: '#2563eb', color: '#fff', border: 'none',
-            borderRadius: 9, padding: '8px 16px', fontSize: 13, fontWeight: 600,
-            cursor: 'pointer', flexShrink: 0,
-          }}
+          className="tp-pwa-banner__install"
         >
           Instalar
         </button>
         <button
           onClick={dismissBanner}
           aria-label="Cerrar"
-          style={{
-            background: 'none', border: 'none', color: '#71716d',
-            cursor: 'pointer', padding: 6, fontSize: 18, lineHeight: 1, flexShrink: 0,
-          }}
+          className="tp-pwa-banner__close"
         >
           ×
         </button>

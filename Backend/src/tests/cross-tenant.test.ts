@@ -345,6 +345,146 @@ testWithDb('integration: reports summary query includes only confirmed rows in s
   }
 });
 
+testWithDb('integration: absences query scoping excludes rows from other tenants', async () => {
+  const { AppDataSource } = await import('../database.js');
+  const { User } = await import('../entities/User.js');
+  const { Absence } = await import('../entities/Absence.js');
+
+  if (!AppDataSource.isInitialized) {
+    await AppDataSource.initialize();
+  }
+
+  const userRepo = AppDataSource.getRepository(User);
+  const absenceRepo = AppDataSource.getRepository(Absence);
+  const seedId = `${Date.now()}-absence-scope`;
+
+  const userA = `tenant-a-absence-${seedId}`;
+  const userB = `tenant-b-absence-${seedId}`;
+
+  await userRepo.save([
+    userRepo.create({
+      uid: userA,
+      email: `${userA}@tempos.test`,
+      displayName: 'Tenant A Absence User',
+      role: 'employee',
+      companyId: 'tenant-a',
+      status: 'active',
+    }),
+    userRepo.create({
+      uid: userB,
+      email: `${userB}@tempos.test`,
+      displayName: 'Tenant B Absence User',
+      role: 'employee',
+      companyId: 'tenant-b',
+      status: 'active',
+    }),
+  ]);
+
+  const inserted = await absenceRepo.save([
+    absenceRepo.create({
+      userId: userA,
+      type: 'vacation',
+      startDate: new Date('2026-04-08'),
+      endDate: new Date('2026-04-08'),
+      status: 'approved',
+    }),
+    absenceRepo.create({
+      userId: userB,
+      type: 'vacation',
+      startDate: new Date('2026-04-08'),
+      endDate: new Date('2026-04-08'),
+      status: 'approved',
+    }),
+  ]);
+
+  try {
+    const scopedRows = await absenceRepo
+      .createQueryBuilder('absence')
+      .innerJoin(User, 'user', 'user.uid = absence.userId')
+      .where('user.companyId = :companyId', { companyId: 'tenant-a' })
+      .orderBy('absence.createdAt', 'DESC')
+      .getMany();
+
+    assert.ok(scopedRows.every((row) => row.userId === userA));
+    assert.ok(scopedRows.some((row) => row.id === inserted[0]?.id));
+    assert.ok(!scopedRows.some((row) => row.id === inserted[1]?.id));
+  } finally {
+    await absenceRepo.delete(inserted.map((row) => row.id));
+    await userRepo.delete({ uid: userA });
+    await userRepo.delete({ uid: userB });
+  }
+});
+
+testWithDb('integration: documents query scoping excludes rows from other tenants', async () => {
+  const { AppDataSource } = await import('../database.js');
+  const { User } = await import('../entities/User.js');
+  const { Document } = await import('../entities/Document.js');
+
+  if (!AppDataSource.isInitialized) {
+    await AppDataSource.initialize();
+  }
+
+  const userRepo = AppDataSource.getRepository(User);
+  const documentRepo = AppDataSource.getRepository(Document);
+  const seedId = `${Date.now()}-document-scope`;
+
+  const userA = `tenant-a-document-${seedId}`;
+  const userB = `tenant-b-document-${seedId}`;
+
+  await userRepo.save([
+    userRepo.create({
+      uid: userA,
+      email: `${userA}@tempos.test`,
+      displayName: 'Tenant A Document User',
+      role: 'employee',
+      companyId: 'tenant-a',
+      status: 'active',
+    }),
+    userRepo.create({
+      uid: userB,
+      email: `${userB}@tempos.test`,
+      displayName: 'Tenant B Document User',
+      role: 'employee',
+      companyId: 'tenant-b',
+      status: 'active',
+    }),
+  ]);
+
+  const inserted = await documentRepo.save([
+    documentRepo.create({
+      userId: userA,
+      title: 'Nomina Abril A',
+      type: 'nomina',
+      status: 'delivered',
+      filename: 'nomina-a.pdf',
+    }),
+    documentRepo.create({
+      userId: userB,
+      title: 'Nomina Abril B',
+      type: 'nomina',
+      status: 'delivered',
+      filename: 'nomina-b.pdf',
+    }),
+  ]);
+
+  try {
+    const scopedRows = await documentRepo
+      .createQueryBuilder('document')
+      .innerJoin(User, 'user', 'user.uid = document.userId')
+      .where('user.companyId = :companyId', { companyId: 'tenant-a' })
+      .orderBy('document.createdAt', 'DESC')
+      .getMany();
+
+    assert.ok(scopedRows.every((row) => row.userId === userA));
+    assert.ok(scopedRows.some((row) => row.id === inserted[0]?.id));
+    assert.ok(!scopedRows.some((row) => row.id === inserted[1]?.id));
+  } finally {
+    await documentRepo.delete(inserted.map((row) => row.id));
+    await userRepo.delete({ uid: userA });
+    await userRepo.delete({ uid: userB });
+  }
+});
+
 testWithDb('integration: audit-log query scoping keeps events inside tenant', async () => {
   const { AppDataSource } = await import('../database.js');
   const { AuditLog } = await import('../entities/AuditLog.js');
