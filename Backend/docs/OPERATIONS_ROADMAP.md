@@ -81,6 +81,24 @@ Resultado esperado:
 
 - Secrets creados en GitHub: `GCP_SA_KEY`, `GCP_PROJECT`, `GCS_BUCKET`, `VERTEX_REGION`.
 
+## Fase 4 - Hardening continuo de dependencias
+
+Objetivo: reducir exposición por vulnerabilidades en runtime y herramientas de build.
+
+Checklist continuo (mensual):
+
+- [ ] Ejecutar `npm audit --json` en Backend y Frontend y registrar severidades.
+- [ ] Aplicar upgrades no disruptivos (minor/patch) y validar build + tests.
+- [ ] Planificar upgrades mayores por ola (tooling primero, runtime después).
+- [ ] Revisar dependencias locales tipo `file:` para evitar acoplamientos erróneos.
+- [ ] Mantener bloqueo de auth (rate limiting) y validación de payloads en endpoints críticos.
+
+KPI de seguridad recomendados:
+
+- Vulnerabilidades críticas: 0
+- Vulnerabilidades altas en runtime: 0
+- Tiempo máximo de remediación (high/critical): 7 días
+
 ## Criterio de cierre
 
 Se considera completado cuando:
@@ -88,3 +106,4 @@ Se considera completado cuando:
 1. `setup_secret_manager.ps1` termina en OK.
 2. `setup_cloud_scheduler.ps1` termina en OK.
 3. La checklist de hardening queda completa.
+4. El ciclo mensual de hardening de dependencias queda calendarizado.
