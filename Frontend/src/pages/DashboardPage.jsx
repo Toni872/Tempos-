@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { useAuth } from '@/hooks/useAuth';
 import UserMenu from '@/components/UserMenu';
 import ModalBase from '../components/dashboard/ModalBase';
 import Loader from '../components/dashboard/Loader';
@@ -12,6 +11,7 @@ import AusenciaForm from '../components/dashboard/AusenciaForm';
 import {
   getClientSession,
   setClientSession,
+  clearClientSession,
   pingStatus,
   getMe,
   getDailyStats,
@@ -47,7 +47,11 @@ function formatDate(value) {
 export default function DashboardPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { logout } = useAuth();
+
+  const handleLogout = useCallback(() => {
+    clearClientSession();
+    navigate('/login', { replace: true });
+  }, [navigate]);
 
   const [isAdmin, setIsAdmin] = useState(location.state?.isAdmin ?? false);
   const [activeTab, setActiveTab] = useState('Inicio');
@@ -561,7 +565,7 @@ export default function DashboardPage() {
         </div>
 
         <div style={{ marginTop: 'auto' }}>
-          <button className="tp-btn tp-btn-ghost" style={{ width: '100%', borderRadius: 10, padding: '10px 12px' }} onClick={logout}>
+          <button className="tp-btn tp-btn-ghost" style={{ width: '100%', borderRadius: 10, padding: '10px 12px' }} onClick={handleLogout}>
             Cerrar sesion
           </button>
         </div>
@@ -573,7 +577,7 @@ export default function DashboardPage() {
             <div style={{ fontSize: 13, color: 'var(--t2)' }}>{now.toLocaleDateString('es-ES')}</div>
             <h1 style={{ fontFamily: 'var(--ff-head)', fontSize: 28, margin: 0 }}>{activeTab}</h1>
           </div>
-          <UserMenu />
+          <UserMenu onLogout={handleLogout} />
         </header>
 
         <div style={{ borderRadius: 10, border: apiStatus.ok ? '1px solid rgba(34,197,94,0.35)' : '1px solid rgba(239,68,68,0.35)', background: apiStatus.ok ? 'rgba(34,197,94,0.08)' : 'rgba(239,68,68,0.08)', padding: '10px 12px', fontSize: 13, color: apiStatus.ok ? '#86efac' : '#fecaca', fontWeight: 600 }}>
