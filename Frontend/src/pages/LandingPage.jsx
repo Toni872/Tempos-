@@ -889,12 +889,28 @@ function HeroImageSlider() {
 
 export default function LandingPage() {
   const navigate = useNavigate();
+  const [navOpen, setNavOpen] = useState(false);
+
+  const scrollToSection = (id) => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+    setNavOpen(false);
+  };
 
   const bindPrefetch = (path) => ({
     onMouseEnter: () => prefetchRoute(path),
     onFocus: () => prefetchRoute(path),
     onTouchStart: () => prefetchRoute(path),
   });
+
+  useEffect(() => {
+    document.body.style.overflow = navOpen ? 'hidden' : '';
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [navOpen]);
 
   // Reveal refs
   const [heroRef, heroVis]         = useReveal(0.05);
@@ -1036,6 +1052,72 @@ export default function LandingPage() {
   return (
     <div className="tp-root">
       <style>{GLOBAL_CSS}</style>
+
+      <header className="tp-nav" role="banner" aria-label="Navegación principal">
+        <button
+          onClick={() => scrollToSection('inicio')}
+          style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'none', border: 'none', color: 'inherit', cursor: 'pointer' }}
+          aria-label="Ir al inicio"
+        >
+          <div style={{
+            width: 28,
+            height: 28,
+            borderRadius: 8,
+            background: 'linear-gradient(145deg, var(--mg), #1d4ed8)',
+            display: 'grid',
+            placeItems: 'center',
+            boxShadow: '0 8px 20px rgba(37,99,235,0.28)',
+            flexShrink: 0,
+          }}>
+            <span style={{ fontSize: 14, fontWeight: 700, color: '#fff', lineHeight: 1 }}>T</span>
+          </div>
+          <div style={{ textAlign: 'left' }}>
+            <div style={{ fontFamily: 'var(--ff-head)', fontWeight: 700, fontSize: 15, letterSpacing: 0.2 }}>Tempos</div>
+            <div style={{ fontSize: 10.5, color: 'var(--t2)', letterSpacing: 0.4 }}>Control horario legal</div>
+          </div>
+        </button>
+
+        <nav className="tp-nav-links" aria-label="Secciones">
+          <button className="tp-nav-link" onClick={() => scrollToSection('inicio')}>Inicio</button>
+          <button className="tp-nav-link" onClick={() => scrollToSection('producto')}>Producto</button>
+          <button className="tp-nav-link" onClick={() => scrollToSection('proceso')}>Proceso</button>
+          <button className="tp-nav-link" onClick={() => scrollToSection('precios')}>Precios</button>
+          <button className="tp-nav-link" onClick={() => scrollToSection('faqs')}>FAQs</button>
+        </nav>
+
+        <div className="tp-nav-actions">
+          <Link to="/login" className="tp-btn tp-btn-ghost" {...bindPrefetch('/login')}>Entrar</Link>
+          <Link to="/trial" className="tp-btn tp-btn-primary" {...bindPrefetch('/trial')}>Prueba gratis</Link>
+        </div>
+
+        <button className="tp-nav-ham" onClick={() => setNavOpen(true)} aria-label="Abrir menú móvil">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round">
+            <line x1="3" y1="6" x2="21" y2="6" />
+            <line x1="3" y1="12" x2="21" y2="12" />
+            <line x1="3" y1="18" x2="21" y2="18" />
+          </svg>
+        </button>
+      </header>
+
+      <div className={`tp-mob-overlay ${navOpen ? 'tp-mob-open' : ''}`} aria-hidden={!navOpen}>
+        <button className="tp-mob-nav-close" onClick={() => setNavOpen(false)} aria-label="Cerrar menú móvil">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round">
+            <line x1="5" y1="5" x2="19" y2="19" />
+            <line x1="19" y1="5" x2="5" y2="19" />
+          </svg>
+        </button>
+
+        <button className="tp-mob-nav-link" onClick={() => scrollToSection('inicio')}>Inicio</button>
+        <button className="tp-mob-nav-link" onClick={() => scrollToSection('producto')}>Producto</button>
+        <button className="tp-mob-nav-link" onClick={() => scrollToSection('proceso')}>Proceso</button>
+        <button className="tp-mob-nav-link" onClick={() => scrollToSection('precios')}>Precios</button>
+        <button className="tp-mob-nav-link" onClick={() => scrollToSection('faqs')}>FAQs</button>
+
+        <div className="tp-mob-nav-actions">
+          <Link to="/login" className="tp-btn tp-btn-ghost" onClick={() => setNavOpen(false)} {...bindPrefetch('/login')}>Entrar</Link>
+          <Link to="/trial" className="tp-btn tp-btn-primary" onClick={() => setNavOpen(false)} {...bindPrefetch('/trial')}>Prueba gratis</Link>
+        </div>
+      </div>
 
       <main id="contenido-principal">
 
@@ -1355,7 +1437,7 @@ export default function LandingPage() {
       </section>
 
       {/* ── FAQs ── */}
-      <section aria-label="Preguntas frecuentes sobre el software de control horario" style={{ padding: '0 clamp(18px,4vw,48px) clamp(56px,7vw,100px)', position: 'relative', zIndex: 1 }}>
+      <section id="faqs" aria-label="Preguntas frecuentes sobre el software de control horario" style={{ padding: '0 clamp(18px,4vw,48px) clamp(56px,7vw,100px)', position: 'relative', zIndex: 1 }}>
         <div style={{ maxWidth: 980, margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: 34 }}>
             <span className="tp-label">FAQs</span>
