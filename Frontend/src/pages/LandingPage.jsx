@@ -1059,20 +1059,19 @@ export default function LandingPage() {
           style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'none', border: 'none', color: 'inherit', cursor: 'pointer' }}
           aria-label="Ir al inicio"
         >
-          <div style={{
-            width: 28,
-            height: 28,
-            borderRadius: 8,
-            background: 'linear-gradient(145deg, var(--mg), #1d4ed8)',
-            display: 'grid',
-            placeItems: 'center',
-            boxShadow: '0 8px 20px rgba(37,99,235,0.28)',
-            flexShrink: 0,
-          }}>
-            <span style={{ fontSize: 14, fontWeight: 700, color: '#fff', lineHeight: 1 }}>T</span>
-          </div>
+          <svg width="28" height="28" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0 }}>
+            <circle cx="50" cy="50" r="45" fill="none" stroke="var(--mg)" strokeWidth="2.5" opacity="0.2"/>
+            <circle cx="50" cy="50" r="40" fill="none" stroke="var(--mg)" strokeWidth="2.8"/>
+            <circle cx="50" cy="12" r="2.2" fill="var(--mg)"/>
+            <circle cx="88" cy="50" r="2.2" fill="var(--mg)"/>
+            <circle cx="50" cy="88" r="2.2" fill="var(--mg)"/>
+            <circle cx="12" cy="50" r="2.2" fill="var(--mg)"/>
+            <line x1="50" y1="50" x2="50" y2="28" stroke="var(--mg)" strokeWidth="2.5" strokeLinecap="round" opacity="0.85"/>
+            <line x1="50" y1="50" x2="68" y2="44" stroke="var(--mg)" strokeWidth="2" strokeLinecap="round" opacity="0.6"/>
+            <circle cx="50" cy="50" r="3.5" fill="var(--mg)"/>
+          </svg>
           <div style={{ textAlign: 'left' }}>
-            <div style={{ fontFamily: 'var(--ff-head)', fontWeight: 700, fontSize: 15, letterSpacing: 0.2 }}>Tempos</div>
+            <div style={{ fontFamily: 'var(--ff-head)', fontWeight: 700, fontSize: 15, letterSpacing: 0.2 }}>Tem<span style={{ color: 'var(--mg)' }}>pos</span></div>
             <div style={{ fontSize: 10.5, color: 'var(--t2)', letterSpacing: 0.4 }}>Control horario legal</div>
           </div>
         </button>
