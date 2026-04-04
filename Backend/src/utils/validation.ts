@@ -23,6 +23,54 @@ export function toMinutes(time: string): number {
   return (hours * 60) + minutes;
 }
 
+function getMaxObjectDepth(value: unknown, depth = 0): number {
+  if (value === null || typeof value !== 'object') {
+    return depth;
+  }
+
+  if (Array.isArray(value)) {
+    return value.reduce<number>((max, item) => Math.max(max, getMaxObjectDepth(item, depth + 1)), depth + 1);
+  }
+
+  const objectValues = Object.values(value as Record<string, unknown>);
+  if (objectValues.length === 0) {
+    return depth + 1;
+  }
+
+  return objectValues.reduce<number>((max, item) => Math.max(max, getMaxObjectDepth(item, depth + 1)), depth + 1);
+}
+
+const fichaMetadataSchema = z
+  .record(z.string().max(80, 'metadata key admite maximo 80 caracteres.'), z.unknown())
+  .superRefine((metadata, ctx) => {
+    const rootKeys = Object.keys(metadata).length;
+    if (rootKeys > 30) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['metadata'],
+        message: 'metadata admite maximo 30 claves en el nivel raiz.',
+      });
+    }
+
+    const depth = getMaxObjectDepth(metadata);
+    if (depth > 5) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['metadata'],
+        message: 'metadata no puede superar 5 niveles de profundidad.',
+      });
+    }
+
+    const serialized = JSON.stringify(metadata);
+    if (serialized.length > 8_192) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['metadata'],
+        message: 'metadata supera el tamaño máximo permitido (8192 bytes).',
+      });
+    }
+  });
+
 export const dateStringSchema = z
   .string()
   .regex(dateRegex, 'Formato de fecha invalido. Usa YYYY-MM-DD.')
@@ -42,7 +90,7 @@ export const createFichaSchema = z.object({
   endTime: timeStringSchema.optional(),
   description: z.string().trim().max(500, 'description admite maximo 500 caracteres.').optional(),
   projectCode: z.string().trim().max(80, 'projectCode admite maximo 80 caracteres.').optional(),
-  metadata: z.record(z.string(), z.unknown()).optional(),
+  metadata: fichaMetadataSchema.optional(),
 }).superRefine((value, ctx) => {
   if (!value.endTime) {
     return;
@@ -78,7 +126,7 @@ export const updateFichaSchema = z.object({
   description: z.string().trim().max(500, 'description admite maximo 500 caracteres.').optional(),
   projectCode: z.string().trim().max(80, 'projectCode admite maximo 80 caracteres.').optional(),
   status: fichaStatusSchema.optional(),
-  metadata: z.record(z.string(), z.unknown()).optional(),
+  metadata: fichaMetadataSchema.optional(),
 }).refine((value) => Object.keys(value).length > 0, {
   message: 'Debes enviar al menos un campo para actualizar.',
 });
