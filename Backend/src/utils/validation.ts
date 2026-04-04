@@ -159,6 +159,14 @@ export const createAbsenceSchema = z.object({
   }
 });
 
+export const updateAuthProfileSchema = z.object({
+  displayName: z
+    .string()
+    .trim()
+    .min(2, 'displayName debe tener al menos 2 caracteres.')
+    .max(120, 'displayName admite maximo 120 caracteres.'),
+});
+
 export function buildValidationError(error: z.ZodError): { error: string; details: string[] } {
   return {
     error: 'Parametros invalidos',

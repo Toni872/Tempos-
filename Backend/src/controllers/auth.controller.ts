@@ -3,6 +3,7 @@ import { AppDataSource } from '../database.js';
 import { User } from '../entities/User.js';
 import { firebaseAuthMiddleware } from '../middleware/auth.middleware.js';
 import { asyncHandler } from '../middleware/errorHandler.js';
+import { buildValidationError, updateAuthProfileSchema } from '../utils/validation.js';
 
 const router = Router();
 
@@ -89,7 +90,14 @@ router.put(
   firebaseAuthMiddleware,
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const firebaseUser = (req as any).firebaseUser;
-    const { displayName } = req.body;
+    const parsedBody = updateAuthProfileSchema.safeParse(req.body);
+
+    if (!parsedBody.success) {
+      res.status(400).json(buildValidationError(parsedBody.error));
+      return;
+    }
+
+    const { displayName } = parsedBody.data;
     const userRepository = AppDataSource.getRepository(User);
 
     let user = await userRepository.findOne({
@@ -101,9 +109,7 @@ router.put(
       return;
     }
 
-    if (displayName) {
-      user.displayName = displayName;
-    }
+    user.displayName = displayName;
 
     await userRepository.save(user);
 
