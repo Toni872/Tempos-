@@ -13,6 +13,7 @@ import absencesRoutes from './controllers/absences.controller.js';
 import reportsRoutes from './controllers/reports.controller.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import { firebaseAuthMiddleware } from './middleware/auth.middleware.js';
+import { authRateLimiter } from './middleware/rate-limit.middleware.js';
 
 const app: Express = express();
 const PORT = process.env.PORT || 8080;
@@ -57,7 +58,7 @@ app.get('/status', async (_req: Request, res: Response) => {
 });
 
 // ─── Routes ────────────────────────────────────────────────────────────────────
-app.use('/api/v1/auth', authRoutes);
+app.use('/api/v1/auth', authRateLimiter, authRoutes);
 app.use('/api/v1/fichas', fichaRoutes);
 app.use('/api/v1/employees', employeesRoutes);
 app.use('/api/v1/documents', documentsRoutes);
