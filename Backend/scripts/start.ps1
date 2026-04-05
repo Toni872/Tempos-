@@ -1,3 +1,21 @@
+$AllowScheduledTask = $false
+
+# If this script is launched by Task Scheduler, do nothing unless explicitly allowed.
+try {
+    $self = Get-CimInstance Win32_Process -Filter "ProcessId = $PID"
+    if ($null -ne $self) {
+        $parent = Get-CimInstance Win32_Process -Filter "ProcessId = $($self.ParentProcessId)"
+        $parentName = ($parent.Name | ForEach-Object { $_.ToLowerInvariant() })
+        if (-not $AllowScheduledTask -and @('taskeng.exe', 'taskhostw.exe', 'svchost.exe') -contains $parentName) {
+            Write-Output "Auto-start blocked: start.ps1 was invoked by Task Scheduler."
+            exit 0
+        }
+    }
+}
+catch {
+    Write-Warning "Could not detect parent process. Continuing with normal startup."
+}
+
 # Start Tempos backend + frontend stack (PowerShell)
 $proj = "C:\Users\Antonio\Desktop\Tempos\Backend"
 Set-Location $proj

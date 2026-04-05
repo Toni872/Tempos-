@@ -1,5 +1,7 @@
 import { Entity, PrimaryColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
 
+export type UserRole = 'admin' | 'manager' | 'employee' | 'auditor';
+
 @Entity('users')
 export class User {
   @PrimaryColumn('uuid')
@@ -14,10 +16,17 @@ export class User {
   @Column({ type: 'boolean', default: false })
   emailVerified!: boolean;
 
+  @Column({ type: 'varchar', default: 'tempos-demo' })
+  companyId!: string;
+
+  @Column({ type: 'varchar', default: 'employee' })
+  role!: UserRole;
+
   @Column({ type: 'json', nullable: true })
   metadata?: {
     createdAt?: string;
     lastSignInTime?: string;
+    invitedAt?: string;
   };
 
   @CreateDateColumn()

@@ -25,6 +25,20 @@ jobs:
           npm run lint
           npm run build
 
+  docker-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify Docker and Compose are available
+        run: |
+          docker --version
+          docker compose version
+      - name: Validate backend docker-compose config
+        working-directory: Backend
+        run: |
+          docker compose -f docker-compose.yml config > /tmp/tempos-compose-config.yml
+          test -s /tmp/tempos-compose-config.yml
+
   frontend:
     runs-on: ubuntu-latest
     steps:

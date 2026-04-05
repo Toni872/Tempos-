@@ -32,7 +32,7 @@ npm run dev
 
 ## Estructura
 
-```
+```text
 Backend/
 ├── src/
 │   ├── index.ts              # Entrada principal
@@ -56,18 +56,24 @@ Backend/
 ## Variables de entorno
 
 Ver `.env.example`. Crucial en producción:
+
 - `DATABASE_URL`: Conexión a Cloud SQL
 - `FIREBASE_PROJECT_ID`: Proyecto de Firebase
 - `GOOGLE_APPLICATION_CREDENTIALS`: Path a firebase-key.json (o Secret Manager en GCP)
+- `AUTH_RATE_LIMIT_WINDOW_MS`: Ventana del limitador de auth en ms (por defecto 300000 en dev, 900000 en prod)
+- `AUTH_RATE_LIMIT_MAX`: Máximo de intentos por ventana en `/api/v1/auth` (por defecto 100 en dev, 25 en prod)
+- `DISABLE_AUTH_RATE_LIMIT`: `true` para desactivar rate limit de auth (solo recomendado en testing local)
 
 ## Endpoints (FASE 1 Completa ✅)
 
 ### Auth
+
 - `POST /api/v1/auth/register` — Registrar usuario (Firebase token requerido)
 - `GET /api/v1/auth/me` — Get perfil actual (protegido)
 - `PUT /api/v1/auth/profile` — Actualizar perfil (protegido)
 
 ### Fichas (Time Tracking)
+
 - `POST /api/v1/fichas` — Crear nueva entrada de tiempo
 - `GET /api/v1/fichas` — Listar fichas con filtros (dateRange, status, limit, offset)
 - `GET /api/v1/fichas/:id` — Obtener ficha específica
@@ -76,6 +82,7 @@ Ver `.env.example`. Crucial en producción:
 - `GET /api/v1/fichas/stats/daily` — Estadísticas diarias de horas
 
 ### General
+
 - `GET /health` — Health check
 - `GET /status` — Estado de la API + BD
 

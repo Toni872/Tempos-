@@ -1,6 +1,24 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, JoinColumn, Index } from 'typeorm';
 import { User } from './User.js';
 
+type FichaCorrectionChanges = {
+  startTime?: string;
+  endTime?: string;
+  description?: string;
+  projectCode?: string;
+};
+
+type FichaCorrectionRequest = {
+  status: 'pending' | 'approved' | 'rejected';
+  reason: string;
+  requestedAt: string;
+  requestedBy: string;
+  proposedChanges: FichaCorrectionChanges;
+  reviewedAt?: string;
+  reviewedBy?: string;
+  reviewComment?: string;
+};
+
 @Entity('fichas')
 @Index(['userId', 'date'])
 @Index(['userId', 'status'])
@@ -38,6 +56,8 @@ export class Ficha {
     tags?: string[];
     location?: string;
     deviceId?: string;
+    correctionRequest?: FichaCorrectionRequest;
+    [key: string]: unknown;
   };
 
   @CreateDateColumn()

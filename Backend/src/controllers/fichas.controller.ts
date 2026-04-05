@@ -143,7 +143,7 @@ router.put(
     const { endTime, description, projectCode, status, metadata } = req.body;
 
     const fichaRepository = AppDataSource.getRepository(Ficha);
-    let ficha = await fichaRepository.findOne({
+    const ficha = await fichaRepository.findOne({
       where: { id, userId: firebaseUser.uid },
     });
 
@@ -189,7 +189,7 @@ router.delete(
     const { id } = req.params;
 
     const fichaRepository = AppDataSource.getRepository(Ficha);
-    let ficha = await fichaRepository.findOne({
+    const ficha = await fichaRepository.findOne({
       where: { id, userId: firebaseUser.uid },
     });
 
