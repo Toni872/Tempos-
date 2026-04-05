@@ -22,7 +22,7 @@ export function createAuthRateLimiter(overrides: Partial<Options> = {}) {
     message: {
       error: 'Demasiadas solicitudes de autenticacion. Intenta de nuevo en unos minutos.',
     },
-    skip: (_req, _res) => process.env.DISABLE_AUTH_RATE_LIMIT === 'true',
+    skip: () => process.env.DISABLE_AUTH_RATE_LIMIT === 'true',
     ...overrides,
   });
 }

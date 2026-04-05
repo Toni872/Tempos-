@@ -19,7 +19,7 @@
     "github:bootstrap": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/bootstrap_github_repo.ps1",
     "github:secrets": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/push_github_secrets.ps1",
     "test": "node --test --test-reporter=tap \"dist/tests/**/*.test.js\"",
-    "lint": "eslint src",
+    "lint": "eslint \"src/**/*.{ts,tsx}\"",
     "format": "prettier --write src"
   },
   "dependencies": {

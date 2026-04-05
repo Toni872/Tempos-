@@ -100,7 +100,7 @@ router.put(
     const { displayName } = parsedBody.data;
     const userRepository = AppDataSource.getRepository(User);
 
-    let user = await userRepository.findOne({
+    const user = await userRepository.findOne({
       where: { uid: firebaseUser.uid },
     });
 
