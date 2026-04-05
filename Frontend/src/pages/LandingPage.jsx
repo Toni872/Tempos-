@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
-import { useNavigate, Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { prefetchRoute } from '@/lib/routePrefetch';
 
 // ─── CSS INJECTION ────────────────────────────────────────────────────────────
 const GLOBAL_CSS = `
@@ -890,12 +891,31 @@ export default function LandingPage() {
   const navigate = useNavigate();
   const [navOpen, setNavOpen] = useState(false);
 
-  // Cerrar menú al cambiar ruta
-  const closeNav = () => setNavOpen(false);
+  const scrollToSection = (id) => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+    setNavOpen(false);
+  };
+
+  const bindPrefetch = (path) => ({
+    onMouseEnter: () => prefetchRoute(path),
+    onFocus: () => prefetchRoute(path),
+    onTouchStart: () => prefetchRoute(path),
+  });
+
+  useEffect(() => {
+    document.body.style.overflow = navOpen ? 'hidden' : '';
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [navOpen]);
 
   // Reveal refs
   const [heroRef, heroVis]         = useReveal(0.05);
   const [benefitsRef, benefitsVis] = useReveal(0.1);
+  const [showcaseRef, showcaseVis] = useReveal(0.08);
   const [stepsRef, stepsVis]       = useReveal(0.1);
   const [pricingRef, pricingVis]   = useReveal(0.08);
 
@@ -936,6 +956,37 @@ export default function LandingPage() {
     {
       title: 'Equipos en movilidad',
       desc: 'Valida fichajes fuera de oficina con geolocalización y reglas por ubicación para mantener trazabilidad.',
+    },
+  ];
+
+  const showcase = [
+    {
+      img: '/landing_workstation.jpg',
+      label: 'Panel de gestión',
+      title: 'Control de jornada desde el panel de empresa',
+      desc: 'El responsable de RRHH o gerencia tiene visión completa de fichajes, ausencias e incidencias desde un único panel web, sin necesidad de exportar datos manualmente.',
+      alt: 'Responsable de equipo gestionando jornadas con Tempos en su ordenador',
+    },
+    {
+      img: '/landing_analytics.jpg',
+      label: 'Informes y analítica',
+      title: 'Datos de jornada listos para gestoría e inspección',
+      desc: 'Genera informes detallados de horas, extras y ausencias exportables en PDF y Excel. Documentación preparada en segundos para auditorías o requerimientos de Inspección de Trabajo.',
+      alt: 'Vista de informes y analítica de control horario en Tempos',
+    },
+    {
+      img: '/landing_team_collab.jpg',
+      label: 'Coordinación de equipo',
+      title: 'Organiza turnos, vacaciones y permisos sin fricciones',
+      desc: 'Los empleados solicitan vacaciones o permisos desde la app y el responsable aprueba o gestiona la incidencia al instante. Menos correos, menos errores, más control.',
+      alt: 'Equipo colaborando con gestión de turnos y vacaciones en Tempos',
+    },
+    {
+      img: '/landing_legal_desk.jpg',
+      label: 'Cumplimiento legal',
+      title: 'Documenta la jornada con trazabilidad real',
+      desc: 'Cada fichaje queda registrado con sello de tiempo y contexto verificable. Historial auditable para cumplir la obligación legal de registro horario en España.',
+      alt: 'Documentación de cumplimiento legal de control horario para inspección',
     },
   ];
 
@@ -1002,88 +1053,70 @@ export default function LandingPage() {
     <div className="tp-root">
       <style>{GLOBAL_CSS}</style>
 
-      {/* ── Navbar ── */}
-      <header>
-      <nav className="tp-nav" aria-label="Navegación principal">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          {/* Reloj logo */}
+      <header className="tp-nav" role="banner" aria-label="Navegación principal">
+        <button
+          onClick={() => scrollToSection('inicio')}
+          style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'none', border: 'none', color: 'inherit', cursor: 'pointer' }}
+          aria-label="Ir al inicio"
+        >
           <svg width="28" height="28" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0 }}>
-            {/* Círculo fondo sutil */}
             <circle cx="50" cy="50" r="45" fill="none" stroke="var(--mg)" strokeWidth="2.5" opacity="0.2"/>
-            
-            {/* Círculo principal */}
             <circle cx="50" cy="50" r="40" fill="none" stroke="var(--mg)" strokeWidth="2.8"/>
-            
-            {/* Puntos de hora (12, 3, 6, 9) */}
             <circle cx="50" cy="12" r="2.2" fill="var(--mg)"/>
             <circle cx="88" cy="50" r="2.2" fill="var(--mg)"/>
             <circle cx="50" cy="88" r="2.2" fill="var(--mg)"/>
             <circle cx="12" cy="50" r="2.2" fill="var(--mg)"/>
-            
-            {/* Aguja hora (más corta) - 10 */}
             <line x1="50" y1="50" x2="50" y2="28" stroke="var(--mg)" strokeWidth="2.5" strokeLinecap="round" opacity="0.85"/>
-            
-            {/* Aguja minutos (más larga) - 2 */}
             <line x1="50" y1="50" x2="68" y2="44" stroke="var(--mg)" strokeWidth="2" strokeLinecap="round" opacity="0.6"/>
-            
-            {/* Centro puntero */}
             <circle cx="50" cy="50" r="3.5" fill="var(--mg)"/>
           </svg>
+          <div style={{ textAlign: 'left' }}>
+            <div style={{ fontFamily: 'var(--ff-head)', fontWeight: 700, fontSize: 15, letterSpacing: 0.2 }}>Tem<span style={{ color: 'var(--mg)' }}>pos</span></div>
+            <div style={{ fontSize: 10.5, color: 'var(--t2)', letterSpacing: 0.4 }}>Control horario legal</div>
+          </div>
+        </button>
 
-          {/* Texto TEMPOS */}
-          <span style={{ fontFamily: 'var(--ff-head)', fontSize: 24, fontWeight: 600, letterSpacing: 1.5, color: 'var(--t0)' }}>
-            Tem<span style={{ color: 'var(--mg)' }}>pos</span>
-          </span>
-        </div>
+        <nav className="tp-nav-links" aria-label="Secciones">
+          <button className="tp-nav-link" onClick={() => scrollToSection('inicio')}>Inicio</button>
+          <button className="tp-nav-link" onClick={() => scrollToSection('producto')}>Producto</button>
+          <button className="tp-nav-link" onClick={() => scrollToSection('proceso')}>Proceso</button>
+          <button className="tp-nav-link" onClick={() => scrollToSection('precios')}>Precios</button>
+          <button className="tp-nav-link" onClick={() => scrollToSection('faqs')}>FAQs</button>
+        </nav>
 
-        {/* ── Desktop links ── */}
-        <div className="tp-nav-links">
-          <Link to="/" className="tp-nav-link">Home</Link>
-          <Link to="/funcionalidades" className="tp-nav-link">Funcionalidades</Link>
-          <Link to="/faqs" className="tp-nav-link">FAQs</Link>
-          <Link to="/blog" className="tp-nav-link">Blog</Link>
-          <Link to="/contacto" className="tp-nav-link">Contacto</Link>
-        </div>
-
-        {/* ── Desktop CTAs ── */}
         <div className="tp-nav-actions">
-          <button onClick={() => navigate('/login')} style={{ fontFamily: 'var(--ff-body)', fontSize: 13, color: 'var(--t2)', textDecoration: 'none', transition: 'color 0.2s', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
-            onMouseEnter={e => e.target.style.color = 'var(--t0)'}
-            onMouseLeave={e => e.target.style.color = 'var(--t2)'}
-          >Iniciar sesión</button>
-          <button onClick={() => navigate('/register')} className="tp-btn tp-btn-primary" style={{ borderRadius: 10, padding: '8px 20px', fontSize: 13.5 }}>
-            Probar gratis
-          </button>
+          <Link to="/login" className="tp-btn tp-btn-ghost" {...bindPrefetch('/login')}>Entrar</Link>
+          <Link to="/trial" className="tp-btn tp-btn-primary" {...bindPrefetch('/trial')}>Prueba gratis</Link>
         </div>
 
-        {/* ── Hamburger (mobile) ── */}
-        <button className="tp-nav-ham" aria-label="Abrir menú" onClick={() => setNavOpen(true)}>
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-            <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+        <button className="tp-nav-ham" onClick={() => setNavOpen(true)} aria-label="Abrir menú móvil">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round">
+            <line x1="3" y1="6" x2="21" y2="6" />
+            <line x1="3" y1="12" x2="21" y2="12" />
+            <line x1="3" y1="18" x2="21" y2="18" />
           </svg>
         </button>
-      </nav>
+      </header>
 
-      {/* ── Mobile nav overlay ── */}
-      <div className={`tp-mob-overlay ${navOpen ? 'tp-mob-open' : ''}`} role="dialog" aria-modal="true" aria-label="Menú de navegación">
-        <button className="tp-mob-nav-close" aria-label="Cerrar menú" onClick={closeNav}>
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      <div className={`tp-mob-overlay ${navOpen ? 'tp-mob-open' : ''}`} aria-hidden={!navOpen}>
+        <button className="tp-mob-nav-close" onClick={() => setNavOpen(false)} aria-label="Cerrar menú móvil">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round">
+            <line x1="5" y1="5" x2="19" y2="19" />
+            <line x1="19" y1="5" x2="5" y2="19" />
+          </svg>
         </button>
-        <Link to="/"               className="tp-mob-nav-link" onClick={closeNav}>Home</Link>
-        <Link to="/funcionalidades" className="tp-mob-nav-link" onClick={closeNav}>Funcionalidades</Link>
-        <Link to="/faqs"            className="tp-mob-nav-link" onClick={closeNav}>FAQs</Link>
-        <Link to="/blog"            className="tp-mob-nav-link" onClick={closeNav}>Blog</Link>
-        <Link to="/contacto"        className="tp-mob-nav-link" onClick={closeNav}>Contacto</Link>
+
+        <button className="tp-mob-nav-link" onClick={() => scrollToSection('inicio')}>Inicio</button>
+        <button className="tp-mob-nav-link" onClick={() => scrollToSection('producto')}>Producto</button>
+        <button className="tp-mob-nav-link" onClick={() => scrollToSection('proceso')}>Proceso</button>
+        <button className="tp-mob-nav-link" onClick={() => scrollToSection('precios')}>Precios</button>
+        <button className="tp-mob-nav-link" onClick={() => scrollToSection('faqs')}>FAQs</button>
+
         <div className="tp-mob-nav-actions">
-          <button onClick={() => { closeNav(); navigate('/login'); }} className="tp-btn tp-btn-ghost" style={{ borderRadius: 12, padding: '13px', fontSize: 15 }}>
-            Iniciar sesión
-          </button>
-          <button onClick={() => { closeNav(); navigate('/register'); }} className="tp-btn tp-btn-primary" style={{ borderRadius: 12, padding: '13px', fontSize: 15 }}>
-            Probar gratis
-          </button>
+          <Link to="/login" className="tp-btn tp-btn-ghost" onClick={() => setNavOpen(false)} {...bindPrefetch('/login')}>Entrar</Link>
+          <Link to="/trial" className="tp-btn tp-btn-primary" onClick={() => setNavOpen(false)} {...bindPrefetch('/trial')}>Prueba gratis</Link>
         </div>
       </div>
-      </header>
 
       <main id="contenido-principal">
 
@@ -1203,6 +1236,60 @@ export default function LandingPage() {
                 </div>
                 <h3 style={{ fontFamily: 'var(--ff-head)', fontSize: 15.5, fontWeight: 700, color: 'var(--t0)', marginBottom: 10, letterSpacing: -0.3, lineHeight: 1.3 }}>{title}</h3>
                 <p style={{ fontSize: 13, color: 'var(--t1)', lineHeight: 1.65, fontWeight: 300 }}>{desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── Feature Showcase ── */}
+      <section ref={showcaseRef} aria-label="Imágenes del software de control horario Tempos en uso" style={{ padding: '0 clamp(18px,4vw,48px) clamp(56px,7vw,96px)', position: 'relative', zIndex: 1, borderTop: '1px solid var(--border)' }}>
+        <div style={{ maxWidth: 1180, margin: '0 auto' }}>
+          <div style={{ textAlign: 'center', marginBottom: 72 }}>
+            <span className="tp-label">Software en acción</span>
+            <h2 style={{ fontFamily: 'var(--ff-head)', fontSize: 44, fontWeight: 600, color: 'var(--t0)', marginBottom: 14, lineHeight: 1.12 }}>
+              Diseñado para el trabajo real
+            </h2>
+            <p style={{ fontSize: 15.5, color: 'var(--t1)', maxWidth: 520, margin: '0 auto', lineHeight: 1.65, fontWeight: 300 }}>
+              Desde el fichaje diario hasta los informes de fin de mes: Tempos cubre cada punto del ciclo de gestión horaria.
+            </p>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'clamp(52px,7vw,88px)' }}>
+            {showcase.map((item, i) => (
+              <div
+                key={item.title}
+                className={`tp-reveal ${showcaseVis ? 'tp-visible' : ''} tp-d${i}`}
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+                  gap: 'clamp(28px,5vw,64px)',
+                  alignItems: 'center',
+                }}
+              >
+                {/* Image side */}
+                <div
+                  style={{
+                    order: i % 2 === 0 ? 0 : 1,
+                    borderRadius: 20, overflow: 'hidden',
+                    border: '1px solid var(--border)',
+                    position: 'relative', flexShrink: 0,
+                  }}
+                >
+                  <img
+                    src={item.img}
+                    alt={item.alt}
+                    style={{ width: '100%', height: 'clamp(220px,28vw,360px)', objectFit: 'cover', display: 'block' }}
+                    loading="lazy"
+                  />
+                  <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(10,10,10,0.32) 0%, transparent 55%)' }} aria-hidden="true" />
+                </div>
+                {/* Text side */}
+                <div style={{ order: i % 2 === 0 ? 1 : 0 }}>
+                  <span className="tp-label" style={{ marginBottom: 16, display: 'inline-block' }}>{item.label}</span>
+                  <h3 style={{ fontFamily: 'var(--ff-head)', fontSize: 'clamp(22px,3vw,30px)', fontWeight: 600, color: 'var(--t0)', marginBottom: 16, lineHeight: 1.22, letterSpacing: -0.4 }}>{item.title}</h3>
+                  <p style={{ fontSize: 15, color: 'var(--t1)', lineHeight: 1.72, fontWeight: 300 }}>{item.desc}</p>
+                </div>
               </div>
             ))}
           </div>
@@ -1349,7 +1436,7 @@ export default function LandingPage() {
       </section>
 
       {/* ── FAQs ── */}
-      <section aria-label="Preguntas frecuentes sobre el software de control horario" style={{ padding: '0 clamp(18px,4vw,48px) clamp(56px,7vw,100px)', position: 'relative', zIndex: 1 }}>
+      <section id="faqs" aria-label="Preguntas frecuentes sobre el software de control horario" style={{ padding: '0 clamp(18px,4vw,48px) clamp(56px,7vw,100px)', position: 'relative', zIndex: 1 }}>
         <div style={{ maxWidth: 980, margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: 34 }}>
             <span className="tp-label">FAQs</span>

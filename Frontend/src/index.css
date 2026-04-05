@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap');
+
 /* --- Dashboard select fix --- */
 .tp-dashboard-select {
   background: rgba(255,255,255,0.03);
@@ -22,7 +24,6 @@
   background: var(--mg);
   color: #fff;
 }
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -220,6 +221,84 @@ body { background: var(--bg0); }
 
 /* ── iPhone float ── */
 .tp-iphone-wrap { animation: tp-float 7s ease-in-out infinite; }
+
+/* ── PWA install banner ── */
+.tp-pwa-banner {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 9999;
+  background: rgba(10,10,12,0.97);
+  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
+  border-top: 1px solid rgba(37,99,235,0.3);
+  padding: 14px 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-family: var(--ff-body);
+}
+
+.tp-pwa-banner__icon {
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+.tp-pwa-banner__text {
+  flex: 1;
+  min-width: 0;
+}
+
+.tp-pwa-banner__title {
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #f5f5f3;
+  line-height: 1.3;
+}
+
+.tp-pwa-banner__subtitle {
+  margin: 0;
+  font-size: 12px;
+  color: #8e8e89;
+  line-height: 1.4;
+}
+
+.tp-pwa-banner__install {
+  background: #2563eb;
+  color: #fff;
+  border: none;
+  border-radius: 9px;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.tp-pwa-banner__close {
+  background: none;
+  border: none;
+  color: #71716d;
+  cursor: pointer;
+  padding: 6px;
+  font-size: 18px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+@media (max-width: 640px) {
+  .tp-pwa-banner {
+    gap: 10px;
+    padding: 12px;
+  }
+
+  .tp-pwa-banner__install {
+    padding: 8px 12px;
+    font-size: 12px;
+  }
+}
 
 
 

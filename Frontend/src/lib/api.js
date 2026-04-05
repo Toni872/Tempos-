@@ -19,6 +19,19 @@ function buildUrl(path) {
   return `${base}${path.startsWith('/') ? '' : '/'}${path}`;
 }
 
+function toQueryString(params = {}) {
+  const qs = new URLSearchParams();
+
+  Object.entries(params).forEach(([key, value]) => {
+    if (value === undefined || value === null) return;
+    const text = String(value).trim();
+    if (!text) return;
+    qs.set(key, text);
+  });
+
+  return qs.toString();
+}
+
 async function request(path, options = {}) {
   const { token, headers, ...rest } = options;
 
@@ -175,6 +188,10 @@ export async function requestAbsence(token, data) {
   return request('/api/v1/absences', { method: 'POST', token, body: JSON.stringify(data) });
 }
 
+export async function listAbsences(token) {
+  return request('/api/v1/absences', { method: 'GET', token });
+}
+
 export async function approveAbsence(token, id) {
   return request(`/api/v1/absences/${id}/approve`, { method: 'POST', token });
 }
@@ -183,9 +200,39 @@ export async function rejectAbsence(token, id) {
   return request(`/api/v1/absences/${id}/reject`, { method: 'POST', token });
 }
 
+export async function listDocuments(token) {
+  return request('/api/v1/documents', { method: 'GET', token });
+}
+
+export async function listFichas(token, params = {}) {
+  const qs = toQueryString(params);
+  const path = `/api/v1/fichas${qs ? `?${qs}` : ''}`;
+  return request(path, { method: 'GET', token });
+}
+
+export async function getReportSummary(token) {
+  return request('/api/v1/reports/summary', { method: 'GET', token });
+}
+
+export async function listAuditLog(token, params = {}) {
+  const qs = toQueryString(params);
+  const path = `/api/v1/reports/audit-log${qs ? `?${qs}` : ''}`;
+  return request(path, { method: 'GET', token });
+}
+
+export async function exportAuditLog(token, params = {}) {
+  const qs = toQueryString(params);
+  const path = `/api/v1/reports/audit-log/export${qs ? `?${qs}` : ''}`;
+  return requestBlob(path, { method: 'GET', token });
+}
+
+export async function closeFichaPeriod(token, payload) {
+  return request('/api/v1/fichas/close-period', { method: 'POST', token, body: JSON.stringify(payload) });
+}
+
 // Reports & export
 export async function exportReport(token, params = {}) {
-  const qs = new URLSearchParams(params).toString();
+  const qs = toQueryString(params);
   const path = `/api/v1/reports/export${qs ? `?${qs}` : ''}`;
   return requestBlob(path, { method: 'GET', token });
 }
@@ -200,15 +247,33 @@ export async function clockOut(token, payload = {}) {
 }
 
 export async function bootstrapLocalSession({ isAdmin = false } = {}) {
-  const token = 'test';
+  const roleToken = isAdmin ? 'test-admin' : 'test-employee';
+  const fallbackToken = 'test';
+
+  const ensureLocalUser = async (token) => {
+    try {
+      return await getMe(token);
+    } catch {
+      try {
+        await registerMe(token);
+      } catch {
+        // Si ya existe el usuario o hay carrera, reintentamos lectura.
+      }
+      return getMe(token);
+    }
+  };
+
+  let token = roleToken;
+  let profile;
 
   try {
-    await getMe(token);
+    profile = await ensureLocalUser(roleToken);
   } catch {
-    await registerMe(token);
+    // Compatibilidad hacia atrás con sesiones antiguas que usaban token "test".
+    token = fallbackToken;
+    profile = await ensureLocalUser(fallbackToken);
   }
 
-  const profile = await getMe(token);
   const session = {
     token,
     isAdmin,

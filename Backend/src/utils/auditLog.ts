@@ -3,6 +3,7 @@ import { AuditLog } from '../entities/AuditLog.js';
 
 interface LogActionParams {
   userId?: string;
+  companyId?: string;
   action: string;
   metadata?: Record<string, unknown>;
   ip?: string;
@@ -18,6 +19,7 @@ export async function logAction(params: LogActionParams): Promise<void> {
     const repo = AppDataSource.getRepository(AuditLog);
     const entry = repo.create({
       userId: params.userId,
+      companyId: params.companyId,
       action: params.action,
       metadata: params.metadata,
       ip: params.ip,
