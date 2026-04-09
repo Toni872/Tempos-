@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 
-export default function DocumentoForm({ onSubmit, onCancel, loading }) {
-  const [nombre, setNombre] = useState('');
-  const [tipo, setTipo] = useState('Nómina');
+export default function DocumentoForm({ initialValues = {}, onSubmit, onCancel, loading }) {
+  const [nombre, setNombre] = useState(initialValues.nombre || initialValues.title || '');
+  const [tipo, setTipo] = useState(initialValues.tipo || initialValues.type || 'Nómina');
   const [file, setFile] = useState(null);
   const [error, setError] = useState('');
 
@@ -13,7 +13,7 @@ export default function DocumentoForm({ onSubmit, onCancel, loading }) {
       return;
     }
     setError('');
-    onSubmit({ nombre, tipo, file });
+    onSubmit({ title: nombre, type: tipo, file });
   };
 
   return (

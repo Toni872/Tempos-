@@ -1,9 +1,18 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 
 export default function ModalBase({ open, onClose, children, title }) {
+  useEffect(() => {
+    if (!open) return;
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [open, onClose]);
+
   if (!open) return null;
   return (
-    <div className="tp-modal-overlay" style={{
+    <div className="tp-modal-overlay" role="dialog" aria-modal="true" aria-label={title || 'Diálogo'} style={{
       position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(0,0,0,0.32)', zIndex: 1000,
       display: 'flex', alignItems: 'center', justifyContent: 'center', animation: 'tp-fade-in 0.2s'
     }} onClick={onClose}>
@@ -15,10 +24,6 @@ export default function ModalBase({ open, onClose, children, title }) {
         {title && <h2 style={{ fontFamily: 'var(--ff-head)', fontSize: 20, fontWeight: 700, marginBottom: 18 }}>{title}</h2>}
         {children}
       </div>
-      <style>{`
-        @keyframes tp-fade-in { from { opacity: 0; } to { opacity: 1; } }
-        @keyframes tp-slide-up { from { transform: translateY(40px); opacity: 0; } to { transform: none; opacity: 1; } }
-      `}</style>
     </div>
   );
 }

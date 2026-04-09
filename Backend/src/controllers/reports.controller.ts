@@ -11,6 +11,15 @@ import { hasPermission } from '../security/authorization.js';
 
 const router = Router();
 
+/** Escape a value for RFC 4180 CSV: wrap in quotes if it contains comma, quote, or newline */
+function csvField(val: string | number | null | undefined): string {
+  const s = String(val ?? '');
+  if (s.includes(',') || s.includes('"') || s.includes('\n') || s.includes('\r')) {
+    return '"' + s.replace(/"/g, '""') + '"';
+  }
+  return s;
+}
+
 function parseDate(val: unknown): string | undefined {
   if (typeof val === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(val)) return val;
   return undefined;
@@ -22,14 +31,14 @@ function fichasToCSV(fichas: Ficha[]): string {
     const raw = f.date as unknown as string | Date;
     const date = typeof raw === 'string' ? raw.split('T')[0] : (raw as Date).toISOString().split('T')[0];
     return [
-      f.id,
-      date,
-      f.startTime,
-      f.endTime ?? '',
-      f.hoursWorked ?? '',
-      (f.description ?? '').replace(/,/g, ';'),
-      f.projectCode ?? '',
-      f.status,
+      csvField(f.id),
+      csvField(date),
+      csvField(f.startTime),
+      csvField(f.endTime),
+      csvField(f.hoursWorked),
+      csvField(f.description),
+      csvField(f.projectCode),
+      csvField(f.status),
     ].join(',');
   });
   return [header, ...rows].join('\n');
@@ -128,16 +137,16 @@ function buildAuditLogQuery(auth: ReturnType<typeof getAuthContext>, canViewComp
 function auditLogsToCSV(rows: AuditLog[]): string {
   const header = 'id,createdAt,userId,companyId,action,ip,userAgent,metadata';
   const lines = rows.map((row) => {
-    const metadata = row.metadata ? JSON.stringify(row.metadata).replace(/,/g, ';').replace(/\n/g, ' ') : '';
+    const metadata = row.metadata ? JSON.stringify(row.metadata) : '';
     return [
-      row.id,
-      row.createdAt.toISOString(),
-      row.userId ?? '',
-      row.companyId ?? '',
-      row.action,
-      row.ip ?? '',
-      (row.userAgent ?? '').replace(/,/g, ';'),
-      metadata,
+      csvField(row.id),
+      csvField(row.createdAt.toISOString()),
+      csvField(row.userId),
+      csvField(row.companyId),
+      csvField(row.action),
+      csvField(row.ip),
+      csvField(row.userAgent),
+      csvField(metadata),
     ].join(',');
   });
 
@@ -217,10 +226,10 @@ router.get(
       res.setHeader('Content-Disposition', 'attachment; filename="informe_tempos.csv"');
       res.send('\uFEFF' + csv); // BOM for Excel compatibility
     } else {
-      // PDF-like plain text (no extra deps; swap for pdfkit in production)
+      // Plain text report (swap for pdfkit when real PDF generation is needed)
       const pdf = fichasToPDF(fichas, totalHours);
-      res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', 'attachment; filename="informe_inspeccion.pdf"');
+      res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+      res.setHeader('Content-Disposition', 'attachment; filename="informe_inspeccion.txt"');
       res.send(Buffer.from(pdf, 'utf-8'));
     }
   })
@@ -355,8 +364,8 @@ router.get(
     }
 
     const pdf = auditLogsToPDF(rows);
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', 'attachment; filename="auditoria_tempos.pdf"');
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.setHeader('Content-Disposition', 'attachment; filename="auditoria_tempos.txt"');
     res.send(Buffer.from(pdf, 'utf-8'));
   })
 );

@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 
-export default function EmpleadoForm({ initialData = {}, onSubmit, onCancel, loading }) {
-  const [nombre, setNombre] = useState(initialData.nombre || '');
-  const [puesto, setPuesto] = useState(initialData.puesto || '');
-  const [sede, setSede] = useState(initialData.sede || '');
-  const [rol, setRol] = useState(initialData.rol || 'Usuario');
+export default function EmpleadoForm({ initialValues = {}, onSubmit, onCancel, loading }) {
+  const [nombre, setNombre] = useState(initialValues.nombre || initialValues.name || '');
+  const [puesto, setPuesto] = useState(initialValues.puesto || initialValues.position || '');
+  const [sede, setSede] = useState(initialValues.sede || '');
+  const [rol, setRol] = useState(initialValues.rol || initialValues.role || 'Usuario');
   const [error, setError] = useState('');
 
   const handleSubmit = e => {

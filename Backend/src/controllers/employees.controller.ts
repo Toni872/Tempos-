@@ -1,3 +1,16 @@
+/**
+ * ⚠️  STUB — In-memory placeholder (no persistence, no RBAC, no tenant scoping).
+ *
+ * TODO: Replace with proper implementation backed by the `users` table:
+ *   - Use appUserContextMiddleware + getAuthContext for auth
+ *   - Scope queries by companyId (tenant isolation)
+ *   - Add requirePermission checks for create/update/delete
+ *   - Validate input with Zod schemas
+ *   - Add audit logging via logAction()
+ *
+ * This file exists solely so the Frontend has a working endpoint during
+ * development. Do NOT deploy to production as-is.
+ */
 import { Router, Request, Response } from 'express';
 import { firebaseAuthMiddleware } from '../middleware/auth.middleware.js';
 
