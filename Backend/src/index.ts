@@ -11,6 +11,7 @@ import employeesRoutes from './controllers/employees.controller.js';
 import documentsRoutes from './controllers/documents.controller.js';
 import absencesRoutes from './controllers/absences.controller.js';
 import reportsRoutes from './controllers/reports.controller.js';
+import contactRoutes from './controllers/contact.controller.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import { firebaseAuthMiddleware } from './middleware/auth.middleware.js';
 import { authRateLimiter } from './middleware/rate-limit.middleware.js';
@@ -64,6 +65,7 @@ app.use('/api/v1/employees', employeesRoutes);
 app.use('/api/v1/documents', documentsRoutes);
 app.use('/api/v1/absences', absencesRoutes);
 app.use('/api/v1/reports', reportsRoutes);
+app.use('/api/v1/contact', contactRoutes);
 
 // Me endpoint (protegido)
 app.get('/api/v1/me', firebaseAuthMiddleware, async (req: Request, res: Response) => {
@@ -90,7 +92,13 @@ AppDataSource.initialize()
       const exists = await userRepo.findOne({ where: { uid: devUid } });
       if (!exists) {
         await userRepo.save(
-          userRepo.create({ uid: devUid, email: 'dev@tempos.es', displayName: 'Dev User' })
+          userRepo.create({
+            uid: devUid,
+            email: 'dev@tempos.es',
+            displayName: 'Dev User',
+            companyId: 'tempos-demo',
+            role: 'admin',
+          })
         );
         console.log('🌱 [DEV] Usuario de desarrollo creado');
       }

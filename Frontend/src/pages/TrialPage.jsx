@@ -142,10 +142,7 @@ export default function TrialPage() {
     setFormError('');
     setIsSubmitting(true);
 
-    // Simular éxito y redirigir
-    setTimeout(() => {
-      navigate('/register', { state: { trial: true, email: formData.email.trim(), company: formData.company.trim() } });
-    }, 350);
+    navigate('/register', { state: { trial: true, email: formData.email.trim(), company: formData.company.trim() } });
   };
 
   return (

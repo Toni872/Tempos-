@@ -1,7 +1,8 @@
 import { Router, Request, Response } from 'express';
 import { AppDataSource } from '../database.js';
 import { User } from '../entities/User.js';
-import { firebaseAuthMiddleware } from '../middleware/auth.middleware.js';
+import { firebaseAuthMiddleware, DEFAULT_COMPANY_ID } from '../middleware/auth.middleware.js';
+import { appUserContextMiddleware, getAuthContext } from '../middleware/request-context.middleware.js';
 import { asyncHandler } from '../middleware/errorHandler.js';
 import { buildValidationError, updateAuthProfileSchema } from '../utils/validation.js';
 
@@ -32,6 +33,8 @@ router.post(
       email: firebaseUser.email,
       displayName: firebaseUser.name || firebaseUser.email,
       emailVerified: firebaseUser.email_verified,
+      companyId: DEFAULT_COMPANY_ID,
+      role: 'employee',
       metadata: {
         createdAt: new Date().toISOString(),
       },
@@ -57,12 +60,13 @@ router.post(
 router.get(
   '/me',
   firebaseAuthMiddleware,
+  appUserContextMiddleware,
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
-    const firebaseUser = (req as any).firebaseUser;
+    const auth = getAuthContext(req);
     const userRepository = AppDataSource.getRepository(User);
 
     const user = await userRepository.findOne({
-      where: { uid: firebaseUser.uid },
+      where: { uid: auth.uid },
     });
 
     if (!user) {
@@ -88,8 +92,9 @@ router.get(
 router.put(
   '/profile',
   firebaseAuthMiddleware,
+  appUserContextMiddleware,
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
-    const firebaseUser = (req as any).firebaseUser;
+    const auth = getAuthContext(req);
     const parsedBody = updateAuthProfileSchema.safeParse(req.body);
 
     if (!parsedBody.success) {
@@ -101,7 +106,7 @@ router.put(
     const userRepository = AppDataSource.getRepository(User);
 
     const user = await userRepository.findOne({
-      where: { uid: firebaseUser.uid },
+      where: { uid: auth.uid },
     });
 
     if (!user) {

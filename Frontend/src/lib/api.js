@@ -119,6 +119,13 @@ export async function pingStatus(token) {
   });
 }
 
+export async function submitContact({ name, email, phone, message }) {
+  return request('/api/v1/contact', {
+    method: 'POST',
+    body: JSON.stringify({ name, email, phone, message }),
+  });
+}
+
 export async function getDailyStats(token, startDate, endDate) {
   const params = new URLSearchParams();
   if (startDate) {

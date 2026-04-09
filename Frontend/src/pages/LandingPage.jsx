@@ -1,671 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from 'react-router-dom';
 import { prefetchRoute } from '@/lib/routePrefetch';
-
-// ─── CSS INJECTION ────────────────────────────────────────────────────────────
-const GLOBAL_CSS = `
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap');
-
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-  :root {
-    --mg: #2563eb;
-    --mg2: #60a5fa;
-    --mg-glow: rgba(37,99,235,0.18);
-    --bg0: #0a0a0a;
-    --bg1: #101010;
-    --bg2: #141414;
-    --bg3: #181818;
-    --border: rgba(255,255,255,0.04);
-    --border-mg: rgba(37,99,235,0.18);
-    --t0: #f2f2f0;
-    --t1: #b5b5b2;
-    --t2: #8e8e89;
-    --t3: #71716d;
-    --ff-head: 'Space Grotesk', sans-serif;
-    --ff-body: 'Inter', sans-serif;
-    --ff-mono: 'Space Mono', monospace;
-    --ease-spring: cubic-bezier(0.16, 1, 0.3, 1);
-  }
-
-  html { scroll-behavior: smooth; }
-  body { background: var(--bg0); }
-
-  .tp-root {
-    background: var(--bg0);
-    color: var(--t0);
-    font-family: var(--ff-body);
-    overflow-x: hidden;
-    position: relative;
-  }
-
-  /* Noise overlay */
-  .tp-root::before {
-    content: '';
-    position: fixed; inset: 0; z-index: 0;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.038'/%3E%3C/svg%3E");
-    pointer-events: none;
-    opacity: 1;
-  }
-
-  /* ── Keyframes ── */
-  @keyframes tp-slider-zoom {
-    from { transform: scale(1); }
-    to   { transform: scale(1.04); }
-  }
-  @keyframes tp-shimmer {
-    0%   { background-position: -300% center; }
-    100% { background-position: 300% center; }
-  }
-  @keyframes tp-pulse-ring {
-    0%   { transform: scale(1); opacity: 0.8; }
-    100% { transform: scale(2.6); opacity: 0; }
-  }
-  @keyframes tp-reveal-up {
-    from { opacity: 0; transform: translateY(36px); }
-    to   { opacity: 1; transform: translateY(0); }
-  }
-  @keyframes tp-reveal-left {
-    from { opacity: 0; transform: translateX(-40px); }
-    to   { opacity: 1; transform: translateX(0); }
-  }
-  @keyframes tp-reveal-right {
-    from { opacity: 0; transform: translateX(40px); }
-    to   { opacity: 1; transform: translateX(0); }
-  }
-  @keyframes tp-blink-cursor {
-    0%,100% { opacity: 1; }
-    50%      { opacity: 0; }
-  }
-  @keyframes tp-slide-row {
-    from { opacity: 0; transform: translateX(10px); }
-    to   { opacity: 1; transform: translateX(0); }
-  }
-  @keyframes tp-nav-in {
-    from { opacity: 0; transform: translateY(-16px); }
-    to   { opacity: 1; transform: translateY(0); }
-  }
-  @keyframes tp-phone-idle {
-    0%   { transform: translateY(0) rotateX(0deg) rotateY(0deg); }
-    50%  { transform: translateY(-6px) rotateX(-0.6deg) rotateY(1.4deg); }
-    100% { transform: translateY(0) rotateX(0deg) rotateY(0deg); }
-  }
-  @keyframes tp-orbit {
-    from { transform: rotate(0deg) translateX(26px) rotate(0deg); }
-    to   { transform: rotate(360deg) translateX(26px) rotate(-360deg); }
-  }
-
-  /* ── Reveal classes ── */
-  .tp-reveal { opacity: 0; }
-  .tp-reveal.tp-visible {
-    animation: tp-reveal-up 0.75s var(--ease-spring) forwards;
-  }
-  .tp-reveal-l { opacity: 0; }
-  .tp-reveal-l.tp-visible {
-    animation: tp-reveal-left 0.85s var(--ease-spring) forwards;
-  }
-  .tp-reveal-r { opacity: 0; }
-  .tp-reveal-r.tp-visible {
-    animation: tp-reveal-right 0.85s var(--ease-spring) forwards;
-  }
-
-  /* ── Accent text (plain, no shimmer) ── */
-  .tp-shimmer {
-    color: var(--mg);
-  }
-
-  /* ── Navbar ── */
-  .tp-nav {
-    position: fixed; top: 0; left: 0; right: 0; z-index: 200;
-    height: 58px;
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 0 48px;
-    background: rgba(20,20,20,0.82);
-    backdrop-filter: blur(24px) saturate(1.4);
-    border-bottom: 1px solid var(--border);
-    animation: tp-nav-in 0.6s var(--ease-spring) 0.1s both;
-  }
-  .tp-nav-link {
-    font-family: var(--ff-body);
-    font-size: 13.5px;
-    color: var(--t2);
-    text-decoration: none;
-    position: relative;
-    transition: color 0.22s ease;
-    letter-spacing: 0.01em;
-  }
-  .tp-nav-link::after {
-    content: '';
-    position: absolute; bottom: -3px; left: 0;
-    width: 0; height: 1px;
-    background: var(--mg);
-    transition: width 0.28s var(--ease-spring);
-  }
-  .tp-nav-link:hover { color: var(--t0); }
-  .tp-nav-link:hover::after { width: 100%; }
-
-  /* ── Buttons ── */
-  .tp-btn {
-    position: relative;
-    border: none; cursor: pointer;
-    font-family: var(--ff-body);
-    font-weight: 600;
-    transition: transform 0.18s ease, opacity 0.2s ease;
-  }
-  .tp-btn:hover { transform: translateY(-1px); opacity: 0.97; }
-  .tp-btn:active { transform: translateY(0); opacity: 0.92; }
-  .tp-btn-primary {
-    background: var(--mg);
-    color: #fff;
-  }
-  .tp-btn-primary:hover {
-    background: #2b68eb;
-  }
-  .tp-btn-ghost {
-    background: transparent;
-    color: var(--t1);
-    border: 1px solid var(--border);
-    transition: color 0.2s ease, border-color 0.2s ease, transform 0.18s ease;
-  }
-  .tp-btn-ghost:hover {
-    color: var(--t0);
-    border-color: var(--border-mg);
-    transform: translateY(-1px);
-  }
-
-  /* ── Cards ── */
-  .tp-card {
-    background: rgba(255,255,255,0.015);
-    backdrop-filter: blur(12px);
-    border: 1px solid var(--border);
-    transition: transform 0.18s ease, border-color 0.2s ease;
-  }
-  .tp-card:hover {
-    transform: translateY(-2px);
-    border-color: var(--border-mg);
-  }
-
-  /* ── Hero iPhone 3D ── */
-  .tp-phone3d-stage {
-    width: 292px;
-    user-select: none;
-  }
-
-  .tp-phone3d-idle {
-    transform-style: preserve-3d;
-    animation: tp-phone-idle 7s ease-in-out infinite;
-  }
-
-  .tp-phone3d-idle.tp-pause {
-    animation-play-state: paused;
-  }
-
-  .tp-phone3d-wrap {
-    perspective: 1600px;
-    perspective-origin: center center;
-    width: 100%;
-    display: grid;
-    place-items: center;
-    touch-action: none;
-    cursor: grab;
-  }
-
-  .tp-phone3d-wrap:active {
-    cursor: grabbing;
-  }
-
-  .tp-phone3d-shadow {
-    position: absolute;
-    width: 206px;
-    height: 58px;
-    background: radial-gradient(ellipse at center, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0) 70%);
-    filter: blur(8px);
-    transform: translateY(252px) rotateX(90deg);
-    pointer-events: none;
-  }
-
-  .tp-phone3d-device {
-    position: relative;
-    width: 252px;
-    height: 516px;
-    transform-style: preserve-3d;
-    transition: transform 180ms var(--ease-spring);
-  }
-
-  .tp-phone3d-device.tp-dragging {
-    transition: none;
-  }
-
-  .tp-phone3d-face {
-    position: absolute;
-    inset: 0;
-    border-radius: 46px;
-    overflow: hidden;
-  }
-
-  .tp-phone3d-front {
-    transform: translateZ(10px);
-    background: linear-gradient(165deg, #57595d 0%, #34363a 20%, #1e2023 58%, #404246 84%, #64666a 100%);
-    box-shadow:
-      inset 0 0 0 1px rgba(255,255,255,0.2),
-      inset 0 2px 3px rgba(255,255,255,0.08),
-      0 28px 62px rgba(0,0,0,0.55);
-  }
-
-  .tp-phone3d-back {
-    transform: rotateY(180deg) translateZ(10px);
-    background: radial-gradient(circle at 22% 14%, rgba(255,255,255,0.2) 0%, rgba(168,170,174,0.35) 30%, rgba(60,62,66,1) 74%, rgba(24,25,28,1) 100%);
-    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.16);
-  }
-
-  .tp-phone3d-screen-wrap {
-    position: absolute;
-    inset: 8px;
-    border-radius: 38px;
-    overflow: hidden;
-    border: 1px solid rgba(255,255,255,0.09);
-    background: #020203;
-  }
-
-  .tp-phone3d-screen {
-    position: absolute;
-    inset: 0;
-    background: radial-gradient(circle at 50% 15%, rgba(255,255,255,0.045) 0%, rgba(8,8,10,1) 40%, #000 100%);
-  }
-
-  .tp-phone3d-glass {
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(120deg, rgba(255,255,255,0.2) 0%, rgba(255,255,255,0.05) 16%, rgba(255,255,255,0) 34%);
-    pointer-events: none;
-  }
-
-  .tp-phone3d-island {
-    position: absolute;
-    top: 13px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 106px;
-    height: 30px;
-    border-radius: 20px;
-    background: #010102;
-    border: 1px solid rgba(255,255,255,0.08);
-    box-shadow: inset 0 0 6px rgba(255,255,255,0.05);
-    z-index: 2;
-  }
-
-  .tp-phone3d-island::before {
-    content: '';
-    position: absolute;
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    right: 16px;
-    top: 10px;
-    background: rgba(115,168,255,0.35);
-    box-shadow: 0 0 4px rgba(115,168,255,0.55);
-  }
-
-  .tp-phone3d-island::after {
-    content: '';
-    position: absolute;
-    width: 36px;
-    height: 6px;
-    border-radius: 99px;
-    left: 18px;
-    top: 12px;
-    background: rgba(255,255,255,0.08);
-  }
-
-  .tp-phone3d-camera-bump {
-    position: absolute;
-    top: 18px;
-    left: 16px;
-    width: 112px;
-    height: 112px;
-    border-radius: 30px;
-    background: linear-gradient(145deg, rgba(84,86,91,0.95), rgba(32,33,36,0.95));
-    border: 1px solid rgba(255,255,255,0.14);
-    box-shadow: inset 0 2px 2px rgba(255,255,255,0.08), 0 10px 20px rgba(0,0,0,0.35);
-  }
-
-  .tp-phone3d-lens {
-    position: absolute;
-    width: 38px;
-    height: 38px;
-    border-radius: 50%;
-    border: 1px solid rgba(255,255,255,0.15);
-    background: radial-gradient(circle at 38% 30%, rgba(115,187,255,0.35) 0%, rgba(20,28,36,0.95) 35%, #050608 100%);
-    box-shadow: inset 0 0 10px rgba(0,0,0,0.8), 0 2px 4px rgba(0,0,0,0.5);
-  }
-
-  .tp-phone3d-lens.l1 { top: 12px; left: 12px; }
-  .tp-phone3d-lens.l2 { top: 12px; right: 12px; }
-  .tp-phone3d-lens.l3 { bottom: 12px; left: 37px; }
-
-  .tp-phone3d-flash {
-    position: absolute;
-    right: 18px;
-    bottom: 18px;
-    width: 14px;
-    height: 14px;
-    border-radius: 50%;
-    background: radial-gradient(circle at 40% 40%, #fff, #d9d9d9 68%, #b9b9b9 100%);
-    box-shadow: 0 0 8px rgba(255,255,255,0.65);
-  }
-
-  .tp-phone3d-logo {
-    position: absolute;
-    left: 50%;
-    top: 56%;
-    transform: translate(-50%, -50%);
-    font-family: var(--ff-head);
-    font-weight: 600;
-    font-size: 24px;
-    letter-spacing: 0.08em;
-    color: rgba(255,255,255,0.34);
-    text-transform: lowercase;
-  }
-
-
-  .tp-phone3d-button {
-    position: absolute;
-    z-index: 5;
-    border-radius: 10px;
-    background: linear-gradient(180deg, #87898d 0%, #5e6065 40%, #36383c 100%);
-    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.12), 0 2px 4px rgba(0,0,0,0.35);
-  }
-
-  .tp-phone3d-btn-action {
-    width: 4px;
-    height: 42px;
-    left: -3px;
-    top: 116px;
-  }
-
-  .tp-phone3d-btn-vol-up,
-  .tp-phone3d-btn-vol-down {
-    width: 4px;
-    height: 58px;
-    left: -3px;
-  }
-
-  .tp-phone3d-btn-vol-up { top: 184px; }
-  .tp-phone3d-btn-vol-down { top: 252px; }
-
-  .tp-phone3d-btn-power {
-    width: 4px;
-    height: 82px;
-    right: -3px;
-    top: 196px;
-  }
-
-  .tp-phone3d-btn-camera {
-    width: 4px;
-    height: 44px;
-    right: -3px;
-    top: 296px;
-  }
-
-  .tp-phone3d-port {
-    position: absolute;
-    bottom: 4px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 42px;
-    height: 6px;
-    border-radius: 4px;
-    background: rgba(12,12,14,0.95);
-    box-shadow: inset 0 0 1px rgba(255,255,255,0.12);
-    z-index: 6;
-  }
-
-  .tp-phone3d-grille {
-    position: absolute;
-    bottom: 5px;
-    width: 26px;
-    height: 6px;
-    z-index: 6;
-    background-image: radial-gradient(circle, rgba(12,12,14,0.95) 1px, transparent 1px);
-    background-size: 5px 5px;
-    background-repeat: repeat-x;
-  }
-
-  .tp-phone3d-grille.left { left: 74px; }
-  .tp-phone3d-grille.right { right: 74px; }
-
-  /* ── Hero responsive ── */
-  .tp-hero-wrap {
-    display: flex;
-    align-items: center;
-    gap: 64px;
-    justify-content: space-between;
-  }
-
-  @media (max-width: 1080px) {
-    .tp-hero-wrap {
-      gap: 38px;
-    }
-    .tp-phone3d-stage {
-      width: 264px;
-    }
-    .tp-phone3d-device {
-      width: 230px;
-      height: 472px;
-    }
-  }
-
-  @media (max-width: 920px) {
-    .tp-hero-wrap {
-      flex-direction: column;
-      align-items: flex-start;
-      gap: 28px;
-    }
-    .tp-hero-right {
-      width: 100%;
-      display: flex;
-      justify-content: center;
-    }
-    .tp-phone3d-stage {
-      width: 250px;
-    }
-    .tp-phone3d-device {
-      width: 216px;
-      height: 444px;
-    }
-  }
-
-  @media (max-width: 640px) {
-    .tp-phone3d-stage {
-      width: 228px;
-    }
-    .tp-phone3d-device {
-      width: 196px;
-      height: 404px;
-    }
-  }
-
-  /* ── Dot live ── */
-  .tp-live-dot {
-    position: relative;
-    width: 7px; height: 7px;
-    border-radius: 50%;
-    background: #22c55e;
-  }
-  .tp-live-dot::before {
-    content: '';
-    position: absolute; inset: 0;
-    border-radius: 50%;
-    background: #22c55e;
-    animation: tp-pulse-ring 1.8s ease-out infinite;
-  }
-
-  /* ── Gradient line ── */
-  .tp-step-connector {
-    position: absolute;
-    top: 0; bottom: 0; left: 38px;
-    width: 1px;
-    background: linear-gradient(to bottom, var(--mg), rgba(37,99,235,0.08));
-  }
-
-  /* ── Scrollbar ── */
-  ::-webkit-scrollbar { width: 4px; }
-  ::-webkit-scrollbar-track { background: var(--bg0); }
-  ::-webkit-scrollbar-thumb { background: var(--bg3); border-radius: 2px; }
-  ::-webkit-scrollbar-thumb:hover { background: rgba(37,99,235,0.4); }
-
-  /* ── Section label ── */
-  .tp-label {
-    display: inline-block;
-    font-family: var(--ff-body);
-    font-size: 10.5px;
-    font-weight: 600;
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
-    color: var(--mg);
-    margin-bottom: 18px;
-  }
-
-  /* ── Decorative grid ── */
-  .tp-grid-bg {
-    background-image:
-      linear-gradient(rgba(255,255,255,0.022) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(255,255,255,0.022) 1px, transparent 1px);
-    background-size: 44px 44px;
-  }
-
-  /* ── Number accent ── */
-  .tp-num-accent {
-    font-family: var(--ff-mono);
-    font-size: 80px;
-    font-weight: 700;
-    color: rgba(37,99,235,0.06);
-    letter-spacing: -4px;
-    line-height: 1;
-    position: absolute;
-    top: -10px; left: -6px;
-    pointer-events: none;
-    user-select: none;
-  }
-
-  /* ── Pricing gradient border ── */
-  .tp-price-featured {
-    position: relative;
-    background: linear-gradient(var(--bg2), var(--bg2)) padding-box,
-                linear-gradient(135deg, var(--mg), rgba(37,99,235,0.3), var(--mg2)) border-box;
-    border: 1px solid transparent;
-  }
-
-  /* ── Row animation delay util ── */
-  .tp-d0 { animation-delay: 0ms; }
-  .tp-d1 { animation-delay: 90ms; }
-  .tp-d2 { animation-delay: 180ms; }
-  .tp-d3 { animation-delay: 270ms; }
-  .tp-d4 { animation-delay: 360ms; }
-
-  /* ── Ambient orb ── */
-  .tp-orb {
-    position: absolute;
-    border-radius: 50%;
-    pointer-events: none;
-    filter: blur(80px);
-    opacity: 0.55;
-  }
-
-  /* ── Visually hidden (accesibilidad & SEO) ── */
-  .tp-visually-hidden {
-    position: absolute;
-    width: 1px; height: 1px;
-    padding: 0; margin: -1px;
-    overflow: hidden;
-    clip: rect(0,0,0,0);
-    white-space: nowrap;
-    border: 0;
-  }
-
-  /* ═══════════════════════════════════════════════════════════
-     RESPONSIVE MOBILE — breakpoints 960 / 620
-  ═══════════════════════════════════════════════════════════ */
-
-  /* ── Nav hamburger ── */
-  .tp-nav-links  { display: flex; gap: 34px; }
-  .tp-nav-actions { display: flex; gap: 12px; align-items: center; }
-  .tp-nav-ham {
-    display: none;
-    background: none; border: none; cursor: pointer;
-    color: var(--t0); align-items: center; justify-content: center;
-    padding: 6px; border-radius: 8px; transition: color 0.2s;
-  }
-  .tp-nav-ham:hover { color: var(--mg); }
-
-  /* ── Mobile overlay menu ── */
-  .tp-mob-overlay {
-    position: fixed; inset: 0; z-index: 190;
-    background: rgba(8,8,10,0.97);
-    backdrop-filter: blur(24px) saturate(1.4);
-    display: flex; flex-direction: column;
-    align-items: center; justify-content: center;
-    gap: 6px;
-    transform: translateY(-110%);
-    transition: transform 0.34s cubic-bezier(0.16,1,0.3,1);
-    pointer-events: none;
-  }
-  .tp-mob-overlay.tp-mob-open {
-    transform: translateY(0);
-    pointer-events: auto;
-  }
-  .tp-mob-nav-link {
-    font-family: var(--ff-head);
-    font-size: 28px; font-weight: 600;
-    color: var(--t0); text-decoration: none;
-    padding: 10px 28px; border-radius: 12px;
-    transition: color 0.2s, background 0.2s;
-    background: none; border: none; cursor: pointer;
-    display: block; text-align: center; letter-spacing: -0.3px;
-  }
-  .tp-mob-nav-link:hover { color: var(--mg); background: rgba(37,99,235,0.07); }
-  .tp-mob-nav-close {
-    position: absolute; top: 18px; right: 20px;
-    background: none; border: none; color: var(--t1); cursor: pointer;
-    padding: 8px; border-radius: 8px;
-    transition: color 0.2s; display: flex; align-items: center;
-  }
-  .tp-mob-nav-close:hover { color: var(--t0); }
-  .tp-mob-nav-actions {
-    display: flex; flex-direction: column;
-    gap: 10px; margin-top: 18px; width: 220px;
-  }
-
-  /* ── Responsive grids ── */
-  .tp-grid-5 { display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px; }
-  .tp-grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
-  .tp-grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
-  .tp-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-  .tp-compare-row { display: grid; grid-template-columns: 240px 1fr; }
-
-  /* ── ≤960px (tablets y móviles grandes) ── */
-  @media (max-width: 960px) {
-    .tp-nav { padding: 0 20px; }
-    .tp-nav-links, .tp-nav-actions { display: none !important; }
-    .tp-nav-ham { display: flex !important; }
-    .tp-grid-5 { grid-template-columns: repeat(2, 1fr); }
-    .tp-grid-4 { grid-template-columns: repeat(2, 1fr); }
-    .tp-grid-3 { grid-template-columns: repeat(2, 1fr); }
-  }
-
-  /* ── ≤620px (móviles estándar) ── */
-  @media (max-width: 620px) {
-    .tp-nav { padding: 0 16px; }
-    .tp-grid-5 { grid-template-columns: 1fr; gap: 12px; }
-    .tp-grid-4 { grid-template-columns: repeat(2, 1fr); gap: 12px; }
-    .tp-grid-3 { grid-template-columns: 1fr; gap: 12px; }
-    .tp-grid-2 { grid-template-columns: 1fr; gap: 12px; }
-    .tp-compare-row { grid-template-columns: 1fr; }
-
-    .tp-hero-wrap { gap: 24px; }
-    .tp-hero-right { display: flex; justify-content: center; }
-  }
-`;
+import '../styles/landing.css';
 
 // ─── HOOKS ────────────────────────────────────────────────────────────────────
 
@@ -890,13 +226,43 @@ function HeroImageSlider() {
 export default function LandingPage() {
   const navigate = useNavigate();
   const [navOpen, setNavOpen] = useState(false);
+  const [activeSection, setActiveSection] = useState('inicio');
+  const [scrollProgress, setScrollProgress] = useState(0);
+  const [isScrolled, setIsScrolled] = useState(false);
+  const [ctaVariant, setCtaVariant] = useState('A');
+
+  const navItems = [
+    { id: 'inicio', label: 'Inicio' },
+    { id: 'producto', label: 'Producto' },
+    { id: 'proceso', label: 'Proceso' },
+    { id: 'precios', label: 'Precios' },
+    { id: 'faqs', label: 'FAQs' },
+  ];
+
+  const withViewTransition = (action) => {
+    if (typeof document !== 'undefined' && 'startViewTransition' in document) {
+      document.startViewTransition(action);
+      return;
+    }
+    action();
+  };
 
   const scrollToSection = (id) => {
     const el = document.getElementById(id);
     if (el) {
-      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      withViewTransition(() => {
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
     }
     setNavOpen(false);
+  };
+
+  const navigateWithTransition = (path) => {
+    withViewTransition(() => navigate(path));
+  };
+
+  const goToTrial = () => {
+    navigateWithTransition('/trial');
   };
 
   const bindPrefetch = (path) => ({
@@ -911,6 +277,81 @@ export default function LandingPage() {
       document.body.style.overflow = '';
     };
   }, [navOpen]);
+
+  useEffect(() => {
+    try {
+      const key = 'tp.cta.variant';
+      const existing = sessionStorage.getItem(key);
+      const variant = existing === 'A' || existing === 'B'
+        ? existing
+        : (Math.random() > 0.5 ? 'A' : 'B');
+      sessionStorage.setItem(key, variant);
+      setCtaVariant(variant);
+    }
+    catch {
+      setCtaVariant('A');
+    }
+  }, []);
+
+  useEffect(() => {
+    const sections = navItems
+      .map((item) => document.getElementById(item.id))
+      .filter(Boolean);
+
+    if (!sections.length) return undefined;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries
+          .filter((entry) => entry.isIntersecting)
+          .sort((a, b) => b.intersectionRatio - a.intersectionRatio);
+
+        if (visible.length) {
+          setActiveSection(visible[0].target.id);
+        }
+      },
+      { root: null, rootMargin: '-36% 0px -48% 0px', threshold: [0.2, 0.4, 0.65] },
+    );
+
+    sections.forEach((section) => observer.observe(section));
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    const onScroll = () => {
+      const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
+      const next = maxScroll > 0 ? (window.scrollY / maxScroll) * 100 : 0;
+      setScrollProgress(Math.min(100, Math.max(0, next)));
+      setIsScrolled(window.scrollY > 18);
+    };
+
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll);
+
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', onScroll);
+    };
+  }, []);
+
+  const ctaCopy = ctaVariant === 'B'
+    ? {
+      navTrial: 'Solicitar demo',
+      heroPrimary: 'Ver demo en vivo',
+      heroSecondary: 'Comparar planes',
+      midPrimary: 'Reservar demo',
+      pricingPrimary: 'Solicitar asesoría',
+      finalPrimary: 'Crear cuenta gratis',
+    }
+    : {
+      navTrial: 'Prueba gratis',
+      heroPrimary: 'Solicitar prueba 14 días',
+      heroSecondary: 'Ver planes',
+      midPrimary: 'Solicitar prueba',
+      pricingPrimary: 'Empezar ahora',
+      finalPrimary: 'Empezar ahora',
+    };
 
   // Reveal refs
   const [heroRef, heroVis]         = useReveal(0.05);
@@ -1051,42 +492,51 @@ export default function LandingPage() {
 
   return (
     <div className="tp-root">
-      <style>{GLOBAL_CSS}</style>
 
-      <header className="tp-nav" role="banner" aria-label="Navegación principal">
-        <button
-          onClick={() => scrollToSection('inicio')}
-          style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'none', border: 'none', color: 'inherit', cursor: 'pointer' }}
-          aria-label="Ir al inicio"
-        >
-          <svg width="28" height="28" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0 }}>
-            <circle cx="50" cy="50" r="45" fill="none" stroke="var(--mg)" strokeWidth="2.5" opacity="0.2"/>
-            <circle cx="50" cy="50" r="40" fill="none" stroke="var(--mg)" strokeWidth="2.8"/>
-            <circle cx="50" cy="12" r="2.2" fill="var(--mg)"/>
-            <circle cx="88" cy="50" r="2.2" fill="var(--mg)"/>
-            <circle cx="50" cy="88" r="2.2" fill="var(--mg)"/>
-            <circle cx="12" cy="50" r="2.2" fill="var(--mg)"/>
-            <line x1="50" y1="50" x2="50" y2="28" stroke="var(--mg)" strokeWidth="2.5" strokeLinecap="round" opacity="0.85"/>
-            <line x1="50" y1="50" x2="68" y2="44" stroke="var(--mg)" strokeWidth="2" strokeLinecap="round" opacity="0.6"/>
-            <circle cx="50" cy="50" r="3.5" fill="var(--mg)"/>
-          </svg>
-          <div style={{ textAlign: 'left' }}>
-            <div style={{ fontFamily: 'var(--ff-head)', fontWeight: 700, fontSize: 15, letterSpacing: 0.2 }}>Tem<span style={{ color: 'var(--mg)' }}>pos</span></div>
-            <div style={{ fontSize: 10.5, color: 'var(--t2)', letterSpacing: 0.4 }}>Control horario legal</div>
-          </div>
-        </button>
+      <header className={`tp-nav ${isScrolled ? 'tp-compact' : ''}`} role="banner" aria-label="Navegación principal">
+        <div className="tp-brand-wrap">
+          <button
+            onClick={() => scrollToSection('inicio')}
+            className="tp-brand"
+            aria-label="Ir al inicio"
+          >
+            <span className="tp-brand-mark" aria-hidden="true">
+              <svg width="30" height="30" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0 }}>
+                <circle cx="50" cy="50" r="45" fill="none" stroke="var(--mg2)" strokeWidth="2.5" opacity="0.2"/>
+                <circle cx="50" cy="50" r="40" fill="none" stroke="var(--mg)" strokeWidth="2.8"/>
+                <circle cx="50" cy="12" r="2.2" fill="var(--mg)"/>
+                <circle cx="88" cy="50" r="2.2" fill="var(--mg)"/>
+                <circle cx="50" cy="88" r="2.2" fill="var(--mg)"/>
+                <circle cx="12" cy="50" r="2.2" fill="var(--mg)"/>
+                <line x1="50" y1="50" x2="50" y2="28" stroke="var(--mg)" strokeWidth="2.5" strokeLinecap="round" opacity="0.85"/>
+                <line x1="50" y1="50" x2="68" y2="44" stroke="var(--mg2)" strokeWidth="2" strokeLinecap="round" opacity="0.78"/>
+                <circle cx="50" cy="50" r="3.5" fill="var(--mg)"/>
+              </svg>
+            </span>
+            <span className="tp-brand-copy">
+              <span className="tp-brand-name">Tem<span>pos</span></span>
+              <span className="tp-brand-tag">Control horario legal</span>
+            </span>
+          </button>
+
+          <span className="tp-brand-proof">Cumplimiento laboral verificado</span>
+        </div>
 
         <nav className="tp-nav-links" aria-label="Secciones">
-          <button className="tp-nav-link" onClick={() => scrollToSection('inicio')}>Inicio</button>
-          <button className="tp-nav-link" onClick={() => scrollToSection('producto')}>Producto</button>
-          <button className="tp-nav-link" onClick={() => scrollToSection('proceso')}>Proceso</button>
-          <button className="tp-nav-link" onClick={() => scrollToSection('precios')}>Precios</button>
-          <button className="tp-nav-link" onClick={() => scrollToSection('faqs')}>FAQs</button>
+          {navItems.map((item) => (
+            <button
+              key={item.id}
+              className={`tp-nav-link ${activeSection === item.id ? 'tp-active' : ''}`}
+              onClick={() => scrollToSection(item.id)}
+            >
+              {item.label}
+            </button>
+          ))}
         </nav>
 
         <div className="tp-nav-actions">
           <Link to="/login" className="tp-btn tp-btn-ghost" {...bindPrefetch('/login')}>Entrar</Link>
-          <Link to="/trial" className="tp-btn tp-btn-primary" {...bindPrefetch('/trial')}>Prueba gratis</Link>
+          <Link to="/trial" className="tp-btn tp-btn-primary" {...bindPrefetch('/trial')}>{ctaCopy.navTrial}</Link>
         </div>
 
         <button className="tp-nav-ham" onClick={() => setNavOpen(true)} aria-label="Abrir menú móvil">
@@ -1096,6 +546,10 @@ export default function LandingPage() {
             <line x1="3" y1="18" x2="21" y2="18" />
           </svg>
         </button>
+
+        <div className="tp-scroll-meter" aria-hidden="true">
+          <span style={{ width: `${scrollProgress}%` }} />
+        </div>
       </header>
 
       <div className={`tp-mob-overlay ${navOpen ? 'tp-mob-open' : ''}`} aria-hidden={!navOpen}>
@@ -1106,15 +560,19 @@ export default function LandingPage() {
           </svg>
         </button>
 
-        <button className="tp-mob-nav-link" onClick={() => scrollToSection('inicio')}>Inicio</button>
-        <button className="tp-mob-nav-link" onClick={() => scrollToSection('producto')}>Producto</button>
-        <button className="tp-mob-nav-link" onClick={() => scrollToSection('proceso')}>Proceso</button>
-        <button className="tp-mob-nav-link" onClick={() => scrollToSection('precios')}>Precios</button>
-        <button className="tp-mob-nav-link" onClick={() => scrollToSection('faqs')}>FAQs</button>
+        {navItems.map((item) => (
+          <button
+            key={item.id}
+            className={`tp-mob-nav-link ${activeSection === item.id ? 'tp-active' : ''}`}
+            onClick={() => scrollToSection(item.id)}
+          >
+            {item.label}
+          </button>
+        ))}
 
         <div className="tp-mob-nav-actions">
           <Link to="/login" className="tp-btn tp-btn-ghost" onClick={() => setNavOpen(false)} {...bindPrefetch('/login')}>Entrar</Link>
-          <Link to="/trial" className="tp-btn tp-btn-primary" onClick={() => setNavOpen(false)} {...bindPrefetch('/trial')}>Prueba gratis</Link>
+          <Link to="/trial" className="tp-btn tp-btn-primary" onClick={() => setNavOpen(false)} {...bindPrefetch('/trial')}>{ctaCopy.navTrial}</Link>
         </div>
       </div>
 
@@ -1124,7 +582,7 @@ export default function LandingPage() {
       <section ref={heroRef} id="inicio" aria-label="Software de control horario legal para empresas y autónomos en España" style={{
         minHeight: '100vh',
         display: 'flex', alignItems: 'center',
-        paddingTop: 58, position: 'relative', overflow: 'hidden',
+        paddingTop: 84, position: 'relative', overflow: 'hidden',
       }}>
         {/* Ambient orbs */}
         <div className="tp-orb" style={{ width: 700, height: 700, top: '-15%', left: '-18%', background: 'radial-gradient(circle, rgba(37,99,235,0.11) 0%, transparent 70%)' }}/>
@@ -1153,11 +611,11 @@ export default function LandingPage() {
               </div>
 
               <div style={{ display: 'flex', gap: 12, marginBottom: 44 }}>
-                <button onClick={() => navigate('/trial')} className="tp-btn tp-btn-primary" style={{ borderRadius: 13, padding: '15px 30px', fontSize: 15, display: 'flex', alignItems: 'center', gap: 9 }}>
-                  Solicitar prueba 14 días <Icon.ArrowRight />
+                <button onClick={() => navigateWithTransition('/trial')} className="tp-btn tp-btn-primary" style={{ borderRadius: 13, padding: '15px 30px', fontSize: 15, display: 'flex', alignItems: 'center', gap: 9 }}>
+                  {ctaCopy.heroPrimary} <Icon.ArrowRight />
                 </button>
-                <button onClick={() => { document.getElementById('precios').scrollIntoView({ behavior: 'smooth' }); }} className="tp-btn tp-btn-ghost" style={{ borderRadius: 13, padding: '15px 28px', fontSize: 15 }}>
-                  Ver planes
+                <button onClick={() => scrollToSection('precios')} className="tp-btn tp-btn-ghost" style={{ borderRadius: 13, padding: '15px 28px', fontSize: 15 }}>
+                  {ctaCopy.heroSecondary}
                 </button>
               </div>
 
@@ -1183,7 +641,7 @@ export default function LandingPage() {
       {/* (Stats strip removed for MVP) */}
 
       {/* ── Feature Grid ── */}
-      <section aria-label="Características principales de Tempos" style={{ padding: '40px 48px 100px', borderBottom: '1px solid var(--border)' }}>
+      <section className="tp-section-surface" aria-label="Características principales de Tempos" style={{ padding: '40px 48px 100px', borderBottom: '1px solid var(--border)' }}>
         <div style={{ maxWidth: 1180, margin: '0 auto' }}>
           <h2 className="tp-visually-hidden">Características principales de Tempos</h2>
           <div className="tp-grid-5">
@@ -1205,7 +663,7 @@ export default function LandingPage() {
       </section>
 
       {/* ── Benefits ── */}
-      <section id="producto" ref={benefitsRef} aria-label="Beneficios del software de control horario Tempos" style={{ padding: 'clamp(60px,8vw,110px) clamp(18px,4vw,48px)', position: 'relative', zIndex: 1 }}>
+      <section className="tp-section-surface" id="producto" ref={benefitsRef} aria-label="Beneficios del software de control horario Tempos" style={{ padding: 'clamp(60px,8vw,110px) clamp(18px,4vw,48px)', position: 'relative', zIndex: 1 }}>
         <div style={{ maxWidth: 1180, margin: '0 auto' }}>
           <div className={`tp-reveal ${benefitsVis ? 'tp-visible' : ''}`} style={{ textAlign: 'center', marginBottom: 64 }}>
             <span className="tp-label">Control y cumplimiento</span>
@@ -1243,7 +701,7 @@ export default function LandingPage() {
       </section>
 
       {/* ── Feature Showcase ── */}
-      <section ref={showcaseRef} aria-label="Imágenes del software de control horario Tempos en uso" style={{ padding: '0 clamp(18px,4vw,48px) clamp(56px,7vw,96px)', position: 'relative', zIndex: 1, borderTop: '1px solid var(--border)' }}>
+      <section className="tp-section-surface" ref={showcaseRef} aria-label="Imágenes del software de control horario Tempos en uso" style={{ padding: '0 clamp(18px,4vw,48px) clamp(56px,7vw,96px)', position: 'relative', zIndex: 1, borderTop: '1px solid var(--border)' }}>
         <div style={{ maxWidth: 1180, margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: 72 }}>
             <span className="tp-label">Software en acción</span>
@@ -1297,7 +755,7 @@ export default function LandingPage() {
       </section>
 
       {/* ── Core modules ── */}
-      <section aria-label="Funcionalidades clave del software de control horario" style={{ padding: '0 clamp(18px,4vw,48px) clamp(56px,7vw,100px)', position: 'relative', zIndex: 1, overflow: 'hidden' }}>
+      <section className="tp-section-surface" aria-label="Funcionalidades clave del software de control horario" style={{ padding: '0 clamp(18px,4vw,48px) clamp(56px,7vw,100px)', position: 'relative', zIndex: 1, overflow: 'hidden' }}>
         <div style={{ maxWidth: 1180, margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: 34 }}>
             <span className="tp-label">Funcionalidades clave</span>
@@ -1328,7 +786,7 @@ export default function LandingPage() {
       </section>
 
       {/* ── Target profiles ── */}
-      <section aria-label="Para quién es Tempos" style={{ padding: '0 48px 96px', position: 'relative', zIndex: 1 }}>
+      <section className="tp-section-surface" aria-label="Para quién es Tempos" style={{ padding: '0 48px 96px', position: 'relative', zIndex: 1 }}>
         <div style={{ maxWidth: 1180, margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: 34 }}>
             <span className="tp-label">Tipos de empresa</span>
@@ -1352,7 +810,7 @@ export default function LandingPage() {
       </section>
 
       {/* ── How it works ── */}
-      <section id="proceso" ref={stepsRef} aria-label="Cómo usar Tempos — 3 pasos para empezar" style={{
+      <section className="tp-section-surface" id="proceso" ref={stepsRef} aria-label="Cómo usar Tempos — 3 pasos para empezar" style={{
         padding: 'clamp(56px,7vw,100px) clamp(18px,4vw,48px)',
         background: 'rgba(255,255,255,0.012)',
         borderTop: '1px solid var(--border)',
@@ -1401,7 +859,7 @@ export default function LandingPage() {
       </section>
 
       {/* ── Use cases ── */}
-      <section aria-label="Razones operativas y casos de uso de Tempos" style={{ padding: 'clamp(52px,6vw,88px) clamp(18px,4vw,48px)', position: 'relative', zIndex: 1 }}>
+      <section className="tp-section-surface" aria-label="Razones operativas y casos de uso de Tempos" style={{ padding: 'clamp(52px,6vw,88px) clamp(18px,4vw,48px)', position: 'relative', zIndex: 1 }}>
         <div style={{ maxWidth: 1180, margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: 36 }}>
             <span className="tp-label">Casos de uso</span>
@@ -1436,7 +894,7 @@ export default function LandingPage() {
       </section>
 
       {/* ── FAQs ── */}
-      <section id="faqs" aria-label="Preguntas frecuentes sobre el software de control horario" style={{ padding: '0 clamp(18px,4vw,48px) clamp(56px,7vw,100px)', position: 'relative', zIndex: 1 }}>
+      <section className="tp-section-surface" id="faqs" aria-label="Preguntas frecuentes sobre el software de control horario" style={{ padding: '0 clamp(18px,4vw,48px) clamp(56px,7vw,100px)', position: 'relative', zIndex: 1 }}>
         <div style={{ maxWidth: 980, margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: 34 }}>
             <span className="tp-label">FAQs</span>
@@ -1460,7 +918,7 @@ export default function LandingPage() {
       </section>
 
       {/* ── Comparison ── */}
-      <section aria-label="Comparativa entre control manual y control horario digital" style={{ padding: '0 48px 88px', position: 'relative', zIndex: 1 }}>
+      <section className="tp-section-surface" aria-label="Comparativa entre control manual y control horario digital" style={{ padding: '0 48px 88px', position: 'relative', zIndex: 1 }}>
         <div style={{ maxWidth: 980, margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: 30 }}>
             <span className="tp-label">Comparativa</span>
@@ -1488,7 +946,7 @@ export default function LandingPage() {
       </section>
 
       {/* ── Mid CTA ── */}
-      <section aria-label="Llamada a la acción antes de precios" style={{ padding: '0 clamp(18px,4vw,48px) clamp(52px,6vw,88px)', position: 'relative', zIndex: 1 }}>
+      <section className="tp-section-surface" aria-label="Llamada a la acción antes de precios" style={{ padding: '0 clamp(18px,4vw,48px) clamp(52px,6vw,88px)', position: 'relative', zIndex: 1 }}>
         <div style={{ maxWidth: 980, margin: '0 auto', border: '1px solid rgba(37,99,235,0.24)', background: 'linear-gradient(180deg, rgba(37,99,235,0.09), rgba(255,255,255,0.015))', borderRadius: 24, padding: '30px 30px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 20, flexWrap: 'wrap' }}>
           <div>
             <h2 style={{ fontFamily: 'var(--ff-head)', fontSize: 28, fontWeight: 600, color: 'var(--t0)', marginBottom: 8 }}>
@@ -1498,14 +956,14 @@ export default function LandingPage() {
               Prueba Tempos con tu operativa real y evalúa en pocos días cómo mejora el control del equipo, la gestión de incidencias y la preparación de documentación.
             </p>
           </div>
-          <button onClick={() => navigate('/trial')} className="tp-btn tp-btn-primary" style={{ borderRadius: 13, padding: '15px 24px', fontSize: 14.5, flexShrink: 0 }}>
-            Solicitar prueba
+          <button onClick={() => navigateWithTransition('/trial')} className="tp-btn tp-btn-primary" style={{ borderRadius: 13, padding: '15px 24px', fontSize: 14.5, flexShrink: 0 }}>
+            {ctaCopy.midPrimary}
           </button>
         </div>
       </section>
 
       {/* ── Pricing ── */}
-      <section id="precios" ref={pricingRef} aria-label="Precios de Tempos — Planes para autónomos y empresas" style={{
+      <section className="tp-section-surface" id="precios" ref={pricingRef} aria-label="Precios de Tempos — Planes para autónomos y empresas" style={{
         padding: 'clamp(60px,8vw,120px) clamp(18px,4vw,48px) clamp(70px,9vw,140px)', borderTop: '1px solid var(--border)', overflow: 'hidden',
         background: 'rgba(255,255,255,0.012)',
         position: 'relative', zIndex: 1,
@@ -1536,13 +994,13 @@ export default function LandingPage() {
                   </div>
                 ))}
               </div>
-              <button className="tp-btn" style={{
+              <button onClick={goToTrial} className="tp-btn" style={{
                 width: '100%', padding: '14px', borderRadius: 13,
                 background: 'rgba(37,99,235,0.1)',
                 border: '1px solid rgba(37,99,235,0.25)',
                 color: 'var(--mg)', fontSize: 14.5, cursor: 'pointer',
               }}>
-                Empezar ahora
+                {ctaCopy.pricingPrimary}
               </button>
             </div>
 
@@ -1568,8 +1026,8 @@ export default function LandingPage() {
                   </div>
                 ))}
               </div>
-              <button className="tp-btn tp-btn-primary" style={{ width: '100%', padding: '14px', borderRadius: 13, fontSize: 14.5, position: 'relative', cursor: 'pointer' }}>
-                Empezar ahora
+              <button onClick={goToTrial} className="tp-btn tp-btn-primary" style={{ width: '100%', padding: '14px', borderRadius: 13, fontSize: 14.5, position: 'relative', cursor: 'pointer' }}>
+                {ctaCopy.pricingPrimary}
               </button>
             </div>
           </div>
@@ -1582,7 +1040,7 @@ export default function LandingPage() {
       </section>
 
       {/* ── Final CTA ── */}
-      <section aria-label="Empieza a usar Tempos hoy" style={{ padding: 'clamp(60px,8vw,120px) clamp(18px,4vw,48px)', textAlign: 'center', position: 'relative', zIndex: 1, overflow: 'hidden' }}>
+      <section className="tp-section-surface" aria-label="Empieza a usar Tempos hoy" style={{ padding: 'clamp(60px,8vw,120px) clamp(18px,4vw,48px)', textAlign: 'center', position: 'relative', zIndex: 1, overflow: 'hidden' }}>
         <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: 800, height: 400, background: 'radial-gradient(ellipse, rgba(37,99,235,0.1) 0%, transparent 65%)', pointerEvents: 'none' }}/>
         <div style={{ maxWidth: 640, margin: '0 auto', position: 'relative' }}>
           <span className="tp-label">Transformación inmediata</span>
@@ -1592,10 +1050,10 @@ export default function LandingPage() {
           <p style={{ fontSize: 16, color: 'var(--t1)', marginBottom: 44, lineHeight: 1.7, fontWeight: 300 }}>
             Únete a cientos de empresas líderes que ya protegen sus márgenes y blindan su cumplimiento legal con Tempos.
           </p>
-            <button onClick={() => navigate('/register')} className="tp-btn tp-btn-primary" style={{
+            <button onClick={() => navigateWithTransition('/register')} className="tp-btn tp-btn-primary" style={{
               borderRadius: 14, padding: '18px 40px', fontSize: 16.5, display: 'inline-flex', alignItems: 'center', gap: 10,
             }}>
-              Empezar ahora <Icon.ArrowRight />
+              {ctaCopy.finalPrimary} <Icon.ArrowRight />
             </button>
         </div>
       </section>
@@ -1614,9 +1072,9 @@ export default function LandingPage() {
           Tem<span style={{ color: 'var(--mg)' }}>pos</span>
         </span>
         <div style={{ display: 'flex', gap: 30 }}>
-          <a href="#" onClick={(e) => e.preventDefault()} style={{ fontSize: 12.5, color: 'var(--t3)', textDecoration: 'none', transition: 'color 0.2s' }} onMouseEnter={e => e.target.style.color = 'var(--t0)'} onMouseLeave={e => e.target.style.color = 'var(--t3)'}>Legal</a>
-          <a href="#" onClick={(e) => e.preventDefault()} style={{ fontSize: 12.5, color: 'var(--t3)', textDecoration: 'none', transition: 'color 0.2s' }} onMouseEnter={e => e.target.style.color = 'var(--t0)'} onMouseLeave={e => e.target.style.color = 'var(--t3)'}>Privacidad</a>
-          <a href="#" onClick={(e) => e.preventDefault()} style={{ fontSize: 12.5, color: 'var(--t3)', textDecoration: 'none', transition: 'color 0.2s' }} onMouseEnter={e => e.target.style.color = 'var(--t0)'} onMouseLeave={e => e.target.style.color = 'var(--t3)'}>Cookies</a>
+          <Link to="/faqs" style={{ fontSize: 12.5, color: 'var(--t3)', textDecoration: 'none', transition: 'color 0.2s' }} onMouseEnter={e => e.target.style.color = 'var(--t0)'} onMouseLeave={e => e.target.style.color = 'var(--t3)'}>Legal</Link>
+          <Link to="/faqs" style={{ fontSize: 12.5, color: 'var(--t3)', textDecoration: 'none', transition: 'color 0.2s' }} onMouseEnter={e => e.target.style.color = 'var(--t0)'} onMouseLeave={e => e.target.style.color = 'var(--t3)'}>Privacidad</Link>
+          <Link to="/faqs" style={{ fontSize: 12.5, color: 'var(--t3)', textDecoration: 'none', transition: 'color 0.2s' }} onMouseEnter={e => e.target.style.color = 'var(--t0)'} onMouseLeave={e => e.target.style.color = 'var(--t3)'}>Cookies</Link>
           <Link to="/contacto" style={{ fontSize: 12.5, color: 'var(--t3)', textDecoration: 'none', transition: 'color 0.2s' }} onMouseEnter={e => e.target.style.color = 'var(--t0)'} onMouseLeave={e => e.target.style.color = 'var(--t3)'}>Contacto</Link>
         </div>
         <p style={{ fontSize: 11.5, color: 'var(--t3)' }}>© 2026 Tempos. Todos los derechos reservados.</p>

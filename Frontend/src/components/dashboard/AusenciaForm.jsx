@@ -1,16 +1,20 @@
 import React, { useState } from 'react';
 
-export default function AusenciaForm({ onSubmit, onCancel, loading }) {
-  const [motivo, setMotivo] = useState('Vacaciones');
-  const [dias, setDias] = useState(1);
-  const [fechaInicio, setFechaInicio] = useState('');
-  const [fechaFin, setFechaFin] = useState('');
+export default function AusenciaForm({ initialValues = {}, onSubmit, onCancel, loading }) {
+  const [motivo, setMotivo] = useState(initialValues.motivo || initialValues.reason || 'Vacaciones');
+  const [dias, setDias] = useState(initialValues.dias || initialValues.days || 1);
+  const [fechaInicio, setFechaInicio] = useState(initialValues.fechaInicio || initialValues.startDate || '');
+  const [fechaFin, setFechaFin] = useState(initialValues.fechaFin || initialValues.endDate || '');
   const [error, setError] = useState('');
 
   const handleSubmit = e => {
     e.preventDefault();
     if (!fechaInicio || !fechaFin || dias < 1) {
       setError('Completa todos los campos correctamente.');
+      return;
+    }
+    if (fechaFin < fechaInicio) {
+      setError('La fecha fin no puede ser anterior a la fecha inicio.');
       return;
     }
     setError('');

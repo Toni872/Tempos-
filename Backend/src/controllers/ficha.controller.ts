@@ -17,8 +17,10 @@ import {
   toMinutes,
   updateFichaSchema,
 } from '../utils/validation.js';
-import { getMadridDateTimeParts, toUtcMidnightDate } from '../utils/timezone.js';
+import { getMadridDateTimeParts, getMadridUtcOffset, toUtcMidnightDate } from '../utils/timezone.js';
 import { applyFichaCorrection, buildFichaCorrectionChanges, type FichaCorrectionChanges } from '../utils/ficha-correction.js';
+import { getTimeEntryService } from '../services/TimeEntryService.js';
+import { TimeEntryType, TimeEntrySource } from '../entities/TimeEntry.js';
 
 const router = Router();
 
@@ -195,6 +197,66 @@ router.get(
 );
 
 /**
+ * GET /api/v1/fichas/stats/daily
+ * Get daily statistics (hours per day)
+ * NOTE: Must be defined BEFORE /:id to prevent Express from capturing "stats" as :id
+ */
+router.get(
+  '/stats/daily',
+  firebaseAuthMiddleware,
+  appUserContextMiddleware,
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const auth = getAuthContext(req);
+    const parseQuery = dailyStatsQuerySchema.safeParse(req.query);
+
+    if (!parseQuery.success) {
+      res.status(400).json(buildValidationError(parseQuery.error));
+      return;
+    }
+
+    const { startDate, endDate } = parseQuery.data;
+
+    const qbStats = AppDataSource.getRepository(Ficha)
+      .createQueryBuilder('ficha')
+      .innerJoin(User, 'user', 'user.uid = ficha.userId')
+      .where('ficha.userId = :uid', { uid: auth.uid })
+      .andWhere('user.companyId = :companyId', { companyId: auth.companyId })
+      .andWhere('ficha.status = :status', { status: 'confirmed' });
+
+    if (startDate && endDate) {
+      qbStats.andWhere('ficha.date BETWEEN :startDate AND :endDate', { startDate, endDate });
+    }
+
+    const fichas = await qbStats.getMany();
+
+    // Agrupar por día
+    const dailyStats = fichas.reduce(
+      (acc, ficha) => {
+        // PostgreSQL puede devolver date como string o Date; normalizar siempre
+        const raw = ficha.date as unknown as string | Date;
+        const dateKey = typeof raw === 'string'
+          ? (raw as string).split('T')[0]
+          : (raw as Date).toISOString().split('T')[0];
+        if (!acc[dateKey]) {
+          acc[dateKey] = { date: dateKey, hours: 0, entries: 0 };
+        }
+        if (ficha.hoursWorked) {
+          acc[dateKey].hours += Number(ficha.hoursWorked);
+        }
+        acc[dateKey].entries += 1;
+        return acc;
+      },
+      {} as Record<string, { date: string; hours: number; entries: number }>
+    );
+
+    res.json({
+      data: Object.values(dailyStats).sort((a, b) => a.date.localeCompare(b.date)),
+      total: Object.keys(dailyStats).length,
+    });
+  })
+);
+
+/**
  * GET /api/v1/fichas/:id
  * Get single ficha by ID
  */
@@ -224,6 +286,93 @@ router.get(
       metadata: ficha.metadata,
       status: ficha.status,
       createdAt: ficha.createdAt,
+    });
+  })
+);
+
+/**
+ * GET /api/v1/fichas/:id/audit-trail
+ * Obtiene trazabilidad completa: ficha + eventos + cambios
+ * Requiere: admin, manager, auditor (no employee de otra persona)
+ */
+router.get(
+  '/:id/audit-trail',
+  firebaseAuthMiddleware,
+  appUserContextMiddleware,
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const auth = getAuthContext(req);
+    const { id } = req.params;
+
+    const ficha = await findScopedFicha(id, auth.uid, auth.companyId);
+
+    if (!ficha) {
+      res.status(404).json({ error: 'Ficha no encontrada' });
+      return;
+    }
+
+    // Validar permisos: solo propietario, manager, admin o auditor pueden ver el audit trail
+    const isOwner = auth.uid === ficha.userId;
+    const isAuditor = auth.role === 'auditor' || auth.role === 'manager' || auth.role === 'admin';
+
+    if (!isOwner && !isAuditor) {
+      res.status(403).json({ error: 'No tienes permisos para ver el historial de auditoría.' });
+      return;
+    }
+
+    // Obtener todos los TimeEntry de la ficha
+    const timeEntries = await AppDataSource.getRepository('TimeEntry')
+      .createQueryBuilder('te')
+      .where('te.fichaId = :fichaId', { fichaId: id })
+      .orderBy('te.timestampUtc', 'ASC')
+      .getMany();
+
+    // Obtener todos los cambios en batch (evita N+1)
+    const entryIds = timeEntries.map((e: Record<string, unknown>) => e.id as string);
+    const changesByEntry: Record<string, unknown[]> = {};
+    if (entryIds.length > 0) {
+      const allChanges = await AppDataSource.getRepository('TimeEntryChangeLog')
+        .createQueryBuilder('log')
+        .where('log.timeEntryId IN (:...ids)', { ids: entryIds })
+        .orderBy('log.createdAt', 'ASC')
+        .getMany();
+
+      for (const change of allChanges as Array<Record<string, unknown>>) {
+        const key = change.timeEntryId as string;
+        if (!changesByEntry[key]) changesByEntry[key] = [];
+        changesByEntry[key].push(change);
+      }
+    }
+
+    res.json({
+      ficha: {
+        id: ficha.id,
+        date: ficha.date,
+        startTime: ficha.startTime,
+        endTime: ficha.endTime,
+        hoursWorked: ficha.hoursWorked,
+        description: ficha.description,
+        projectCode: ficha.projectCode,
+        status: ficha.status,
+        createdAt: ficha.createdAt,
+        metadata: ficha.metadata,
+      },
+      timeEntries: timeEntries.map((te: Record<string, unknown>) => ({
+        id: te.id,
+        type: te.type,
+        timestampUtc: te.timestampUtc,
+        localDateTime: te.localDateTime,
+        source: te.source,
+        ip: te.ip,
+        latitude: te.latitude,
+        longitude: te.longitude,
+        createdAt: te.createdAt,
+      })),
+      changeLog: changesByEntry,
+      auditMeta: {
+        requestedBy: auth.uid,
+        requestedAt: new Date().toISOString(),
+        requestedRole: auth.role,
+      },
     });
   })
 );
@@ -430,6 +579,15 @@ router.post(
       reviewComment: parsed.data.comment,
     };
 
+    // Capturar estado anterior para auditoría
+    const beforeState = {
+      startTime: ficha.startTime,
+      endTime: ficha.endTime,
+      hoursWorked: ficha.hoursWorked,
+      description: ficha.description,
+      projectCode: ficha.projectCode,
+    };
+
     if (parsed.data.decision === 'approved') {
       const nextState = applyFichaCorrection(buildFichaBaseState(ficha), correctionRequest.proposedChanges);
       ficha.startTime = nextState.startTime;
@@ -444,6 +602,33 @@ router.post(
 
     upsertFichaCorrectionMetadata(ficha, reviewedRequest);
     await AppDataSource.getRepository(Ficha).save(ficha);
+
+    // Registrar cambios en TimeEntry si fue aprobada la corrección
+    if (parsed.data.decision === 'approved') {
+      const timeEntryService = getTimeEntryService();
+      const afterState = {
+        startTime: ficha.startTime,
+        endTime: ficha.endTime,
+        hoursWorked: ficha.hoursWorked,
+        description: ficha.description,
+        projectCode: ficha.projectCode,
+      };
+
+      try {
+        await timeEntryService.approveChanges({
+          fichaId: ficha.id,
+          approvedBy: auth.uid,
+          reason: parsed.data.comment || 'Corrección aprobada por manager',
+          beforeState,
+          afterState,
+          ip: req.ip,
+          userAgent: req.get('user-agent'),
+        });
+      } catch (error) {
+        console.error('Error registrando TimeEntryChangeLog para corrección:', error);
+        // No bloquear respuesta si falla changeLog (fallback graceful)
+      }
+    }
 
     await logAction({
       userId: auth.uid,
@@ -593,65 +778,6 @@ router.delete(
 );
 
 /**
- * GET /api/v1/fichas/stats/daily
- * Get daily statistics (hours per day)
- */
-router.get(
-  '/stats/daily',
-  firebaseAuthMiddleware,
-  appUserContextMiddleware,
-  asyncHandler(async (req: Request, res: Response): Promise<void> => {
-    const auth = getAuthContext(req);
-    const parseQuery = dailyStatsQuerySchema.safeParse(req.query);
-
-    if (!parseQuery.success) {
-      res.status(400).json(buildValidationError(parseQuery.error));
-      return;
-    }
-
-    const { startDate, endDate } = parseQuery.data;
-
-    const qbStats = AppDataSource.getRepository(Ficha)
-      .createQueryBuilder('ficha')
-      .innerJoin(User, 'user', 'user.uid = ficha.userId')
-      .where('ficha.userId = :uid', { uid: auth.uid })
-      .andWhere('user.companyId = :companyId', { companyId: auth.companyId })
-      .andWhere('ficha.status = :status', { status: 'confirmed' });
-
-    if (startDate && endDate) {
-      qbStats.andWhere('ficha.date BETWEEN :startDate AND :endDate', { startDate, endDate });
-    }
-
-    const fichas = await qbStats.getMany();
-
-    // Agrupar por día
-    const dailyStats = fichas.reduce(
-      (acc, ficha) => {
-        // PostgreSQL puede devolver date como string o Date; normalizar siempre
-        const raw = ficha.date as unknown as string | Date;
-        const dateKey = typeof raw === 'string'
-          ? (raw as string).split('T')[0]
-          : (raw as Date).toISOString().split('T')[0];
-        if (!acc[dateKey]) {
-          acc[dateKey] = { date: dateKey, hours: 0, entries: 0 };
-        }
-        if (ficha.hoursWorked) {
-          acc[dateKey].hours += Number(ficha.hoursWorked);
-        }
-        acc[dateKey].entries += 1;
-        return acc;
-      },
-      {} as Record<string, { date: string; hours: number; entries: number }>
-    );
-
-    res.json({
-      data: Object.values(dailyStats).sort((a, b) => a.date.localeCompare(b.date)),
-      total: Object.keys(dailyStats).length,
-    });
-  })
-);
-
-/**
  * POST /api/v1/fichas/clockin
  * Registrar hora de entrada (crea ficha con startTime = ahora)
  */
@@ -695,6 +821,27 @@ router.post(
 
     await fichaRepository.save(ficha);
 
+    // Registrar evento atómico CLOCK_IN
+    const timeEntryService = getTimeEntryService();
+    const now = new Date();
+    const { dateIso: localDate } = getMadridDateTimeParts(now);
+    
+    try {
+      await timeEntryService.recordClockEvent({
+        userId: auth.uid,
+        fichaId: ficha.id,
+        type: TimeEntryType.CLOCK_IN,
+        source: TimeEntrySource.WEB,
+        timestampUtc: now,
+        localDateTime: `${localDate}T${timeHHMM}${getMadridUtcOffset(now)}`,
+        ip: req.ip,
+        userAgent: req.get('user-agent'),
+      });
+    } catch (eventError) {
+      console.error('Error registrando TimeEntry CLOCK_IN:', eventError);
+      // No bloquear respuesta si falla registro de evento (fallback graceful)
+    }
+
     res.status(201).json({
       message: 'Entrada registrada',
       ficha: { id: ficha.id, date: ficha.date, startTime: ficha.startTime, status: ficha.status },
@@ -736,6 +883,27 @@ router.post(
     openFicha.status = 'confirmed';
 
     await fichaRepository.save(openFicha);
+
+    // Registrar evento atómico CLOCK_OUT
+    const timeEntryService = getTimeEntryService();
+    const now = new Date();
+    const { dateIso: localDate } = getMadridDateTimeParts(now);
+
+    try {
+      await timeEntryService.recordClockEvent({
+        userId: auth.uid,
+        fichaId: openFicha.id,
+        type: TimeEntryType.CLOCK_OUT,
+        source: TimeEntrySource.WEB,
+        timestampUtc: now,
+        localDateTime: `${localDate}T${timeHHMM}${getMadridUtcOffset(now)}`,
+        ip: req.ip,
+        userAgent: req.get('user-agent'),
+      });
+    } catch (eventError) {
+      console.error('Error registrando TimeEntry CLOCK_OUT:', eventError);
+      // No bloquear respuesta si falla registro de evento (fallback graceful)
+    }
 
     res.json({
       message: 'Salida registrada',
