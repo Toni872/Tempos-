@@ -4,9 +4,7 @@ steps:
     args:
       - build
       - -t
-      - ${_IMAGE}:${COMMIT_SHA}
-      - -t
-      - ${_IMAGE}:latest
+      - ${_IMAGE}:${_TAG}
       - .
 
   - name: gcr.io/cloud-builders/docker
@@ -26,7 +24,7 @@ steps:
 
         DEPLOY_ARGS=(
           run deploy "${_SERVICE_NAME}"
-          --image "${_IMAGE}:${COMMIT_SHA}"
+          --image "${_IMAGE}:${_TAG}"
           --platform managed
           --region "${_REGION}"
           --allow-unauthenticated
@@ -45,13 +43,13 @@ steps:
         gcloud "${DEPLOY_ARGS[@]}"
 
 images:
-  - ${_IMAGE}:${COMMIT_SHA}
-  - ${_IMAGE}:latest
+  - ${_IMAGE}:${_TAG}
 
 substitutions:
   _SERVICE_NAME: tempos-api
-  _REGION: europe-west1
-  _IMAGE: gcr.io/$PROJECT_ID/tempos-api
-  _FIREBASE_PROJECT_ID: tempos-app
-  _DATABASE_SECRET: REPLACE_ME
+  _REGION: europe-west4
+  _IMAGE: gcr.io/tempos-project/tempos-api
+  _FIREBASE_PROJECT_ID: tempos-project-f1e77
+  _DATABASE_SECRET: tempos-db-url
   _CLOUD_SQL_INSTANCE: REPLACE_ME
+  _TAG: latest

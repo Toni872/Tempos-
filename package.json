@@ -1,0 +1,16 @@
+{
+  "name": "tempos-monorepo",
+  "version": "1.0.0",
+  "description": "Tempos HR Dashboard - Root configuration",
+  "private": true,
+  "scripts": {
+    "install:all": "npm install && cd Backend && npm install && cd ../Frontend && npm install",
+    "dev:backend": "cd Backend && npm run dev",
+    "dev:frontend": "cd Frontend && npm run dev",
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "build:all": "cd Backend && npm run build && cd ../Frontend && npm run build"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

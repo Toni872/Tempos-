@@ -58,10 +58,38 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return;
+          const rawPath = id.split('node_modules/')[1];
+          if (!rawPath) return;
+          const parts = rawPath.split('/');
+          const packageName = parts[0].startsWith('@') ? `${parts[0]}/${parts[1]}` : parts[0];
+
+          if (packageName === 'react-router-dom') return 'vendor-router';
+          if (packageName === 'recharts') return 'vendor-recharts';
+          if (packageName === 'firebase') return 'vendor-firebase';
+          if (packageName === 'scheduler') return 'vendor-react';
+          if (packageName === 'react' || packageName === 'react-dom') return 'vendor-react';
+          if (packageName.startsWith('@capacitor')) return 'vendor-capacitor';
+          return 'vendor';
+        },
+      },
+    },
+  },
   server: {
     port: 5173,
     proxy: {
-      '/api': 'http://localhost:8080',
+      '/api': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+      },
+      '/status': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+      },
     },
   },
 })

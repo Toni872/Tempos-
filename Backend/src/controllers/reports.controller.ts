@@ -5,11 +5,22 @@ import { AppDataSource } from '../database.js';
 import { Ficha } from '../entities/Ficha.js';
 import { User } from '../entities/User.js';
 import { AuditLog } from '../entities/AuditLog.js';
+import { Absence } from '../entities/Absence.js';
+import { TimeEntry, TimeEntryType } from '../entities/TimeEntry.js';
 import { logAction } from '../utils/auditLog.js';
 import { appUserContextMiddleware, getAuthContext } from '../middleware/request-context.middleware.js';
 import { hasPermission } from '../security/authorization.js';
 
 const router = Router();
+
+/** Escape a value for RFC 4180 CSV: wrap in quotes if it contains comma, quote, or newline */
+function csvField(val: string | number | null | undefined): string {
+  const s = String(val ?? '');
+  if (s.includes(',') || s.includes('"') || s.includes('\n') || s.includes('\r')) {
+    return '"' + s.replace(/"/g, '""') + '"';
+  }
+  return s;
+}
 
 function parseDate(val: unknown): string | undefined {
   if (typeof val === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(val)) return val;
@@ -22,31 +33,42 @@ function fichasToCSV(fichas: Ficha[]): string {
     const raw = f.date as unknown as string | Date;
     const date = typeof raw === 'string' ? raw.split('T')[0] : (raw as Date).toISOString().split('T')[0];
     return [
-      f.id,
-      date,
-      f.startTime,
-      f.endTime ?? '',
-      f.hoursWorked ?? '',
-      (f.description ?? '').replace(/,/g, ';'),
-      f.projectCode ?? '',
-      f.status,
+      csvField(f.id),
+      csvField(date),
+      csvField(f.startTime),
+      csvField(f.endTime),
+      csvField(f.hoursWorked),
+      csvField(f.description),
+      csvField(f.projectCode),
+      csvField(f.status),
     ].join(',');
   });
   return [header, ...rows].join('\n');
 }
 
-function fichasToPDF(fichas: Ficha[], totalHours: number): string {
+function fichasToPDF(fichas: (Ficha & { userDisplayName?: string, userEmail?: string })[], totalHours: number, targetUser?: User): string {
   const now = new Date().toLocaleString('es-ES');
+  const employerName = 'Antonio Lloret Sánchez';
+  const entityName = 'Tempos (Control Horario)';
+  
+  const employeeInfo = targetUser 
+    ? `EMPLEADO: ${targetUser.displayName} (${targetUser.email})`
+    : 'EMPLEADO: TODOS (REPORTE GLOBAL)';
+
   const lines = [
-    `INFORME DE INSPECCIÓN DE TRABAJO · ${now}`,
-    '='.repeat(60),
+    `REGISTRO DE JORNADA LABORAL (Art. 34.9 ET) · ${now}`,
+    '='.repeat(70),
+    `EMPRESA / TITULAR: ${employerName}`,
+    `SOFTWARE: ${entityName}`,
+    employeeInfo,
+    '='.repeat(70),
     '',
     `Total registros: ${fichas.length}`,
     `Total horas confirmadas: ${totalHours.toFixed(2)}h`,
     '',
-    '-'.repeat(60),
+    '-'.repeat(70),
     'FECHA        INICIO   FIN      HORAS  PROYECTO       ESTADO',
-    '-'.repeat(60),
+    '-'.repeat(70),
     ...fichas.map((f) => {
       const raw = f.date as unknown as string | Date;
       const date = typeof raw === 'string' ? raw.split('T')[0] : (raw as Date).toISOString().split('T')[0];
@@ -54,10 +76,12 @@ function fichasToPDF(fichas: Ficha[], totalHours: number): string {
       const proj = (f.projectCode ?? '').substring(0, 12).padEnd(14);
       return `${date}  ${f.startTime}  ${(f.endTime ?? '-----').padEnd(5)}  ${h}  ${proj}  ${f.status}`;
     }),
-    '-'.repeat(60),
+    '-'.repeat(70),
     '',
-    'Este informe ha sido generado automáticamente por Tempos.',
-    'Es válido como registro de control horario según el art. 34.9 ET.',
+    'DECLARACIÓN: Los datos aquí contenidos son un fiel reflejo de la jornada laboral registrada.',
+    'Este informe ha sido generado digitalmente y es íntegro e inalterable en su origen.',
+    '',
+    'Firma del Trabajador/a: ____________________   Firma de la Empresa: ____________________',
   ];
   return lines.join('\n');
 }
@@ -128,16 +152,16 @@ function buildAuditLogQuery(auth: ReturnType<typeof getAuthContext>, canViewComp
 function auditLogsToCSV(rows: AuditLog[]): string {
   const header = 'id,createdAt,userId,companyId,action,ip,userAgent,metadata';
   const lines = rows.map((row) => {
-    const metadata = row.metadata ? JSON.stringify(row.metadata).replace(/,/g, ';').replace(/\n/g, ' ') : '';
+    const metadata = row.metadata ? JSON.stringify(row.metadata) : '';
     return [
-      row.id,
-      row.createdAt.toISOString(),
-      row.userId ?? '',
-      row.companyId ?? '',
-      row.action,
-      row.ip ?? '',
-      (row.userAgent ?? '').replace(/,/g, ';'),
-      metadata,
+      csvField(row.id),
+      csvField(row.createdAt.toISOString()),
+      csvField(row.userId),
+      csvField(row.companyId),
+      csvField(row.action),
+      csvField(row.ip),
+      csvField(row.userAgent),
+      csvField(metadata),
     ].join(',');
   });
 
@@ -182,15 +206,31 @@ router.get(
     const format = (req.query.format as string) || 'csv';
     const startDate = parseDate(req.query.startDate);
     const endDate = parseDate(req.query.endDate);
+    const targetUserId = typeof req.query.targetUserId === 'string' ? req.query.targetUserId : undefined;
+
+    // RBAC: Solo permitir ver otros usuarios si tiene permiso 'view_employees'
+    const isViewingSelf = !targetUserId || targetUserId === auth.uid;
+    const canViewOthers = hasPermission(auth, 'view_employees');
+
+    if (!isViewingSelf && !canViewOthers) {
+      res.status(403).json({ error: 'No tienes permisos para exportar informes de otros empleados.' });
+      return;
+    }
 
     const qb = AppDataSource.getRepository(Ficha)
       .createQueryBuilder('ficha')
       .innerJoin(User, 'user', 'user.uid = ficha.userId')
-      .where('ficha.userId = :uid', { uid: auth.uid })
-      .andWhere('user.companyId = :companyId', { companyId: auth.companyId })
+      .where('user.companyId = :companyId', { companyId: auth.companyId })
       .andWhere('ficha.status = :status', { status: 'confirmed' })
       .orderBy('ficha.date', 'ASC')
       .addOrderBy('ficha.startTime', 'ASC');
+
+    if (targetUserId) {
+      qb.andWhere('ficha.userId = :targetUserId', { targetUserId });
+    } else if (!canViewOthers) {
+      // Si no es admin y no especificó target, forzar al suyo propio
+      qb.andWhere('ficha.userId = :uid', { uid: auth.uid });
+    }
 
     if (startDate && endDate) {
       qb.andWhere('ficha.date BETWEEN :startDate AND :endDate', { startDate, endDate });
@@ -201,13 +241,22 @@ router.get(
     }
 
     const fichas = await qb.getMany();
+    
+    // Obtener info del usuario objetivo para la cabecera del informe
+    let targetUserInfo: User | undefined;
+    if (targetUserId) {
+      targetUserInfo = await AppDataSource.getRepository(User).findOne({ where: { uid: targetUserId } }) || undefined;
+    } else if (!targetUserId && !canViewOthers) {
+      targetUserInfo = await AppDataSource.getRepository(User).findOne({ where: { uid: auth.uid } }) || undefined;
+    }
+
     const totalHours = fichas.reduce((acc, f) => acc + (Number(f.hoursWorked) || 0), 0);
 
     await logAction({
       userId: auth.uid,
       companyId: auth.companyId,
       action: 'report_export',
-      metadata: { format, startDate, endDate, recordCount: fichas.length },
+      metadata: { format, startDate, endDate, targetUserId, recordCount: fichas.length },
       ip: req.ip,
     });
 
@@ -217,10 +266,10 @@ router.get(
       res.setHeader('Content-Disposition', 'attachment; filename="informe_tempos.csv"');
       res.send('\uFEFF' + csv); // BOM for Excel compatibility
     } else {
-      // PDF-like plain text (no extra deps; swap for pdfkit in production)
-      const pdf = fichasToPDF(fichas, totalHours);
-      res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', 'attachment; filename="informe_inspeccion.pdf"');
+      // Plain text report (swap for pdfkit when real PDF generation is needed)
+      const pdf = fichasToPDF(fichas, totalHours, targetUserInfo);
+      res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+      res.setHeader('Content-Disposition', 'attachment; filename="informe_inspeccion.txt"');
       res.send(Buffer.from(pdf, 'utf-8'));
     }
   })
@@ -355,9 +404,143 @@ router.get(
     }
 
     const pdf = auditLogsToPDF(rows);
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', 'attachment; filename="auditoria_tempos.pdf"');
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.setHeader('Content-Disposition', 'attachment; filename="auditoria_tempos.txt"');
     res.send(Buffer.from(pdf, 'utf-8'));
+  })
+);
+
+
+/**
+ * GET /api/v1/reports/dashboard-stats
+ * Resumen de indicadores clave para el gerente (Dashboard Inicio)
+ */
+router.get(
+  '/dashboard-stats',
+  firebaseAuthMiddleware,
+  appUserContextMiddleware,
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const auth = getAuthContext(req);
+    const isAdmin = hasPermission(auth, 'view_employees');
+
+    if (!isAdmin) {
+      res.status(403).json({ error: 'Acceso reservado a administradores/gerentes.' });
+      return;
+    }
+
+    const today = new Date();
+
+    // 1. Empleados y sus estados hoy
+    const userRepo = AppDataSource.getRepository(User);
+    const employees = await userRepo.find({
+      where: { companyId: auth.companyId, status: 'active' }
+    });
+    const totalEmployees = employees.length;
+
+    const entryRepo = AppDataSource.getRepository(TimeEntry);
+    
+    // Obtenemos los últimos TimeEntry de hoy para cada empleado de la empresa
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+
+    const latestEntries = await entryRepo
+      .createQueryBuilder('te')
+      .where('te.userId IN (:...uids)', { uids: employees.length > 0 ? employees.map(e => e.uid) : ['none'] })
+      .andWhere('te.timestampUtc >= :startOfToday', { startOfToday })
+      .orderBy('te.timestampUtc', 'DESC')
+      .getMany();
+
+    // Mapear último estado por usuario
+    const userStatusMap = new Map<string, TimeEntryType>();
+    latestEntries.forEach(entry => {
+      if (!userStatusMap.has(entry.userId)) {
+        userStatusMap.set(entry.userId, entry.type);
+      }
+    });
+
+    let workingCount = 0;
+    let breakCount = 0;
+    
+    employees.forEach(e => {
+      const status = userStatusMap.get(e.uid);
+      if (status === TimeEntryType.CLOCK_IN || status === TimeEntryType.BREAK_END) {
+        workingCount++;
+      } else if (status === TimeEntryType.BREAK_START) {
+        breakCount++;
+      }
+    });
+
+    const outsideCount = totalEmployees - workingCount - breakCount;
+
+    // 2. Ausencias hoy y pendientes
+    const absenceRepo = AppDataSource.getRepository(Absence);
+    await absenceRepo
+      .createQueryBuilder('absence')
+      .innerJoin(User, 'user', 'user.uid = absence.userId')
+      .where('user.companyId = :companyId', { companyId: auth.companyId })
+      .andWhere('absence.status = :status', { status: 'approved' })
+      .andWhere(':today BETWEEN absence.startDate AND absence.endDate', { today: today.toISOString() })
+      .getCount();
+
+    const pendingAbsences = await absenceRepo
+      .createQueryBuilder('absence')
+      .innerJoin(User, 'user', 'user.uid = absence.userId')
+      .where('user.companyId = :companyId', { companyId: auth.companyId })
+      .andWhere('absence.status = :status', { status: 'pending' })
+      .getCount();
+
+    // 3. Actividad reciente (los eventos de fichajes de hoy para el timeline lateral)
+    const recentActivity = await AppDataSource.getRepository(AuditLog)
+      .createQueryBuilder('audit')
+      .leftJoin(User, 'user', 'user.uid = audit.userId')
+      .where('audit.companyId = :companyId', { companyId: auth.companyId })
+      .andWhere('audit.action IN (:...actions)', { actions: ['clockin', 'clockout', 'fichaje_entrada', 'fichaje_salida', 'break_start', 'break_end'] })
+      .select([
+        'audit.id',
+        'audit.action',
+        'audit.createdAt',
+        'audit.metadata',
+        'user.displayName',
+        'user.email'
+      ])
+      .orderBy('audit.createdAt', 'DESC')
+      .take(15)
+      .getMany();
+
+    // 4. Lista de estados de empleados (para la tabla central)
+    const employeeStatusList = employees.map(e => {
+      const lastType = userStatusMap.get(e.uid);
+      let statusLabel = 'Fuera de jornada';
+      let statusColor = 'zinc';
+
+      if (lastType === TimeEntryType.CLOCK_IN || lastType === TimeEntryType.BREAK_END) {
+        statusLabel = 'Trabajando';
+        statusColor = 'blue';
+      } else if (lastType === TimeEntryType.BREAK_START) {
+        statusLabel = 'En pausa';
+        statusColor = 'orange';
+      }
+
+      return {
+        uid: e.uid,
+        name: e.displayName || e.email,
+        status: statusLabel,
+        color: statusColor,
+        lastAction: lastType || 'Ninguna'
+      };
+    });
+
+    res.json({
+      metrics: {
+        working: workingCount,
+        onBreak: breakCount,
+        outside: outsideCount,
+        registered: totalEmployees,
+        pendingAbsences
+      },
+      recentActivity,
+      employeeStatusList
+    });
   })
 );
 

@@ -7,16 +7,16 @@ export default {
   theme: {
     extend: {
       colors: {
-        mg: '#e8007d',
-        'mg-2': '#ff3399',
+        mg: '#2563eb',
+        'mg-2': '#60a5fa',
         'bg-0': '#141414',
         'bg-1': '#191919',
         'bg-2': '#1e1e1e',
         'bg-3': '#242424',
       },
       fontFamily: {
-        head: ['Cormorant Garamond', 'Georgia', 'serif'],
-        body: ['DM Sans', 'sans-serif'],
+        head: ['Space Grotesk', 'sans-serif'],
+        body: ['Inter', 'sans-serif'],
       },
     },
   },

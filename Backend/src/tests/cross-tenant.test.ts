@@ -35,6 +35,14 @@ function ctx(overrides: Partial<AuthContext> = {}): AuthContext {
   };
 }
 
+async function ensureDbInitialized(): Promise<void> {
+  const { AppDataSource: dataSource } = await import('../database.js');
+  if (!dataSource.isInitialized) {
+    (dataSource.options as any).synchronize = true;
+    await dataSource.initialize();
+  }
+}
+
 // ─── isSameCompany ───────────────────────────────────────────────────────────
 
 test('isSameCompany returns false for different companies', () => {
@@ -181,16 +189,14 @@ test('deleted user loses all access to resources', () => {
 const testWithDb = hasDatabaseUrl ? test : test.skip;
 
 testWithDb('integration: fichas query scoping excludes rows from other tenants', async () => {
-  const { AppDataSource } = await import('../database.js');
+  await ensureDbInitialized();
+
+  const { AppDataSource: dataSource } = await import('../database.js');
   const { User } = await import('../entities/User.js');
   const { Ficha } = await import('../entities/Ficha.js');
 
-  if (!AppDataSource.isInitialized) {
-    await AppDataSource.initialize();
-  }
-
-  const userRepo = AppDataSource.getRepository(User);
-  const fichaRepo = AppDataSource.getRepository(Ficha);
+  const userRepo = dataSource.getRepository(User);
+  const fichaRepo = dataSource.getRepository(Ficha);
 
   const seedId = Date.now().toString();
   const userA = `tenant-a-user-${seedId}`;
@@ -257,16 +263,14 @@ testWithDb('integration: fichas query scoping excludes rows from other tenants',
 });
 
 testWithDb('integration: reports summary query includes only confirmed rows in same tenant', async () => {
-  const { AppDataSource } = await import('../database.js');
+  await ensureDbInitialized();
+
+  const { AppDataSource: dataSource } = await import('../database.js');
   const { User } = await import('../entities/User.js');
   const { Ficha } = await import('../entities/Ficha.js');
 
-  if (!AppDataSource.isInitialized) {
-    await AppDataSource.initialize();
-  }
-
-  const userRepo = AppDataSource.getRepository(User);
-  const fichaRepo = AppDataSource.getRepository(Ficha);
+  const userRepo = dataSource.getRepository(User);
+  const fichaRepo = dataSource.getRepository(Ficha);
 
   const seedId = `${Date.now()}-reports`;
   const userA = `tenant-a-reports-${seedId}`;
@@ -346,16 +350,14 @@ testWithDb('integration: reports summary query includes only confirmed rows in s
 });
 
 testWithDb('integration: absences query scoping excludes rows from other tenants', async () => {
-  const { AppDataSource } = await import('../database.js');
   const { User } = await import('../entities/User.js');
   const { Absence } = await import('../entities/Absence.js');
 
-  if (!AppDataSource.isInitialized) {
-    await AppDataSource.initialize();
-  }
+  await ensureDbInitialized();
 
-  const userRepo = AppDataSource.getRepository(User);
-  const absenceRepo = AppDataSource.getRepository(Absence);
+  const { AppDataSource: dataSource } = await import('../database.js');
+  const userRepo = dataSource.getRepository(User);
+  const absenceRepo = dataSource.getRepository(Absence);
   const seedId = `${Date.now()}-absence-scope`;
 
   const userA = `tenant-a-absence-${seedId}`;
@@ -416,16 +418,14 @@ testWithDb('integration: absences query scoping excludes rows from other tenants
 });
 
 testWithDb('integration: documents query scoping excludes rows from other tenants', async () => {
-  const { AppDataSource } = await import('../database.js');
   const { User } = await import('../entities/User.js');
   const { Document } = await import('../entities/Document.js');
 
-  if (!AppDataSource.isInitialized) {
-    await AppDataSource.initialize();
-  }
+  await ensureDbInitialized();
 
-  const userRepo = AppDataSource.getRepository(User);
-  const documentRepo = AppDataSource.getRepository(Document);
+  const { AppDataSource: dataSource } = await import('../database.js');
+  const userRepo = dataSource.getRepository(User);
+  const documentRepo = dataSource.getRepository(Document);
   const seedId = `${Date.now()}-document-scope`;
 
   const userA = `tenant-a-document-${seedId}`;
@@ -486,14 +486,12 @@ testWithDb('integration: documents query scoping excludes rows from other tenant
 });
 
 testWithDb('integration: audit-log query scoping keeps events inside tenant', async () => {
-  const { AppDataSource } = await import('../database.js');
+  await ensureDbInitialized();
+
+  const { AppDataSource: dataSource } = await import('../database.js');
   const { AuditLog } = await import('../entities/AuditLog.js');
 
-  if (!AppDataSource.isInitialized) {
-    await AppDataSource.initialize();
-  }
-
-  const auditRepo = AppDataSource.getRepository(AuditLog);
+  const auditRepo = dataSource.getRepository(AuditLog);
   const seedId = `${Date.now()}-audit-scope`;
 
   const tenantAUser = `tenant-a-user-${seedId}`;
@@ -530,14 +528,12 @@ testWithDb('integration: audit-log query scoping keeps events inside tenant', as
 });
 
 testWithDb('integration: audit-log filters by action and user inside tenant', async () => {
-  const { AppDataSource } = await import('../database.js');
+  await ensureDbInitialized();
+
+  const { AppDataSource: dataSource } = await import('../database.js');
   const { AuditLog } = await import('../entities/AuditLog.js');
 
-  if (!AppDataSource.isInitialized) {
-    await AppDataSource.initialize();
-  }
-
-  const auditRepo = AppDataSource.getRepository(AuditLog);
+  const auditRepo = dataSource.getRepository(AuditLog);
   const seedId = `${Date.now()}-audit-filter`;
 
   const targetUser = `tenant-a-target-${seedId}`;

@@ -32,23 +32,32 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  --mg: #2563eb;
-  --mg2: #60a5fa;
-  --mg-glow: rgba(37,99,235,0.18);
-  --bg0: #141414;
-  --bg1: #191919;
-  --bg2: #1e1e1e;
-  --bg3: #242424;
-  --border: rgba(255,255,255,0.06);
-  --border-mg: rgba(37,99,235,0.22);
-  --t0: #f2f2f0;
-  --t1: #b5b5b2;
-  --t2: #8e8e89;
-  --t3: #71716d;
+  --mg: #3b82f6;      /* Vibrant Blue 500 */
+  --mg-dark: #2563eb; /* Blue 600 */
+  --mg-light: #60a5fa; /* Blue 400 */
+  --mg-glow: rgba(59, 130, 246, 0.2);
+  
+  --bg0: #0a0a0c;     /* Deep Obsidian */
+  --bg1: #111114;     /* Raised Surfaces */
+  --bg2: #19191c;     /* Component Backgrounds */
+  --bg3: #222226;     /* Elevated Components */
+  
+  --border: rgba(255, 255, 255, 0.05);
+  --border-strong: rgba(255, 255, 255, 0.08);
+  --border-mg: rgba(59, 130, 246, 0.25);
+  
+  --t0: #ffffff;      /* Pure White Header */
+  --t1: #e4e4e7;      /* High Emphasis Body */
+  --t2: #a1a1aa;      /* Medium Emphasis */
+  --t3: #71717a;      /* Low Emphasis / Muted */
+  
   --ff-head: 'Space Grotesk', sans-serif;
   --ff-body: 'Inter', sans-serif;
   --ff-mono: 'Space Mono', monospace;
+  
   --ease-spring: cubic-bezier(0.16, 1, 0.3, 1);
+  --radius-xl: 16px;
+  --radius-2xl: 24px;
 }
 
 html { scroll-behavior: smooth; }
@@ -389,3 +398,8 @@ body { background: var(--bg0); }
   filter: blur(80px);
   opacity: 0.55;
 }
+
+/* ── Shared keyframes (used by Loader, ModalBase) ── */
+@keyframes tp-spin { 100% { transform: rotate(360deg); } }
+@keyframes tp-fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes tp-slide-up { from { transform: translateY(40px); opacity: 0; } to { transform: none; opacity: 1; } }

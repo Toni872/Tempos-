@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 
 const PHONE_REGEX = /^[+]?[(]?[0-9\s-]{6,20}$/;
@@ -142,10 +142,7 @@ export default function TrialPage() {
     setFormError('');
     setIsSubmitting(true);
 
-    // Simular éxito y redirigir
-    setTimeout(() => {
-      navigate('/register', { state: { trial: true, email: formData.email.trim(), company: formData.company.trim() } });
-    }, 350);
+    navigate('/register', { state: { trial: true, email: formData.email.trim(), company: formData.company.trim() } });
   };
 
   return (

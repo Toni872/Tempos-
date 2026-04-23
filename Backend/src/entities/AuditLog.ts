@@ -8,7 +8,7 @@ export class AuditLog {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
 
-  @Column({ type: 'uuid', nullable: true })
+  @Column({ type: 'varchar', length: 128, nullable: true })
   userId?: string;
 
   @Column({ type: 'varchar', nullable: true })

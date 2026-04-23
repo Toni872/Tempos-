@@ -1,4 +1,6 @@
-const DEFAULT_LOCAL_API = 'http://localhost:8080';
+// En desarrollo, usamos rutas relativas para que el proxy de Vite las reenvíe al backend.
+// En producción, VITE_API_URL apuntará al dominio real del backend.
+const DEFAULT_LOCAL_API = '';
 const SESSION_STORAGE_KEY = 'tempos.session';
 
 function getApiBaseUrl() {
@@ -33,51 +35,55 @@ function toQueryString(params = {}) {
 }
 
 async function request(path, options = {}) {
-  const { token, headers, ...rest } = options;
+	const { token, headers, ...rest } = options;
 
-  const response = await fetch(buildUrl(path), {
-    ...rest,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(headers || {}),
-    },
-  });
+	const response = await fetch(buildUrl(path), {
+		...rest,
+		headers: {
+			'Content-Type': 'application/json',
+			...(token ? { Authorization: `Bearer ${token}` } : {}),
+			...(headers || {}),
+		},
+	});
 
-  let payload = null;
-  try {
-    payload = await response.json();
-  } catch {
-    payload = null;
-  }
+	let payload = null;
+	try {
+		payload = await response.json();
+	} catch {
+		payload = null;
+	}
 
-  if (!response.ok) {
-    const message = payload?.error || payload?.message || `Error HTTP ${response.status}`;
-    throw new Error(message);
-  }
+	if (!response.ok) {
+		const message = payload?.error || payload?.message || `Error HTTP ${response.status}`;
+		const error = new Error(message);
+		error.status = response.status;
+		throw error;
+	}
 
-  return payload;
+	return payload;
 }
 
 async function requestBlob(path, options = {}) {
-  const { token, headers, ...rest } = options;
-  const res = await fetch(buildUrl(path), {
-    ...rest,
-    headers: {
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(headers || {}),
-    },
-  });
+	const { token, headers, ...rest } = options;
+	const res = await fetch(buildUrl(path), {
+		...rest,
+		headers: {
+			...(token ? { Authorization: `Bearer ${token}` } : {}),
+			...(headers || {}),
+		},
+	});
 
-  if (!res.ok) {
-    let payload = null;
-    try { payload = await res.json(); } catch {};
-    const message = payload?.error || payload?.message || `Error HTTP ${res.status}`;
-    throw new Error(message);
-  }
+	if (!res.ok) {
+		let payload = null;
+		try { payload = await res.json(); } catch {};
+		const message = payload?.error || payload?.message || `Error HTTP ${res.status}`;
+		const error = new Error(message);
+		error.status = res.status;
+		throw error;
+	}
 
-  const blob = await res.blob();
-  return blob;
+	const blob = await res.blob();
+	return blob;
 }
 
 export function getClientSession() {
@@ -97,11 +103,11 @@ export function clearClientSession() {
   localStorage.removeItem(SESSION_STORAGE_KEY);
 }
 
-export async function registerMe(token) {
+export async function registerMe(token, data = {}) {
   return request('/api/v1/auth/register', {
     method: 'POST',
     token,
-    body: JSON.stringify({}),
+    body: JSON.stringify(data),
   });
 }
 
@@ -116,6 +122,13 @@ export async function pingStatus(token) {
   return request('/status', {
     method: 'GET',
     token,
+  });
+}
+
+export async function submitContact({ name, email, phone, message }) {
+  return request('/api/v1/contact', {
+    method: 'POST',
+    body: JSON.stringify({ name, email, phone, message }),
   });
 }
 
@@ -154,6 +167,39 @@ export async function deleteEmployee(token, id) {
   return request(`/api/v1/employees/${id}`, { method: 'DELETE', token });
 }
 
+// Work Centers (Centros de Trabajo)
+export async function listWorkCenters(token) {
+  return request('/api/v1/work-centers', { method: 'GET', token });
+}
+
+export async function createWorkCenter(token, data) {
+  return request('/api/v1/work-centers', { method: 'POST', token, body: JSON.stringify(data) });
+}
+
+export async function updateWorkCenter(token, id, data) {
+  return request(`/api/v1/work-centers/${id}`, { method: 'PUT', token, body: JSON.stringify(data) });
+}
+export async function deleteWorkCenter(token, id) {
+  return request(`/api/v1/work-centers/${id}`, { method: 'DELETE', token });
+}
+
+// Schedules & Shifts
+export async function listSchedules(token) {
+  return request('/api/v1/schedules', { method: 'GET', token });
+}
+
+export async function createSchedule(token, data) {
+  return request('/api/v1/schedules', { method: 'POST', token, body: JSON.stringify(data) });
+}
+
+export async function listShiftAssignments(token) {
+  return request('/api/v1/schedules/assignments', { method: 'GET', token });
+}
+
+export async function assignShift(token, data) {
+  return request('/api/v1/schedules/assign', { method: 'POST', token, body: JSON.stringify(data) });
+}
+
 // Documents
 export async function uploadDocument(token, formData) {
   const path = '/api/v1/documents';
@@ -169,7 +215,9 @@ export async function uploadDocument(token, formData) {
     let payload = null;
     try { payload = await response.json(); } catch {}
     const message = payload?.error || payload?.message || `Error HTTP ${response.status}`;
-    throw new Error(message);
+    const error = new Error(message);
+    error.status = response.status;
+    throw error;
   }
 
   return response.json();
@@ -179,8 +227,18 @@ export async function downloadDocument(token, id) {
   return requestBlob(`/api/v1/documents/${id}/download`, { method: 'GET', token });
 }
 
-export async function signDocument(token, id) {
-  return request(`/api/v1/documents/${id}/sign`, { method: 'POST', token });
+export async function signDocument(token, id, data = {}) {
+  return request(`/api/v1/documents/${id}/sign`, { 
+    method: 'POST', 
+    token,
+    body: JSON.stringify(data)
+  });
+}
+
+export async function listDocuments(token, params = {}) {
+  const qs = toQueryString(params);
+  const path = `/api/v1/documents${qs ? `?${qs}` : ''}`;
+  return request(path, { method: 'GET', token });
 }
 
 // Absences
@@ -200,14 +258,14 @@ export async function rejectAbsence(token, id) {
   return request(`/api/v1/absences/${id}/reject`, { method: 'POST', token });
 }
 
-export async function listDocuments(token) {
-  return request('/api/v1/documents', { method: 'GET', token });
-}
-
 export async function listFichas(token, params = {}) {
   const qs = toQueryString(params);
   const path = `/api/v1/fichas${qs ? `?${qs}` : ''}`;
   return request(path, { method: 'GET', token });
+}
+
+export async function getDashboardStats(token) {
+  return request('/api/v1/reports/dashboard-stats', { method: 'GET', token });
 }
 
 export async function getReportSummary(token) {
@@ -244,6 +302,10 @@ export async function clockIn(token, payload = {}) {
 
 export async function clockOut(token, payload = {}) {
   return request('/api/v1/fichas/clockout', { method: 'POST', token, body: JSON.stringify(payload) });
+}
+
+export async function getActiveFicha(token) {
+  return request('/api/v1/fichas/active', { method: 'GET', token });
 }
 
 export async function bootstrapLocalSession({ isAdmin = false } = {}) {
@@ -284,3 +346,12 @@ export async function bootstrapLocalSession({ isAdmin = false } = {}) {
   setClientSession(session);
   return session;
 }
+
+const api = {
+  get: (path, options) => request(path, { ...options, method: 'GET' }),
+  post: (path, body, options) => request(path, { ...options, method: 'POST', body: typeof body === 'string' ? body : JSON.stringify(body) }),
+  put: (path, body, options) => request(path, { ...options, method: 'PUT', body: typeof body === 'string' ? body : JSON.stringify(body) }),
+  delete: (path, options) => request(path, { ...options, method: 'DELETE' }),
+};
+
+export default api;

@@ -11,19 +11,28 @@ import { documentStorageService } from '../services/document-storage.service.js'
 
 const router = Router();
 
-async function findScopedDocument(id: string, companyId: string, userId: string): Promise<Document | null> {
-  return AppDataSource.getRepository(Document)
+/**
+ * Helper to find a document ensuring it belongs to the same company
+ * and the user has permission to see it.
+ */
+async function findScopedDocument(id: string, auth: { uid: string, companyId: string, role?: string }): Promise<Document | null> {
+  const query = AppDataSource.getRepository(Document)
     .createQueryBuilder('document')
     .innerJoin(User, 'user', 'user.uid = document.userId')
     .where('document.id = :id', { id })
-    .andWhere('document.userId = :userId', { userId })
-    .andWhere('user.companyId = :companyId', { companyId })
-    .getOne();
+    .andWhere('user.companyId = :companyId', { companyId: auth.companyId });
+  
+  // If not admin, can only see their own docs
+  if (auth.role !== 'admin') {
+    query.andWhere('document.userId = :userId', { userId: auth.uid });
+  }
+
+  return query.getOne();
 }
 
 /**
  * GET /api/v1/documents
- * List documents for the authenticated user
+ * List documents. Admins can filter by ?userId=XYZ.
  */
 router.get(
   '/',
@@ -31,18 +40,27 @@ router.get(
   appUserContextMiddleware,
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const auth = getAuthContext(req);
+    const { userId } = req.query;
+    
     const repo = AppDataSource.getRepository(Document);
-    const docs = await repo.find({
-      where: { userId: auth.uid },
-      order: { createdAt: 'DESC' },
-    });
+    const query = repo.createQueryBuilder('document')
+      .innerJoin(User, 'user', 'user.uid = document.userId')
+      .where('user.companyId = :companyId', { companyId: auth.companyId });
+
+    if (auth.role === 'admin') {
+      if (userId) query.andWhere('document.userId = :userId', { userId });
+    } else {
+      query.andWhere('document.userId = :userId', { userId: auth.uid });
+    }
+
+    const docs = await query.orderBy('document.createdAt', 'DESC').getMany();
     res.json({ data: docs });
   })
 );
 
 /**
  * POST /api/v1/documents
- * Upload a document (multipart/form-data or JSON metadata)
+ * Upload a document (multipart/form-data)
  */
 router.post(
   '/',
@@ -51,11 +69,9 @@ router.post(
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const auth = getAuthContext(req);
     const contentType = req.headers['content-type'] || '';
-
     const repo = AppDataSource.getRepository(Document);
 
     if (contentType.includes('multipart/form-data')) {
-      // File upload via busboy
       const bb = busboy({ headers: req.headers });
       const fields: Record<string, string> = {};
       const fileChunks: Buffer[] = [];
@@ -66,64 +82,61 @@ router.post(
         bb.on('file', (_name, stream, info) => {
           originalFilename = info.filename || 'documento.bin';
           detectedMimeType = info.mimeType || 'application/octet-stream';
-          stream.on('data', (chunk: Buffer) => {
-            fileChunks.push(Buffer.from(chunk));
-          });
+          stream.on('data', (chunk: Buffer) => fileChunks.push(Buffer.from(chunk)));
           stream.on('error', reject);
         });
-
-        bb.on('field', (key, value) => {
-          fields[key] = value;
-        });
-
+        bb.on('field', (key, value) => { fields[key] = value; });
         bb.on('error', reject);
         bb.on('close', resolve);
         req.pipe(bb);
       });
+
+      const targetUserId = auth.role === 'admin' && fields['userId']
+        ? fields['userId']
+        : auth.uid;
 
       const content = Buffer.concat(fileChunks);
       const uploadResult = await documentStorageService.save({
         filename: originalFilename,
         mimeType: fields['mimeType'] || detectedMimeType,
         content,
-        userId: auth.uid,
+        userId: targetUserId,
       });
 
       const doc = repo.create({
-        userId: auth.uid,
-        title: fields['title'] || uploadResult.filename,
+        userId: targetUserId,
+        title: fields['title'] || originalFilename,
         type: (fields['type'] as any) || 'other',
-        status: 'delivered',
+        status: fields['requireSignature'] === 'true' ? 'pending' : 'delivered',
         filename: uploadResult.filename,
         fileUrl: uploadResult.fileUrl,
         mimeType: fields['mimeType'] || detectedMimeType,
       });
 
       await repo.save(doc);
-      await logAction({ userId: auth.uid, companyId: auth.companyId, action: 'document_upload', metadata: { documentId: doc.id, title: doc.title } });
-      res.status(201).json({ message: 'Documento subido', document: doc });
+      await logAction({ userId: auth.uid, companyId: auth.companyId, action: 'document_upload', metadata: { documentId: doc.id, targetUserId } });
+      res.status(201).json({ data: doc });
     } else {
-      // JSON metadata only (e.g. admin creates doc record without binary)
-      const { title, type, filename, fileUrl, mimeType } = req.body;
+      // JSON metadata for manually registered docs
+      const { userId, title, type, fileUrl, mimeType, requireSignature } = req.body;
+      const targetUserId = auth.role === 'admin' && userId ? userId : auth.uid;
+      
       const doc = repo.create({
-        userId: auth.uid,
-        title: title || 'Documento sin título',
+        userId: targetUserId,
+        title: title || 'Documento',
         type: type || 'other',
-        status: 'delivered',
-        filename,
+        status: requireSignature ? 'pending' : 'delivered',
         fileUrl,
         mimeType,
       });
       await repo.save(doc);
-      await logAction({ userId: auth.uid, companyId: auth.companyId, action: 'document_create', metadata: { documentId: doc.id } });
-      res.status(201).json({ message: 'Documento registrado', document: doc });
+      res.status(201).json({ data: doc });
     }
   })
 );
 
 /**
  * GET /api/v1/documents/:id/download
- * Download a document file
  */
 router.get(
   '/:id/download',
@@ -132,30 +145,31 @@ router.get(
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const auth = getAuthContext(req);
     const { id } = req.params;
-    const doc = await findScopedDocument(id, auth.companyId, auth.uid);
+    const doc = await findScopedDocument(id, auth);
+    
     if (!doc) {
       res.status(404).json({ error: 'Documento no encontrado' });
       return;
     }
 
-    const readStream = await documentStorageService.openReadStream(doc.fileUrl || '');
-    if (readStream) {
-      res.setHeader('Content-Disposition', `attachment; filename="${doc.filename || 'documento'}"`);
-      res.setHeader('Content-Type', doc.mimeType || 'application/octet-stream');
-      readStream.pipe(res);
-    } else {
-      // Fallback: send placeholder content
-      const content = `Documento: ${doc.title}\nFecha: ${doc.createdAt}\nEstado: ${doc.status}`;
-      res.setHeader('Content-Disposition', `attachment; filename="${doc.filename || 'documento.txt'}"`);
-      res.setHeader('Content-Type', 'text/plain');
-      res.send(content);
+    try {
+      const readStream = await documentStorageService.openReadStream(doc.fileUrl || '');
+      if (readStream) {
+        res.setHeader('Content-Disposition', `attachment; filename="${doc.filename || 'documento'}"`);
+        res.setHeader('Content-Type', doc.mimeType || 'application/octet-stream');
+        readStream.pipe(res);
+      } else {
+        throw new Error('No stream available');
+      }
+    } catch {
+      res.status(500).json({ error: 'Error al descargar el archivo' });
     }
   })
 );
 
 /**
  * POST /api/v1/documents/:id/sign
- * Mark a document as signed
+ * Digital signature with evidence tracking
  */
 router.post(
   '/:id/sign',
@@ -164,19 +178,42 @@ router.post(
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const auth = getAuthContext(req);
     const { id } = req.params;
-    const repo = AppDataSource.getRepository(Document);
+    const { signatureData, location } = req.body;
 
-    const doc = await findScopedDocument(id, auth.companyId, auth.uid);
+    if (!signatureData) {
+      res.status(400).json({ error: 'La firma es obligatoria' });
+      return;
+    }
+
+    const doc = await findScopedDocument(id, auth);
     if (!doc) {
       res.status(404).json({ error: 'Documento no encontrado' });
       return;
     }
 
-    doc.status = 'signed';
-    await repo.save(doc);
-    await logAction({ userId: auth.uid, companyId: auth.companyId, action: 'document_sign', metadata: { documentId: doc.id, title: doc.title } });
+    if (doc.userId !== auth.uid) {
+      res.status(403).json({ error: 'Solo el destinatario puede firmar este documento' });
+      return;
+    }
 
-    res.json({ message: 'Documento firmado', document: doc });
+    doc.status = 'signed';
+    doc.signatureData = signatureData;
+    doc.signedAt = new Date();
+    doc.signatureMetadata = {
+      ip: req.ip || req.headers['x-forwarded-for']?.toString() || 'unknown',
+      userAgent: req.headers['user-agent'] || 'unknown',
+      location: location || undefined
+    };
+
+    await AppDataSource.getRepository(Document).save(doc);
+    await logAction({ 
+      userId: auth.uid, 
+      companyId: auth.companyId, 
+      action: 'document_signed_legal', 
+      metadata: { documentId: doc.id, title: doc.title } 
+    });
+
+    res.json({ message: 'Documento firmado con éxito', data: doc });
   })
 );
 

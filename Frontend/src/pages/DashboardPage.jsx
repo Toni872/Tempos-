@@ -1,23 +1,54 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import UserMenu from '@/components/UserMenu';
-import ModalBase from '../components/dashboard/ModalBase';
-import Loader from '../components/dashboard/Loader';
-import Success from '../components/dashboard/Success';
-import Error from '../components/dashboard/Error';
-import EmpleadoForm from '../components/dashboard/EmpleadoForm';
-import DocumentoForm from '../components/dashboard/DocumentoForm';
-import AusenciaForm from '../components/dashboard/AusenciaForm';
+import api from '@/lib/api';
+
+// Icons
+import { Clock, Users, MapPin, Calendar, FileText, Search, Download, LayoutDashboard } from 'lucide-react';
+
+// Modular Components
+import DashboardShell from '@/components/dashboard/DashboardShell';
+import OverviewTab from '@/components/dashboard/OverviewTab';
+import EmployeeTab from '@/components/dashboard/EmployeeTab';
+import AttendanceTab from '@/components/dashboard/AttendanceTab';
+import AnalisisTab from '@/components/dashboard/AnalisisTab';
+import InformesTab from '@/components/dashboard/InformesTab';
+import NominasTab from '@/components/dashboard/NominasTab';
+import HorariosTab from '@/components/dashboard/HorariosTab';
+import SedesTab from '@/components/dashboard/SedesTab';
+import AusenciasTab from '@/components/dashboard/AusenciasTab';
+import DocumentosTab from '@/components/dashboard/DocumentosTab';
+import MensajesTab from '@/components/dashboard/MensajesTab';
+import PerfilTab from '@/components/dashboard/PerfilTab';
+import ConfiguracionTab from '@/components/dashboard/ConfiguracionTab';
+
+// Specific Forms
+import ScheduleForm from '@/components/dashboard/ScheduleForm';
+import ShiftAssignForm from '@/components/dashboard/ShiftAssignForm';
+
+// Existing UI Components
+import ModalBase from '@/components/dashboard/ModalBase';
+import GeolocationConsentModal from '@/components/GeolocationConsentModal';
+
+// Hooks
+import { useGeolocation } from '@/hooks/useGeolocation';
+import Loader from '@/components/dashboard/Loader';
+import Success from '@/components/dashboard/Success';
+import ErrorComponent from '@/components/dashboard/Error';
+import EmpleadoForm from '@/components/dashboard/EmpleadoForm';
+import WorkCenterForm from '@/components/dashboard/WorkCenterForm';
+import DocumentoForm from '@/components/dashboard/DocumentoForm';
+import AusenciaForm from '@/components/dashboard/AusenciaForm';
+import FichaForm from '@/components/dashboard/FichaForm';
+import ExpedienteEmpleado from '@/components/dashboard/ExpedienteEmpleado';
+import MapaAuditoria from '@/components/dashboard/MapaAuditoria';
+import SchedulingGrid from '@/components/dashboard/SchedulingGrid';
+
 import {
   getClientSession,
-  setClientSession,
   clearClientSession,
-  pingStatus,
   getMe,
   getDailyStats,
   listEmployees,
-  createEmployee,
-  updateEmployee,
   deleteEmployee,
   listDocuments,
   uploadDocument,
@@ -30,18 +61,20 @@ import {
   exportReport,
   clockIn,
   clockOut,
+  getActiveFicha,
   getReportSummary,
   listAuditLog,
   exportAuditLog,
   closeFichaPeriod,
+  listWorkCenters,
+  deleteWorkCenter,
+  listSchedules,
+  listShiftAssignments,
+  getDashboardStats,
 } from '@/lib/api';
 
-const TABS_ADMIN = ['Inicio', 'Equipo', 'Ausencias', 'Documentos', 'Informes', 'Ajustes'];
-const TABS_EMPLOYEE = ['Inicio', 'Ausencias', 'Documentos', 'Informes'];
-
-function formatDate(value) {
-  if (!value) return '-';
-  return new Date(value).toLocaleDateString('es-ES');
+function cn(...classes) {
+  return classes.filter(Boolean).join(' ');
 }
 
 export default function DashboardPage() {
@@ -53,110 +86,124 @@ export default function DashboardPage() {
     navigate('/login', { replace: true });
   }, [navigate]);
 
-  const [isAdmin, setIsAdmin] = useState(location.state?.isAdmin ?? false);
+  const [isAdmin, setIsAdmin] = useState(location.state?.isAdmin ?? true);
   const [activeTab, setActiveTab] = useState('Inicio');
   const [now, setNow] = useState(new Date());
   const [clockedIn, setClockedIn] = useState(false);
 
-  const [apiStatus, setApiStatus] = useState({ ok: false, loading: true, message: 'Conectando con API...' });
+  const [apiStatus, setApiStatus] = useState({ ok: false, loading: true, message: 'Conectando...' });
   const [profile, setProfile] = useState(null);
-  const [statsError, setStatsError] = useState('');
-
+  const [activeFicha, setActiveFicha] = useState(null);
+  const [stats, setStats] = useState({ activeEmployees: 0, presentNow: 0, totalHoursMonth: 0, pendingAbsences: 0 });
   const [dailyStats, setDailyStats] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [documents, setDocuments] = useState([]);
   const [absences, setAbsences] = useState([]);
+  const [registros, setRegistros] = useState([]);
+  const [workCenters, setWorkCenters] = useState([]);
+  const [schedules, setSchedules] = useState([]);
+  const [shiftAssignments, setShiftAssignments] = useState([]);
   const [reportSummary, setReportSummary] = useState(null);
+  const [dashboardStats, setDashboardStats] = useState(null);
   const [auditLogRows, setAuditLogRows] = useState([]);
-  const [auditFilters, setAuditFilters] = useState(() => {
-    const today = new Date().toISOString().slice(0, 10);
-    return {
-      action: '',
-      userId: '',
-      startDate: today,
-      endDate: today,
-    };
-  });
-  const [periodRange, setPeriodRange] = useState(() => {
-    const today = new Date();
-    const yyyy = today.getFullYear();
-    const mm = String(today.getMonth() + 1).padStart(2, '0');
-    const lastDay = new Date(yyyy, today.getMonth() + 1, 0).getDate();
-    return {
-      startDate: `${yyyy}-${mm}-01`,
-      endDate: `${yyyy}-${mm}-${String(lastDay).padStart(2, '0')}`,
-    };
-  });
+  const [auditFilters, setAuditFilters] = useState({ action: '', userId: '', startDate: '', endDate: '' });
+  const [registrosFilters, setRegistrosFilters] = useState({ employeeId: '', startDate: '', endDate: '' });
+
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
 
   const [modal, setModal] = useState(null);
-  const [modalMode, setModalMode] = useState('add');
+  const [modalMode, setModalMode] = useState('create');
   const [modalData, setModalData] = useState(null);
-  const [feedback, setFeedback] = useState({ type: '', message: '' });
+  const [selectedEmployee, setSelectedEmployee] = useState(null);
 
-  const tabs = isAdmin ? TABS_ADMIN : TABS_EMPLOYEE;
+  // Geolocation consent modal
+  const [showGeolocationConsent, setShowGeolocationConsent] = useState(false);
+  const [geolocationModalMode, setGeolocationModalMode] = useState('consent'); // 'consent' or 'revoke'
+  const { location: geoLocation, error: geoError, loading: geoLoading, consentGiven, requestLocation, revokeConsent } = useGeolocation();
 
-  useEffect(() => {
-    const id = setInterval(() => setNow(new Date()), 1000);
-    return () => clearInterval(id);
-  }, []);
+  const [elapsedWorkingTime, setElapsedWorkingTime] = useState('00:00:00');
 
-  const openModal = (name, mode = 'add', data = null) => {
-    setModal(name);
-    setModalMode(mode);
-    setModalData(data);
+  const showFeedback = (type, message) => {
+    if (type === 'error') setError(message);
+    else if (type === 'success') setSuccess(message);
+    // Loading handled by local state or feedback modal if needed
   };
 
   const closeModal = () => {
     setModal(null);
     setModalData(null);
-    setModalMode('add');
+    setModalMode('create');
   };
 
-  const showFeedback = (type, message) => {
-    setFeedback({ type, message });
-    setModal('feedback');
+  const openModal = (type, mode = 'create', data = null) => {
+    setModal(type);
+    setModalMode(mode);
+    setModalData(data);
   };
 
-  const loadAuditLog = useCallback(async (token, overrides = {}) => {
-    const params = {
-      ...auditFilters,
-      limit: 10,
-      ...overrides,
-    };
+  const loadCollections = async (token, isUserAdmin) => {
+    try {
+      // Common data for everyone
+      const [docs, abs, fxs] = await Promise.all([
+        listDocuments(token),
+        listAbsences(token),
+        api.get('/api/v1/fichas', { 
+          token, 
+          params: { 
+            userId: registrosFilters.employeeId,
+            startDate: registrosFilters.startDate,
+            endDate: registrosFilters.endDate
+          } 
+        })
+      ]);
 
-    const result = await listAuditLog(token, params);
-    setAuditLogRows(Array.isArray(result?.data) ? result.data : []);
-  }, [auditFilters]);
+      setDocuments(Array.isArray(docs) ? docs : []);
+      setAbsences(Array.isArray(abs) ? abs : []);
+      setRegistros(Array.isArray(fxs) ? fxs : (fxs?.data || []));
 
-  const loadCollections = useCallback(async (token) => {
-    const [employeesResult, documentsResult, absencesResult, summaryResult, auditResult] = await Promise.allSettled([
-      listEmployees(token),
-      listDocuments(token),
-      listAbsences(token),
-      getReportSummary(token),
-      listAuditLog(token, { limit: 10 }),
-    ]);
+      // Admin only data
+      if (isUserAdmin) {
+        const [emp, wcs, schs, shifts, dbStats] = await Promise.all([
+          listEmployees(token),
+          listWorkCenters(token),
+          listSchedules(token),
+          listShiftAssignments(token),
+          getDashboardStats(token)
+        ]);
+        setEmployees(emp?.data || []);
+        setWorkCenters(wcs?.data || wcs || []);
+        setSchedules(schs?.data || schs || []);
+        setShiftAssignments(shifts?.data || shifts || []);
+        setDashboardStats(dbStats);
 
-    if (employeesResult.status === 'fulfilled') {
-      setEmployees(Array.isArray(employeesResult.value?.data) ? employeesResult.value.data : []);
+        const activeEmp = emp?.data || [];
+        const present = activeEmp.filter(e => e.isWorking).length;
+        setStats(prev => ({ 
+          ...prev, 
+          activeEmployees: activeEmp.length, 
+          presentNow: present, 
+          pendingAbsences: (Array.isArray(abs) ? abs : []).filter(a => a.status === 'pending').length 
+        }));
+      }
+    } catch (err) {
+      console.error('Error loading collections:', err);
+      if (err.status === 401) {
+        handleLogout();
+      }
     }
+  };
 
-    if (documentsResult.status === 'fulfilled') {
-      setDocuments(Array.isArray(documentsResult.value?.data) ? documentsResult.value.data : []);
-    }
+  const refreshAllData = async () => {
+    const session = getClientSession();
+    if (session?.token) await loadCollections(session.token, isAdmin);
+  };
 
-    if (absencesResult.status === 'fulfilled') {
-      setAbsences(Array.isArray(absencesResult.value?.data) ? absencesResult.value.data : []);
-    }
-
-    if (summaryResult.status === 'fulfilled') {
-      setReportSummary(summaryResult.value || null);
-    }
-
-    if (auditResult.status === 'fulfilled') {
-      setAuditLogRows(Array.isArray(auditResult.value?.data) ? auditResult.value.data : []);
-    }
-  }, []);
+  // Efecto para recargar registros cuando cambian los filtros
+  useEffect(() => {
+    refreshAllData();
+  }, [registrosFilters]);
 
   useEffect(() => {
     const session = getClientSession();
@@ -165,693 +212,520 @@ export default function DashboardPage() {
       return;
     }
 
-    const nextIsAdmin = location.state?.isAdmin ?? session.isAdmin ?? false;
-    setIsAdmin(nextIsAdmin);
-
-    if (session.isAdmin !== nextIsAdmin) {
-      setClientSession({ ...session, isAdmin: nextIsAdmin });
-    }
-
-    const load = async () => {
+    const init = async () => {
+      setLoading(true);
       try {
-        const status = await pingStatus(session.token);
-        setApiStatus({
-          ok: status?.database === 'connected',
-          loading: false,
-          message: status?.database === 'connected' ? 'API conectada' : 'API sin conexion a base de datos',
-        });
-      } catch {
-        setApiStatus({ ok: false, loading: false, message: 'No se pudo conectar con la API.' });
-      }
+        const me = await getMe(session.token);
+        setProfile(me);
+        setIsAdmin(me.role === 'admin');
 
-      try {
-        setProfile(await getMe(session.token));
-      } catch {
-        setProfile(null);
-      }
+        const ficha = await getActiveFicha(session.token);
+        setActiveFicha(ficha);
+        setClockedIn(!!ficha);
 
-      const today = new Date();
-      const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
-      try {
-        const stats = await getDailyStats(session.token, firstDay.toISOString().split('T')[0], today.toISOString().split('T')[0]);
-        setDailyStats(Array.isArray(stats?.data) ? stats.data : []);
-        setStatsError('');
-      } catch {
-        setDailyStats([]);
-        setStatsError('No se pudieron cargar las estadisticas de fichajes.');
-      }
+        await loadCollections(session.token, me.role === 'admin');
+        const dStats = await getDailyStats(session.token);
+        setDailyStats(Array.isArray(dStats) ? dStats : []);
+        
+        const summary = await getReportSummary(session.token);
+        setReportSummary(summary);
 
-      await loadCollections(session.token);
+        setApiStatus({ ok: true, loading: false, message: 'Sistema Operativo' });
+      } catch (err) {
+        console.error('Init error:', err);
+        if (err.status === 401) {
+          handleLogout();
+          return; // STOP EXECUTION
+        } else {
+          setApiStatus({ ok: false, loading: false, message: 'Error de conexión' });
+        }
+      } finally {
+        setLoading(false);
+      }
     };
 
-    load();
-  }, [location.state?.isAdmin, navigate, loadCollections]);
+    init();
+    const interval = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(interval);
+  }, [navigate]);
+
+  useEffect(() => {
+    if (!clockedIn || !activeFicha) {
+      setElapsedWorkingTime('00:00:00');
+      return;
+    }
+    const timer = setInterval(() => {
+      const start = new Date(activeFicha.startTime).getTime();
+      const diff = Date.now() - start;
+      const h = Math.floor(diff / 3600000);
+      const m = Math.floor((diff % 3600000) / 60000);
+      const s = Math.floor((diff % 60000) / 1000);
+      setElapsedWorkingTime(`${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [clockedIn, activeFicha]);
 
   const handleClockToggle = async () => {
     const session = getClientSession();
     if (!session?.token) return;
 
+    // Check if user requires geolocation
+    const currentUser = employees.find(emp => emp.uid === session.userId || emp.id === session.userId);
+    const requiresGeo = currentUser?.requiresGeolocation;
+
+    if (requiresGeo && !consentGiven) {
+      setShowGeolocationConsent(true);
+      return;
+    }
+
     try {
-      if (clockedIn) {
-        await clockOut(session.token);
-      } else {
-        await clockIn(session.token);
+      let payload = {};
+
+      if (requiresGeo && consentGiven) {
+        // Request location if needed
+        await requestLocation();
+        if (geoLocation) {
+          payload = {
+            latitude: geoLocation.latitude,
+            longitude: geoLocation.longitude,
+            accuracy: geoLocation.accuracy,
+          };
+        }
       }
-      setClockedIn((prev) => !prev);
+
+      if (clockedIn) {
+        await clockOut(session.token, payload);
+        setClockedIn(false);
+        setActiveFicha(null);
+        showFeedback('success', 'Turno finalizado.');
+      } else {
+        payload.workCenterId = workCenters[0]?.id;
+        const res = await clockIn(session.token, payload);
+        setActiveFicha(res);
+        setClockedIn(true);
+        showFeedback('success', 'Turno iniciado.');
+      }
+      await refreshAllData();
     } catch (err) {
-      showFeedback('error', err instanceof Error ? err.message : 'No se pudo registrar el fichaje.');
+      showFeedback('error', 'Error al cambiar estado de fichaje.');
     }
   };
 
   const handleEmployeeSubmit = async (values) => {
     const session = getClientSession();
     if (!session?.token) return;
-
-    showFeedback('loading', 'Guardando empleado...');
     try {
-      if (modalMode === 'edit' && modalData?.id) {
-        await updateEmployee(session.token, modalData.id, values);
+      if (modalMode === 'edit') {
+        await api.put(`/api/v1/employees/${modalData.id}`, values, { token: session?.token });
       } else {
         await createEmployee(session.token, values);
       }
-      await loadCollections(session.token);
+      await refreshAllData();
       closeModal();
-      showFeedback('success', 'Empleado guardado correctamente.');
+      showFeedback('success', 'Empleado guardado.');
     } catch (err) {
-      showFeedback('error', err instanceof Error ? err.message : 'No se pudo guardar el empleado.');
+      showFeedback('error', 'Error al guardar empleado.');
     }
   };
 
-  const handleEmployeeDelete = async (employee) => {
-    const session = getClientSession();
-    if (!session?.token || !employee?.id) return;
+  const handleGeolocationConsentAccept = async () => {
+    setShowGeolocationConsent(false);
+    setGeolocationModalMode('consent');
+    // Now proceed with clock toggle
+    await handleClockToggle();
+  };
 
-    showFeedback('loading', 'Desactivando empleado...');
+  const handleGeolocationConsentDeny = () => {
+    setShowGeolocationConsent(false);
+    setGeolocationModalMode('consent');
+    showFeedback('error', 'Se requiere consentimiento de geolocalización para fichar.');
+  };
+
+  const handleGeolocationConsentRevoke = () => {
+    revokeConsent();
+    setShowGeolocationConsent(false);
+    setGeolocationModalMode('consent');
+    showFeedback('success', 'Consentimiento de geolocalización revocado. Ya no se recopilarán datos de ubicación.');
+  };
+
+  const openRevokeModal = () => {
+    setGeolocationModalMode('revoke');
+    setShowGeolocationConsent(true);
+  };
+
+  const handleFichaSubmit = async (data) => {
+    setLoading(true);
     try {
-      await deleteEmployee(session.token, employee.id);
-      await loadCollections(session.token);
-      showFeedback('success', 'Empleado desactivado.');
+      const session = getClientSession();
+      if (modalMode === 'edit') {
+        await api.put(`/api/v1/fichas/${modalData.id}`, data, { token: session.token });
+        showFeedback('success', 'Fichaje actualizado.');
+      }
+      await refreshAllData();
+      closeModal();
     } catch (err) {
-      showFeedback('error', err instanceof Error ? err.message : 'No se pudo desactivar el empleado.');
+      showFeedback('error', 'Error al guardar fichaje.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleWorkCenterSubmit = async (values) => {
+    const session = getClientSession();
+    try {
+      if (modalMode === 'edit') {
+        await api.put(`/api/v1/work-centers/${modalData.id}`, values, { token: session?.token });
+      } else {
+        await api.post('/api/v1/work-centers', values, { token: session?.token });
+      }
+      await refreshAllData();
+      closeModal();
+    } catch (err) {
+      showFeedback('error', 'Error al guardar centro.');
+    }
+  };
+
+  const handleWorkCenterDelete = async (wc) => {
+    if (!confirm(`¿Estás seguro de que deseas eliminar la sede "${wc.name}"?`)) return;
+    try {
+      const session = getClientSession();
+      await api.delete(`/api/v1/work-centers/${wc.id}`, { token: session?.token });
+      await refreshAllData();
+      showFeedback('success', 'Sede eliminada correctamente.');
+    } catch (err) {
+      showFeedback('error', 'Error al eliminar centro.');
+    }
+  };
+
+  const handleScheduleSubmit = async (data) => {
+    setLoading(true);
+    try {
+      const session = getClientSession();
+      if (modalMode === 'edit') {
+        await api.put(`/api/v1/schedules/${modalData.id}`, data, { token: session?.token });
+        showFeedback('success', 'Plantilla actualizada.');
+      } else {
+        await api.post('/api/v1/schedules', data, { token: session?.token });
+        showFeedback('success', 'Nueva plantilla creada.');
+      }
+      await refreshAllData();
+      closeModal();
+    } catch (err) {
+      showFeedback('error', 'Error al guardar horario.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEmployeeDelete = async (emp) => {
+    if (!confirm(`¿Eliminar al empleado ${emp.name}?`)) return;
+    try {
+      const session = getClientSession();
+      await api.delete(`/api/v1/employees/${emp.id}`, { token: session?.token });
+      await refreshAllData();
+      showFeedback('success', 'Empleado eliminado correctamente.');
+    } catch (err) {
+      showFeedback('error', 'Error al eliminar empleado.');
+    }
+  };
+
+  const handleDownloadDocument = async (doc) => {
+    showFeedback('success', `Descargando ${doc.title}...`);
+    // Placeholder logic for downloading the document URL
+    if (doc.url) window.open(doc.url, '_blank');
+  };
+
+  const handleSignDocument = async (doc) => {
+    showFeedback('success', `Iniciando flujo de firma para ${doc.title}...`);
+    // Placeholder logic for signing
+  };
+
+  const handleScheduleDelete = async (sch) => {
+    if (!confirm(`¿Borrar plantilla de horario "${sch.name}"?`)) return;
+    try {
+      const session = getClientSession();
+      await api.delete(`/api/v1/schedules/${sch.id}`, { token: session?.token });
+      await refreshAllData();
+      showFeedback('success', 'Plantilla eliminada.');
+    } catch (err) {
+      showFeedback('error', 'Error al eliminar horario.');
     }
   };
 
   const handleDocumentSubmit = async (values) => {
     const session = getClientSession();
-    if (!session?.token) return;
-
-    showFeedback('loading', 'Subiendo documento...');
     try {
       const fd = new FormData();
       fd.append('title', values.title);
       fd.append('type', values.type || 'other');
       if (values.file) fd.append('file', values.file);
       await uploadDocument(session.token, fd);
-      await loadCollections(session.token);
+      await refreshAllData();
       closeModal();
-      showFeedback('success', 'Documento subido correctamente.');
     } catch (err) {
-      showFeedback('error', err instanceof Error ? err.message : 'No se pudo subir el documento.');
+      showFeedback('error', 'Error al subir documento.');
     }
   };
 
   const handleAbsenceSubmit = async (values) => {
     const session = getClientSession();
-    if (!session?.token) return;
-
-    showFeedback('loading', 'Enviando solicitud...');
     try {
       await requestAbsence(session.token, values);
-      await loadCollections(session.token);
+      await refreshAllData();
       closeModal();
-      showFeedback('success', 'Solicitud enviada correctamente.');
     } catch (err) {
-      showFeedback('error', err instanceof Error ? err.message : 'No se pudo enviar la solicitud.');
+      showFeedback('error', 'Error al solicitar ausencia.');
     }
   };
 
   const actOnAbsence = async (id, action) => {
     const session = getClientSession();
-    if (!session?.token) return;
-
-    showFeedback('loading', action === 'approve' ? 'Aprobando ausencia...' : 'Rechazando ausencia...');
     try {
-      if (action === 'approve') {
-        await approveAbsence(session.token, id);
-      } else {
-        await rejectAbsence(session.token, id);
-      }
-      await loadCollections(session.token);
-      showFeedback('success', action === 'approve' ? 'Ausencia aprobada.' : 'Ausencia rechazada.');
+      if (action === 'approve') await approveAbsence(session.token, id);
+      else await rejectAbsence(session.token, id);
+      await refreshAllData();
     } catch (err) {
-      showFeedback('error', err instanceof Error ? err.message : 'No se pudo procesar la ausencia.');
-    }
-  };
-
-  const handleDownloadDocument = async (doc) => {
-    const session = getClientSession();
-    if (!session?.token) return;
-
-    showFeedback('loading', 'Descargando documento...');
-    try {
-      const blob = await downloadDocument(session.token, doc.id);
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = doc.filename || `${doc.title || 'documento'}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
-      showFeedback('success', 'Descarga completada.');
-    } catch (err) {
-      showFeedback('error', err instanceof Error ? err.message : 'No se pudo descargar el documento.');
-    }
-  };
-
-  const handleSignDocument = async (doc) => {
-    const session = getClientSession();
-    if (!session?.token) return;
-
-    showFeedback('loading', 'Firmando documento...');
-    try {
-      await signDocument(session.token, doc.id);
-      await loadCollections(session.token);
-      showFeedback('success', 'Documento firmado correctamente.');
-    } catch (err) {
-      showFeedback('error', err instanceof Error ? err.message : 'No se pudo firmar el documento.');
+      showFeedback('error', 'Error al procesar ausencia.');
     }
   };
 
   const handleExportReport = async () => {
     const session = getClientSession();
-    if (!session?.token) return;
-
-    showFeedback('loading', 'Exportando informe...');
     try {
       const blob = await exportReport(session.token, { format: 'pdf' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
       a.download = 'informe_inspeccion.pdf';
-      document.body.appendChild(a);
       a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
-      showFeedback('success', 'Informe exportado.');
     } catch (err) {
-      showFeedback('error', err instanceof Error ? err.message : 'No se pudo exportar el informe.');
+      showFeedback('error', 'Error al exportar.');
     }
   };
 
-  const handleExportAudit = async (format = 'csv') => {
+  const handleExportAudit = async (format) => {
     const session = getClientSession();
-    if (!session?.token) return;
-
-    showFeedback('loading', `Exportando auditoria (${format.toUpperCase()})...`);
     try {
-      const blob = await exportAuditLog(session.token, { ...auditFilters, format, limit: 2000 });
+      const blob = await exportAuditLog(session.token, { ...auditFilters, format });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = format === 'csv' ? 'auditoria_tempos.csv' : 'auditoria_tempos.pdf';
-      document.body.appendChild(a);
+      a.download = `auditoria.${format}`;
       a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
-      showFeedback('success', 'Auditoria exportada.');
     } catch (err) {
-      showFeedback('error', err instanceof Error ? err.message : 'No se pudo exportar la auditoria.');
+      showFeedback('error', 'Error al exportar auditoria.');
     }
   };
 
   const handleApplyAuditFilters = async () => {
     const session = getClientSession();
-    if (!session?.token) return;
-
-    showFeedback('loading', 'Aplicando filtros de auditoria...');
     try {
-      await loadAuditLog(session.token);
-      showFeedback('success', 'Filtros aplicados en auditoria reciente.');
+      const logs = await listAuditLog(session.token, auditFilters);
+      setAuditLogRows(logs);
     } catch (err) {
-      showFeedback('error', err instanceof Error ? err.message : 'No se pudieron aplicar los filtros.');
+      console.error(err);
     }
   };
 
-  const handleResetAuditFilters = async () => {
-    const session = getClientSession();
-    if (!session?.token) return;
-
-    const today = new Date().toISOString().slice(0, 10);
-    const resetFilters = {
-      action: '',
-      userId: '',
-      startDate: today,
-      endDate: today,
-    };
-
-    setAuditFilters(resetFilters);
-
-    showFeedback('loading', 'Restableciendo filtros...');
-    try {
-      await loadAuditLog(session.token, resetFilters);
-      showFeedback('success', 'Filtros restablecidos.');
-    } catch (err) {
-      showFeedback('error', err instanceof Error ? err.message : 'No se pudieron restablecer los filtros.');
-    }
-  };
-
-  const handleClosePeriod = async () => {
-    const session = getClientSession();
-    if (!session?.token) return;
-
-    if (!periodRange.startDate || !periodRange.endDate) {
-      showFeedback('error', 'Debes indicar startDate y endDate para cerrar el periodo.');
-      return;
-    }
-
-    showFeedback('loading', 'Cerrando periodo...');
-    try {
-      const result = await closeFichaPeriod(session.token, {
-        startDate: periodRange.startDate,
-        endDate: periodRange.endDate,
-      });
-      await loadCollections(session.token);
-      showFeedback('success', `Periodo cerrado. Fichas archivadas: ${result?.archivedCount ?? 0}.`);
-    } catch (err) {
-      showFeedback('error', err instanceof Error ? err.message : 'No se pudo cerrar el periodo.');
-    }
+  const handleResetAuditFilters = () => {
+    setAuditFilters({ action: '', userId: '', startDate: '', endDate: '' });
   };
 
   const pendingAbsences = useMemo(
-    () => absences.filter((item) => item.status === 'pending'),
+    () => (Array.isArray(absences) ? absences : []).filter((item) => item.status === 'pending'),
     [absences]
   );
 
+  if (loading) return <Loader />;
+
   return (
-    <div className="tp-root tp-dash-shell" style={{ minHeight: '100vh', background: 'var(--bg0)', color: 'var(--t0)', display: 'flex' }}>
-      <style>{`
-        .tp-dash-shell {
-          background:
-            radial-gradient(1200px 520px at 90% -10%, rgba(37,99,235,0.12), transparent 55%),
-            radial-gradient(1000px 380px at 0% 100%, rgba(16,185,129,0.08), transparent 60%),
-            var(--bg0);
-        }
+    <DashboardShell
+      activeTab={activeTab}
+      setActiveTab={setActiveTab}
+      onLogout={handleLogout}
+      profile={profile}
+    >
+      {activeTab === 'Inicio' && (
+        <OverviewTab 
+          profile={profile}
+          stats={stats}
+          dailyStats={dailyStats}
+          activeFicha={activeFicha}
+          clockedIn={clockedIn}
+          handleClockToggle={handleClockToggle}
+          elapsedWorkingTime={elapsedWorkingTime}
+          reportSummary={reportSummary}
+          dashboardStats={dashboardStats}
+        />
+      )}
 
-        .tp-dash-sidebar {
-          width: 240px;
-          border-right: 1px solid var(--border);
-          padding: 20px;
-          display: flex;
-          flex-direction: column;
-          gap: 10px;
-          background: rgba(25,25,25,0.75);
-          backdrop-filter: blur(10px);
-        }
+      {activeTab === 'Equipo' && (
+        <EmployeeTab 
+          employees={employees}
+          onAddEmployee={() => openModal('empleado')}
+          onEditEmployee={(emp) => openModal('empleado', 'edit', emp)}
+          onDeleteEmployee={handleEmployeeDelete}
+          onViewExpediente={setSelectedEmployee}
+        />
+      )}
 
-        .tp-dash-tabs {
-          display: flex;
-          flex-direction: column;
-          gap: 10px;
-        }
+      {activeTab === 'Registros' && (
+        <AttendanceTab 
+          registros={registros} 
+          filters={registrosFilters}
+          setFilters={setRegistrosFilters}
+          onExport={() => alert('Próximamente...')}
+          employees={employees}
+          workCenters={workCenters}
+          onEdit={(row) => openModal('registros', 'edit', row)}
+        />
+      )}
 
-        .tp-dash-main {
-          flex: 1;
-          padding: 24px;
-          display: flex;
-          flex-direction: column;
-          gap: 16px;
-          overflow: auto;
-        }
+      {activeTab === 'Horarios' && (
+        <HorariosTab 
+          employees={employees}
+          schedules={schedules}
+          assignments={shiftAssignments}
+          isAdmin={isAdmin}
+          profile={profile}
+          onAssign={(emp, date) => openModal('assign_shift', 'create', { userId: emp.id, startDate: date.toISOString().split('T')[0] })}
+          onAddTemplate={() => openModal('schedule')}
+          onEditTemplate={(sch) => openModal('schedule', 'edit', sch)}
+          onDeleteTemplate={handleScheduleDelete}
+        />
+      )}
 
-        .tp-dash-table-wrap {
-          overflow-x: auto;
-          border: 1px solid var(--border);
-          border-radius: 12px;
-          background: rgba(22,22,22,0.85);
-        }
+      {activeTab === 'Sedes' && (
+        <SedesTab 
+          workCenters={workCenters}
+          onAdd={() => openModal('workcenter')}
+          onEdit={(wc) => openModal('workcenter', 'edit', wc)}
+          onDelete={handleWorkCenterDelete}
+        />
+      )}
 
-        .tp-dash-table-wrap table th,
-        .tp-dash-table-wrap table td {
-          padding: 10px 12px;
-          border-bottom: 1px solid var(--border);
-          text-align: left;
-          white-space: nowrap;
-          font-size: 13px;
-        }
+      {activeTab === 'Ausencias' && (
+        <AusenciasTab
+          pendingAbsences={pendingAbsences}
+          isAdmin={isAdmin}
+          onRequestAbsence={() => openModal('ausencia')}
+          onActOnAbsence={actOnAbsence}
+        />
+      )}
 
-        .tp-dash-table-wrap table th {
-          color: var(--t2);
-          font-size: 11px;
-          letter-spacing: 0.04em;
-          text-transform: uppercase;
-          font-weight: 600;
-        }
+      {activeTab === 'Documentos' && (
+        <DocumentosTab
+          documents={documents}
+          isAdmin={isAdmin}
+          onUploadDocument={() => openModal('documento')}
+          onDownloadDocument={handleDownloadDocument}
+          onSignDocument={handleSignDocument}
+        />
+      )}
 
-        @media (max-width: 980px) {
-          .tp-dash-shell {
-            flex-direction: column;
-          }
+      {activeTab === 'Análisis' && (
+        <AnalisisTab
+          registros={registros}
+          workCenters={workCenters}
+          employees={employees}
+        />
+      )}
 
-          .tp-dash-sidebar {
-            width: 100%;
-            border-right: none;
-            border-bottom: 1px solid var(--border);
-            position: sticky;
-            top: 0;
-            z-index: 10;
-          }
+      {activeTab === 'Informes' && (
+        <InformesTab 
+          auditLogs={auditLogRows}
+          onExportAudit={handleExportAudit}
+          onExportInspection={handleExportReport}
+          onResetFilters={handleResetAuditFilters}
+        />
+      )}
 
-          .tp-dash-tabs {
-            flex-direction: row;
-            flex-wrap: wrap;
-          }
+      {activeTab === 'Nóminas' && (
+        <NominasTab
+          employees={employees}
+          documents={documents}
+          onUploadDocument={() => openModal('documento')}
+        />
+      )}
 
-          .tp-dash-main {
-            padding: 16px;
-          }
+      {activeTab === 'Mensajes' && (
+        <MensajesTab profile={profile} />
+      )}
 
-          .tp-dash-home-grid {
-            grid-template-columns: 1fr !important;
-          }
+      {activeTab === 'Mi Perfil' && (
+        <PerfilTab 
+          profile={profile}
+          consentGiven={consentGiven}
+          openRevokeModal={openRevokeModal}
+        />
+      )}
 
-          .tp-dash-header {
-            flex-direction: column;
-            align-items: flex-start !important;
-            gap: 8px;
-          }
-        }
-      `}</style>
-      <aside className="tp-dash-sidebar">
-        <div style={{ fontFamily: 'var(--ff-head)', fontSize: 24, fontWeight: 700, marginBottom: 12 }}>Tempos</div>
-        <div className="tp-dash-tabs">
-          {tabs.map((tab) => (
-            <button
-              key={tab}
-              className="tp-btn"
-              onClick={() => setActiveTab(tab)}
-              style={{
-                textAlign: 'left',
-                padding: '10px 12px',
-                borderRadius: 10,
-                border: activeTab === tab ? '1px solid rgba(37,99,235,0.6)' : '1px solid var(--border)',
-                background: activeTab === tab ? 'rgba(37,99,235,0.12)' : 'transparent',
-                color: activeTab === tab ? 'var(--mg2)' : 'var(--t1)',
-              }}
-            >
-              {tab}
-            </button>
-          ))}
-        </div>
+      {(activeTab === 'Mi Empresa' || activeTab === 'Ajustes') && (
+        <ConfiguracionTab 
+          profile={profile}
+          isAdmin={isAdmin}
+        />
+      )}
 
-        <div style={{ marginTop: 'auto' }}>
-          <button className="tp-btn tp-btn-ghost" style={{ width: '100%', borderRadius: 10, padding: '10px 12px' }} onClick={handleLogout}>
-            Cerrar sesion
-          </button>
-        </div>
-      </aside>
-
-      <main className="tp-dash-main">
-        <header className="tp-dash-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <div style={{ fontSize: 13, color: 'var(--t2)' }}>{now.toLocaleDateString('es-ES')}</div>
-            <h1 style={{ fontFamily: 'var(--ff-head)', fontSize: 28, margin: 0 }}>{activeTab}</h1>
-          </div>
-          <UserMenu onLogout={handleLogout} />
-        </header>
-
-        <div style={{ borderRadius: 10, border: apiStatus.ok ? '1px solid rgba(34,197,94,0.35)' : '1px solid rgba(239,68,68,0.35)', background: apiStatus.ok ? 'rgba(34,197,94,0.08)' : 'rgba(239,68,68,0.08)', padding: '10px 12px', fontSize: 13, color: apiStatus.ok ? '#86efac' : '#fecaca', fontWeight: 600 }}>
-          {apiStatus.loading ? 'Conectando con API...' : apiStatus.message}
-          {statsError ? ` · ${statsError}` : ''}
-        </div>
-
-        {activeTab === 'Inicio' && (
-          <section className="tp-dash-home-grid" style={{ display: 'grid', gap: 16, gridTemplateColumns: 'repeat(3, minmax(0,1fr))' }}>
-            <article className="tp-card" style={{ padding: 18, borderRadius: 12 }}>
-              <div style={{ color: 'var(--t2)', fontSize: 13 }}>Usuario</div>
-              <div style={{ fontSize: 18, fontWeight: 600 }}>{profile?.displayName || profile?.email || 'Sin perfil'}</div>
-            </article>
-            <article className="tp-card" style={{ padding: 18, borderRadius: 12 }}>
-              <div style={{ color: 'var(--t2)', fontSize: 13 }}>Fichajes del mes</div>
-              <div style={{ fontSize: 28, fontWeight: 700 }}>{dailyStats.length}</div>
-            </article>
-            <article className="tp-card" style={{ padding: 18, borderRadius: 12 }}>
-              <div style={{ color: 'var(--t2)', fontSize: 13 }}>Jornada</div>
-              <button className="tp-btn tp-btn-primary" style={{ marginTop: 8, borderRadius: 10, padding: '10px 14px' }} onClick={handleClockToggle}>
-                {clockedIn ? 'Finalizar turno' : 'Marcar entrada'}
-              </button>
-            </article>
-          </section>
+      <ModalBase isOpen={!!modal} onClose={closeModal} title={modal}>
+        {modal === 'empleado' && (
+          <EmpleadoForm 
+            mode={modalMode} 
+            initialValues={modalData} 
+            onSubmit={handleEmployeeSubmit}
+            onCancel={closeModal}
+            loading={loading}
+          />
         )}
-
-        {activeTab === 'Equipo' && (
-          <section>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
-              <h2 style={{ margin: 0 }}>Equipo</h2>
-              <button className="tp-btn tp-btn-primary" style={{ borderRadius: 10, padding: '8px 12px' }} onClick={() => openModal('empleado')}>+ Empleado</button>
-            </div>
-            <div className="tp-dash-table-wrap">
-              <table className="tp-dash-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr>
-                    <th>Nombre</th><th>Email</th><th>Rol</th><th>Estado</th><th></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {employees.map((e) => (
-                    <tr key={e.id}>
-                      <td>{e.name || e.email}</td>
-                      <td>{e.email}</td>
-                      <td>{e.role}</td>
-                      <td>{e.status}</td>
-                      <td style={{ textAlign: 'right' }}>
-                        <button className="tp-btn tp-btn-ghost" style={{ borderRadius: 8, padding: '6px 10px', marginRight: 6 }} onClick={() => openModal('empleado', 'edit', e)}>Editar</button>
-                        {isAdmin && (
-                          <button className="tp-btn" style={{ borderRadius: 8, padding: '6px 10px', color: '#fca5a5', border: '1px solid rgba(239,68,68,0.35)', background: 'transparent' }} onClick={() => handleEmployeeDelete(e)}>
-                            Desactivar
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                  {employees.length === 0 && (
-                    <tr><td colSpan={5}>No hay empleados para mostrar.</td></tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </section>
+        {modal === 'registros' && (
+          <FichaForm 
+            initialData={modalData}
+            onSubmit={handleFichaSubmit}
+            onCancel={closeModal}
+            loading={loading}
+          />
         )}
-
-        {activeTab === 'Ausencias' && (
-          <section>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
-              <h2 style={{ margin: 0 }}>Ausencias</h2>
-              <button className="tp-btn tp-btn-primary" style={{ borderRadius: 10, padding: '8px 12px' }} onClick={() => openModal('ausencia')}>Solicitar</button>
-            </div>
-            {pendingAbsences.length === 0 && <div style={{ color: 'var(--t1)' }}>No hay ausencias pendientes.</div>}
-            {pendingAbsences.map((a) => (
-              <div key={a.id} className="tp-card" style={{ borderRadius: 12, padding: 14, marginBottom: 10, display: 'flex', justifyContent: 'space-between' }}>
-                <div>
-                  <div style={{ fontWeight: 600 }}>{a.type}</div>
-                  <div style={{ color: 'var(--t1)', fontSize: 13 }}>{formatDate(a.startDate)} - {formatDate(a.endDate)}</div>
-                </div>
-                {isAdmin && (
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <button className="tp-btn tp-btn-ghost" style={{ borderRadius: 8, padding: '6px 10px' }} onClick={() => actOnAbsence(a.id, 'reject')}>Rechazar</button>
-                    <button className="tp-btn tp-btn-primary" style={{ borderRadius: 8, padding: '6px 10px' }} onClick={() => actOnAbsence(a.id, 'approve')}>Aprobar</button>
-                  </div>
-                )}
-              </div>
-            ))}
-          </section>
+        {modal === 'workcenter' && <WorkCenterForm mode={modalMode} initialData={modalData} onSuccess={() => { closeModal(); refreshAllData(); }} />}
+        {modal === 'ausencia' && <AusenciaForm onSuccess={() => { closeModal(); refreshAllData(); }} />}
+        {modal === 'documento' && <DocumentoForm onSuccess={() => { closeModal(); refreshAllData(); }} />}
+        {modal === 'schedule' && (
+          <ScheduleForm 
+            mode={modalMode}
+            initialValues={modalData}
+            onSubmit={handleScheduleSubmit} 
+            onCancel={closeModal} 
+            loading={loading}
+          />
         )}
-
-        {activeTab === 'Documentos' && (
-          <section>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
-              <h2 style={{ margin: 0 }}>Documentos</h2>
-              {isAdmin && <button className="tp-btn tp-btn-primary" style={{ borderRadius: 10, padding: '8px 12px' }} onClick={() => openModal('documento')}>+ Documento</button>}
-            </div>
-            <div className="tp-dash-table-wrap">
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr>
-                    <th>Titulo</th><th>Tipo</th><th>Estado</th><th>Fecha</th><th></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {documents.map((d) => (
-                    <tr key={d.id}>
-                      <td>{d.title || d.filename || 'Documento'}</td>
-                      <td>{d.type || 'other'}</td>
-                      <td>{d.status}</td>
-                      <td>{formatDate(d.createdAt)}</td>
-                      <td style={{ textAlign: 'right' }}>
-                        <button className="tp-btn tp-btn-ghost" style={{ borderRadius: 8, padding: '6px 10px', marginRight: 6 }} onClick={() => handleDownloadDocument(d)}>Descargar</button>
-                        {d.status !== 'signed' && <button className="tp-btn tp-btn-primary" style={{ borderRadius: 8, padding: '6px 10px' }} onClick={() => handleSignDocument(d)}>Firmar</button>}
-                      </td>
-                    </tr>
-                  ))}
-                  {documents.length === 0 && (
-                    <tr><td colSpan={5}>No hay documentos.</td></tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </section>
-        )}
-
-        {activeTab === 'Informes' && (
-          <section className="tp-card" style={{ borderRadius: 12, padding: 16 }}>
-            <h2 style={{ marginTop: 0 }}>Informes</h2>
-            <p style={{ color: 'var(--t1)' }}>Entradas confirmadas: {reportSummary?.totalEntries ?? 0}</p>
-            <p style={{ color: 'var(--t1)' }}>Horas totales: {reportSummary?.totalHours ?? 0}</p>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
-              <button className="tp-btn tp-btn-primary" style={{ borderRadius: 10, padding: '8px 12px' }} onClick={handleExportReport}>Exportar fichajes PDF</button>
-              <button className="tp-btn tp-btn-ghost" style={{ borderRadius: 10, padding: '8px 12px' }} onClick={() => handleExportAudit('csv')}>Exportar auditoria CSV</button>
-              <button className="tp-btn tp-btn-ghost" style={{ borderRadius: 10, padding: '8px 12px' }} onClick={() => handleExportAudit('pdf')}>Exportar auditoria PDF</button>
-            </div>
-
-            <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12, marginTop: 12 }}>
-              <h3 style={{ marginTop: 0, marginBottom: 8, fontSize: 16 }}>Auditoria reciente</h3>
-              <div style={{ display: 'grid', gap: 8, gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', marginBottom: 10 }}>
-                <label style={{ display: 'grid', gap: 4, fontSize: 12, color: 'var(--t2)' }}>
-                  Accion
-                  <select
-                    value={auditFilters.action}
-                    onChange={(e) => setAuditFilters((prev) => ({ ...prev, action: e.target.value }))}
-                    style={{ borderRadius: 8, border: '1px solid var(--border)', padding: '8px 10px', background: 'var(--bg2)', color: 'var(--t0)' }}
-                  >
-                    <option value="">Todas</option>
-                    <option value="clock_in">clock_in</option>
-                    <option value="clock_out">clock_out</option>
-                    <option value="ficha_correction_requested">ficha_correction_requested</option>
-                    <option value="ficha_correction_reviewed">ficha_correction_reviewed</option>
-                    <option value="ficha_period_closed">ficha_period_closed</option>
-                    <option value="report_export">report_export</option>
-                    <option value="report_audit_export">report_audit_export</option>
-                  </select>
-                </label>
-                <label style={{ display: 'grid', gap: 4, fontSize: 12, color: 'var(--t2)' }}>
-                  Usuario
-                  <input
-                    type="text"
-                    value={auditFilters.userId}
-                    onChange={(e) => setAuditFilters((prev) => ({ ...prev, userId: e.target.value }))}
-                    placeholder="uid (opcional)"
-                    style={{ borderRadius: 8, border: '1px solid var(--border)', padding: '8px 10px', background: 'var(--bg2)', color: 'var(--t0)' }}
-                  />
-                </label>
-                <label style={{ display: 'grid', gap: 4, fontSize: 12, color: 'var(--t2)' }}>
-                  Desde
-                  <input
-                    type="date"
-                    value={auditFilters.startDate}
-                    onChange={(e) => setAuditFilters((prev) => ({ ...prev, startDate: e.target.value }))}
-                    style={{ borderRadius: 8, border: '1px solid var(--border)', padding: '8px 10px', background: 'var(--bg2)', color: 'var(--t0)' }}
-                  />
-                </label>
-                <label style={{ display: 'grid', gap: 4, fontSize: 12, color: 'var(--t2)' }}>
-                  Hasta
-                  <input
-                    type="date"
-                    value={auditFilters.endDate}
-                    onChange={(e) => setAuditFilters((prev) => ({ ...prev, endDate: e.target.value }))}
-                    style={{ borderRadius: 8, border: '1px solid var(--border)', padding: '8px 10px', background: 'var(--bg2)', color: 'var(--t0)' }}
-                  />
-                </label>
-              </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 10 }}>
-                <button className="tp-btn tp-btn-primary" style={{ borderRadius: 10, padding: '8px 12px' }} onClick={handleApplyAuditFilters}>
-                  Aplicar filtros
-                </button>
-                <button className="tp-btn tp-btn-ghost" style={{ borderRadius: 10, padding: '8px 12px' }} onClick={handleResetAuditFilters}>
-                  Restablecer
-                </button>
-              </div>
-              {auditLogRows.length === 0 ? (
-                <p style={{ color: 'var(--t2)', margin: 0 }}>Sin eventos recientes.</p>
-              ) : (
-                <div className="tp-dash-table-wrap">
-                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                    <thead>
-                      <tr>
-                        <th>Fecha</th>
-                        <th>Accion</th>
-                        <th>Usuario</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {auditLogRows.map((row) => (
-                        <tr key={row.id}>
-                          <td>{formatDate(row.createdAt)}</td>
-                          <td>{row.action}</td>
-                          <td>{row.userId || '-'}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-
-            {isAdmin && (
-              <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12, marginTop: 12 }}>
-                <h3 style={{ marginTop: 0, marginBottom: 8, fontSize: 16 }}>Cierre de periodo</h3>
-                <div style={{ display: 'grid', gap: 8, gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', marginBottom: 10 }}>
-                  <label style={{ display: 'grid', gap: 4, fontSize: 12, color: 'var(--t2)' }}>
-                    Inicio
-                    <input
-                      type="date"
-                      value={periodRange.startDate}
-                      onChange={(e) => setPeriodRange((prev) => ({ ...prev, startDate: e.target.value }))}
-                      style={{ borderRadius: 8, border: '1px solid var(--border)', padding: '8px 10px', background: 'var(--bg2)', color: 'var(--t0)' }}
-                    />
-                  </label>
-                  <label style={{ display: 'grid', gap: 4, fontSize: 12, color: 'var(--t2)' }}>
-                    Fin
-                    <input
-                      type="date"
-                      value={periodRange.endDate}
-                      onChange={(e) => setPeriodRange((prev) => ({ ...prev, endDate: e.target.value }))}
-                      style={{ borderRadius: 8, border: '1px solid var(--border)', padding: '8px 10px', background: 'var(--bg2)', color: 'var(--t0)' }}
-                    />
-                  </label>
-                </div>
-                <button className="tp-btn" style={{ borderRadius: 10, padding: '8px 12px', border: '1px solid rgba(245,158,11,0.45)', color: '#fbbf24', background: 'rgba(245,158,11,0.08)' }} onClick={handleClosePeriod}>
-                  Cerrar periodo
-                </button>
-              </div>
-            )}
-          </section>
-        )}
-
-        {activeTab === 'Ajustes' && (
-          <section className="tp-card" style={{ borderRadius: 12, padding: 16 }}>
-            <h2 style={{ marginTop: 0 }}>Ajustes</h2>
-            <button className="tp-btn tp-btn-ghost" style={{ borderRadius: 10, padding: '8px 12px' }} onClick={() => navigate('/kiosk')}>Ir a Kiosko</button>
-          </section>
-        )}
-      </main>
-
-      <ModalBase open={modal === 'empleado'} onClose={closeModal} title={modalMode === 'edit' ? 'Editar empleado' : 'Nuevo empleado'}>
-        <EmpleadoForm initialValues={modalData || {}} onSubmit={handleEmployeeSubmit} onCancel={closeModal} />
+        {modal === 'assign_shift' && <ShiftAssignForm initialValues={modalData} employees={employees} schedules={schedules} onSubmit={async (data) => { 
+          try { 
+            const session = getClientSession();
+            await api.post('/api/v1/schedules/assign', data, { token: session?.token }); 
+            closeModal(); 
+            refreshAllData(); 
+          } catch (err) { console.error(err); } 
+        }} onCancel={closeModal} />}
       </ModalBase>
 
-      <ModalBase open={modal === 'documento'} onClose={closeModal} title={'Subir documento'}>
-        <DocumentoForm initialValues={modalData || {}} onSubmit={handleDocumentSubmit} onCancel={closeModal} />
-      </ModalBase>
+      {selectedEmployee && (
+        <ExpedienteEmpleado 
+          employee={selectedEmployee} 
+          onClose={() => setSelectedEmployee(null)} 
+          fichas={[]}
+          onUpdate={refreshAllData}
+        />
+      )}
 
-      <ModalBase open={modal === 'ausencia'} onClose={closeModal} title={'Solicitar ausencia'}>
-        <AusenciaForm initialValues={modalData || {}} onSubmit={handleAbsenceSubmit} onCancel={closeModal} />
-      </ModalBase>
+      {success && <Success message={success} onClose={() => setSuccess('')} />}
+      {error && <ErrorComponent message={error} onClose={() => setError('')} />}
 
-      <ModalBase open={modal === 'feedback'} onClose={() => setModal(null)} title={feedback.type === 'error' ? 'Error' : feedback.type === 'success' ? 'Exito' : ''}>
-        {feedback.type === 'loading' && <Loader text={feedback.message} />}
-        {feedback.type === 'success' && <Success text={feedback.message} />}
-        {feedback.type === 'error' && <Error text={feedback.message} />}
-      </ModalBase>
-    </div>
+      <GeolocationConsentModal
+        isOpen={showGeolocationConsent}
+        onAccept={handleGeolocationConsentAccept}
+        onDeny={handleGeolocationConsentDeny}
+        showRevokeOption={geolocationModalMode === 'revoke'}
+        onRevoke={handleGeolocationConsentRevoke}
+      />
+    </DashboardShell>
   );
 }
