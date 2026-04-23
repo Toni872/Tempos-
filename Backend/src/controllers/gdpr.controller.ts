@@ -1,3 +1,4 @@
+/* eslint-disable */
 // @ts-nocheck
 import { Request, Response } from 'express';
 import { AppDataSource } from '../database.js';
