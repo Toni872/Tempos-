@@ -24,7 +24,7 @@ export class TimeEntryChangeLog {
   @JoinColumn({ name: 'timeEntryId' })
   timeEntry!: TimeEntry;
 
-  @Column({ type: 'uuid' })
+  @Column({ type: 'varchar', length: 128 })
   changedBy!: string; // UID del usuario que hizo el cambio
 
   @ManyToOne(() => User)

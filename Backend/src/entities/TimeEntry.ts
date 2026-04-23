@@ -30,7 +30,7 @@ export class TimeEntry {
   @JoinColumn({ name: 'fichaId' })
   ficha!: Ficha;
 
-  @Column({ type: 'uuid' })
+  @Column({ type: 'varchar', length: 128 })
   userId!: string;
 
   @ManyToOne(() => User)

@@ -109,6 +109,7 @@ export const listFichasQuerySchema = z.object({
   startDate: dateStringSchema.optional(),
   endDate: dateStringSchema.optional(),
   status: fichaStatusSchema.optional(),
+  userId: z.string().uuid().optional(),
   limit: z.coerce.number().int().min(1).max(200).default(50),
   offset: z.coerce.number().int().min(0).default(0),
 }).superRefine((value, ctx) => {
@@ -213,6 +214,66 @@ export const updateAuthProfileSchema = z.object({
     .trim()
     .min(2, 'displayName debe tener al menos 2 caracteres.')
     .max(120, 'displayName admite maximo 120 caracteres.'),
+});
+
+export const userRoleSchema = z.enum(['admin', 'manager', 'auditor', 'employee']);
+export const userStatusSchema = z.enum(['active', 'suspended', 'deleted']);
+
+export const createEmployeeSchema = z.object({
+  email: z.string().trim().email('Email inválido'),
+  displayName: z.string().trim().min(2, 'Nombre demasiado corto').max(120, 'Nombre demasiado largo'),
+  role: userRoleSchema.default('employee'),
+  hourlyRate: z.coerce.number().min(0).optional(),
+  overtimeRate: z.coerce.number().min(0).optional(),
+  requiresGeolocation: z.boolean().optional(),
+  requiresQR: z.boolean().optional(),
+  kioskPin: z.string().regex(/^\d{4,10}$/, 'El PIN debe tener entre 4 y 10 dígitos').or(z.literal('')).optional(),
+});
+
+export const updateEmployeeSchema = z.object({
+  displayName: z.string().trim().min(2, 'Nombre demasiado corto').max(120, 'Nombre demasiado largo').optional(),
+  role: userRoleSchema.optional(),
+  status: userStatusSchema.optional(),
+  hourlyRate: z.coerce.number().min(0).optional(),
+  overtimeRate: z.coerce.number().min(0).optional(),
+  requiresGeolocation: z.boolean().optional(),
+  requiresQR: z.boolean().optional(),
+  kioskPin: z.string().regex(/^\d{4,10}$/, 'El PIN debe tener entre 4 y 10 dígitos').or(z.literal('')).optional(),
+}).refine((data) => Object.keys(data).length > 0, {
+  message: 'Debe proporcionar al menos un campo para actualizar',
+});
+
+export const clockInSchema = z.object({
+  description: z.string().trim().max(500).optional(),
+  projectCode: z.string().trim().max(80).optional(),
+  location: z.object({
+    lat: z.number(),
+    lng: z.number(),
+  }).optional(),
+  qrToken: z.string().optional(),
+});
+
+export const clockOutSchema = z.object({
+  location: z.object({
+    lat: z.number(),
+    lng: z.number(),
+  }).optional(),
+  qrToken: z.string().optional(),
+});
+
+export const scheduleSchema = z.object({
+  name: z.string().trim().min(2).max(255),
+  startTime: timeStringSchema,
+  endTime: timeStringSchema,
+  daysOfWeek: z.array(z.number().min(1).max(7)).min(1),
+  gracePeriodMinutes: z.number().int().min(0).max(120).default(0),
+});
+
+export const assignShiftSchema = z.object({
+  userId: z.string().uuid(),
+  scheduleId: z.string().uuid(),
+  startDate: dateStringSchema,
+  endDate: dateStringSchema.optional(),
 });
 
 export function buildValidationError(error: z.ZodError): { error: string; details: string[] } {

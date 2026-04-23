@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { AppDataSource } from '../database.js';
+import { IsNull, Raw } from 'typeorm';
 import { Ficha } from '../entities/Ficha.js';
 import { User } from '../entities/User.js';
 import { firebaseAuthMiddleware } from '../middleware/auth.middleware.js';
@@ -21,6 +22,9 @@ import { getMadridDateTimeParts, getMadridUtcOffset, toUtcMidnightDate } from '.
 import { applyFichaCorrection, buildFichaCorrectionChanges, type FichaCorrectionChanges } from '../utils/ficha-correction.js';
 import { getTimeEntryService } from '../services/TimeEntryService.js';
 import { TimeEntryType, TimeEntrySource } from '../entities/TimeEntry.js';
+import { WorkCenter } from '../entities/WorkCenter.js';
+import { LocationService } from '../services/LocationService.js';
+import { clockInSchema, clockOutSchema } from '../utils/validation.js';
 
 const router = Router();
 
@@ -151,21 +155,44 @@ router.get(
       return;
     }
 
-    const { startDate, endDate, status, limit, offset } = parseQuery.data;
+    const { startDate, endDate, status, userId, limit, offset } = parseQuery.data;
 
     const qb = AppDataSource.getRepository(Ficha)
       .createQueryBuilder('ficha')
-      .innerJoin(User, 'user', 'user.uid = ficha.userId')
-      .where('ficha.userId = :uid', { uid: auth.uid })
-      .andWhere('user.companyId = :companyId', { companyId: auth.companyId })
+      .leftJoinAndSelect('User', 'user', 'user.uid = ficha.userId') // Cambio a leftJoin para mayor flexibilidad
+      .select([
+        'ficha.id',
+        'ficha.userId',
+        'ficha.date',
+        'ficha.startTime',
+        'ficha.endTime',
+        'ficha.hoursWorked',
+        'ficha.description',
+        'ficha.projectCode',
+        'ficha.status',
+        'ficha.metadata',
+        'user.displayName',
+        'user.email',
+        'user.uid'
+      ])
+      .where('user.companyId = :companyId', { companyId: auth.companyId })
       .orderBy('ficha.date', 'DESC')
       .addOrderBy('ficha.startTime', 'DESC')
       .take(limit)
       .skip(offset);
 
+    // Si es admin/manager y hay userId, filtramos por ese empleado
+    if (auth.isPrivileged && userId) {
+      qb.andWhere('ficha.userId = :userId', { userId });
+    } else if (!auth.isPrivileged) {
+      // Si no es privilegiado, solo ve sus propias fichas
+      qb.andWhere('ficha.userId = :uid', { uid: auth.uid });
+    }
+
     if (status) {
       qb.andWhere('ficha.status = :status', { status });
     }
+    
     if (startDate && endDate) {
       qb.andWhere('ficha.date BETWEEN :startDate AND :endDate', { startDate, endDate });
     } else if (startDate) {
@@ -178,14 +205,8 @@ router.get(
 
     res.json({
       data: fichas.map((f) => ({
-        id: f.id,
-        date: f.date,
-        startTime: f.startTime,
-        endTime: f.endTime,
-        hoursWorked: f.hoursWorked,
-        description: f.description,
-        projectCode: f.projectCode,
-        status: f.status,
+        ...f,
+        userName: (f as any).displayName || (f as any).user?.displayName || 'Sistema',
       })),
       pagination: {
         total,
@@ -193,6 +214,31 @@ router.get(
         offset,
       },
     });
+  })
+);
+
+/**
+ * GET /api/v1/fichas/active
+ * Obtiene la ficha activa (sin endTime) del usuario para hoy
+ */
+router.get(
+  '/active',
+  firebaseAuthMiddleware,
+  appUserContextMiddleware,
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const auth = getAuthContext(req);
+    const { dateIso } = getMadridDateTimeParts(new Date());
+
+    const repo = AppDataSource.getRepository(Ficha);
+    const openFicha = await repo.findOne({
+      where: {
+        userId: auth.uid,
+        endTime: IsNull(),
+        date: Raw(alias => `${alias} = :date`, { date: dateIso })
+      }
+    });
+
+    res.json({ data: openFicha || null });
   })
 );
 
@@ -510,6 +556,28 @@ router.post(
     ficha.status = 'disputed';
     await AppDataSource.getRepository(Ficha).save(ficha);
 
+    // Registrar solicitud en TimeEntryChangeLog (auditoría atómica)
+    const timeEntryService = getTimeEntryService();
+    try {
+      await timeEntryService.requestCorrections({
+        fichaId: ficha.id,
+        requestedBy: auth.uid,
+        reason: parsed.data.reason,
+        beforeState: buildFichaBaseState(ficha), // El estado fue capturado antes de los cambios propuestos
+        afterState: {
+          startTime: parsed.data.startTime ?? ficha.startTime,
+          endTime: parsed.data.endTime ?? ficha.endTime,
+          description: parsed.data.description ?? ficha.description,
+          projectCode: parsed.data.projectCode ?? ficha.projectCode,
+        },
+        ip: req.ip,
+        userAgent: req.get('user-agent'),
+      });
+    } catch (auditError) {
+      console.error('Error registrando TimeEntryChangeLog para solicitud de corrección:', auditError);
+      // No bloqueamos la solicitud principal, pero lo logueamos
+    }
+
     await logAction({
       userId: auth.uid,
       companyId: auth.companyId,
@@ -579,15 +647,6 @@ router.post(
       reviewComment: parsed.data.comment,
     };
 
-    // Capturar estado anterior para auditoría
-    const beforeState = {
-      startTime: ficha.startTime,
-      endTime: ficha.endTime,
-      hoursWorked: ficha.hoursWorked,
-      description: ficha.description,
-      projectCode: ficha.projectCode,
-    };
-
     if (parsed.data.decision === 'approved') {
       const nextState = applyFichaCorrection(buildFichaBaseState(ficha), correctionRequest.proposedChanges);
       ficha.startTime = nextState.startTime;
@@ -603,31 +662,20 @@ router.post(
     upsertFichaCorrectionMetadata(ficha, reviewedRequest);
     await AppDataSource.getRepository(Ficha).save(ficha);
 
-    // Registrar cambios en TimeEntry si fue aprobada la corrección
-    if (parsed.data.decision === 'approved') {
-      const timeEntryService = getTimeEntryService();
-      const afterState = {
-        startTime: ficha.startTime,
-        endTime: ficha.endTime,
-        hoursWorked: ficha.hoursWorked,
-        description: ficha.description,
-        projectCode: ficha.projectCode,
-      };
-
-      try {
-        await timeEntryService.approveChanges({
-          fichaId: ficha.id,
-          approvedBy: auth.uid,
-          reason: parsed.data.comment || 'Corrección aprobada por manager',
-          beforeState,
-          afterState,
-          ip: req.ip,
-          userAgent: req.get('user-agent'),
-        });
-      } catch (error) {
-        console.error('Error registrando TimeEntryChangeLog para corrección:', error);
-        // No bloquear respuesta si falla changeLog (fallback graceful)
-      }
+    // Cerrar ciclo de vida en TimeEntryChangeLog (Aprobar o Rechazar logs pendientes)
+    const timeEntryService = getTimeEntryService();
+    try {
+      await timeEntryService.reviewCorrections({
+        fichaId: ficha.id,
+        reviewedBy: auth.uid,
+        decision: parsed.data.decision,
+        comment: parsed.data.comment || (parsed.data.decision === 'approved' ? 'Corrección aprobada' : 'Corrección rechazada'),
+        ip: req.ip,
+        userAgent: req.get('user-agent'),
+      });
+    } catch (error) {
+      console.error('Error actualizando TimeEntryChangeLog en revisión:', error);
+      // Fallback graceful
     }
 
     await logAction({
@@ -808,7 +856,56 @@ router.post(
       return;
     }
 
-    const { description, projectCode } = req.body as { description?: string; projectCode?: string };
+    const parseBody = clockInSchema.safeParse(req.body);
+    if (!parseBody.success) {
+      res.status(400).json(buildValidationError(parseBody.error));
+      return;
+    }
+
+    const { description, projectCode, location, qrToken } = parseBody.data;
+
+    // --- VALIDACIONES DE RRHH ---
+    const user = await AppDataSource.getRepository(User).findOneBy({ uid: auth.uid });
+    if (!user) {
+      res.status(404).json({ error: 'Usuario no encontrado' });
+      return;
+    }
+
+    const workCenterRepo = AppDataSource.getRepository(WorkCenter);
+
+    // 1. Geolocalización
+    if (user.requiresGeolocation) {
+      if (!location) {
+        res.status(403).json({ error: 'La ubicación GPS es obligatoria para fichar.' });
+        return;
+      }
+      
+      const centers = await workCenterRepo.findBy({ companyId: auth.companyId, status: 'active' });
+      const isInsideAny = centers.some(c => 
+        c.latitude && c.longitude && 
+        LocationService.isWithinRadius(location, { lat: Number(c.latitude), lng: Number(c.longitude) }, c.radiusMeters)
+      );
+
+      if (!isInsideAny) {
+        res.status(403).json({ error: 'Estás fuera del radio de cualquier centro de trabajo autorizado.' });
+        return;
+      }
+    }
+
+    // 2. Código QR
+    if (user.requiresQR) {
+      if (!qrToken) {
+        res.status(403).json({ error: 'El escaneo de código QR es obligatorio para fichar.' });
+        return;
+      }
+
+      const validToken = await workCenterRepo.findOneBy({ companyId: auth.companyId, qrToken, status: 'active' });
+      if (!validToken) {
+        res.status(403).json({ error: 'El código QR no es válido o no pertenece a una sede autorizada.' });
+        return;
+      }
+    }
+    // ----------------------------
 
     const ficha = fichaRepository.create({
       userId: auth.uid,
@@ -817,6 +914,7 @@ router.post(
       description,
       projectCode,
       status: 'draft',
+      metadata: location ? { location: `${location.lat},${location.lng}` } : undefined,
     });
 
     await fichaRepository.save(ficha);
@@ -836,6 +934,8 @@ router.post(
         localDateTime: `${localDate}T${timeHHMM}${getMadridUtcOffset(now)}`,
         ip: req.ip,
         userAgent: req.get('user-agent'),
+        latitude: location?.lat,
+        longitude: location?.lng,
       });
     } catch (eventError) {
       console.error('Error registrando TimeEntry CLOCK_IN:', eventError);
@@ -878,6 +978,57 @@ router.post(
       return;
     }
 
+    const parseBody = clockOutSchema.safeParse(req.body);
+    if (!parseBody.success) {
+      res.status(400).json(buildValidationError(parseBody.error));
+      return;
+    }
+
+    const { location, qrToken } = parseBody.data;
+
+    // --- VALIDACIONES DE RRHH ---
+    const user = await AppDataSource.getRepository(User).findOneBy({ uid: auth.uid });
+    if (!user) {
+      res.status(404).json({ error: 'Usuario no encontrado' });
+      return;
+    }
+
+    const workCenterRepo = AppDataSource.getRepository(WorkCenter);
+
+    // 1. Geolocalización (CLOCK-OUT)
+    if (user.requiresGeolocation) {
+      if (!location) {
+        res.status(403).json({ error: 'La ubicación GPS es obligatoria para fichar la salida.' });
+        return;
+      }
+      
+      const centers = await workCenterRepo.findBy({ companyId: auth.companyId, status: 'active' });
+      const isInsideAny = centers.some(c => 
+        c.latitude && c.longitude && 
+        LocationService.isWithinRadius(location, { lat: Number(c.latitude), lng: Number(c.longitude) }, c.radiusMeters)
+      );
+
+      if (!isInsideAny) {
+        res.status(403).json({ error: 'No puedes finalizar la jornada fuera de un centro de trabajo autorizado.' });
+        return;
+      }
+    }
+
+    // 2. Código QR (CLOCK-OUT)
+    if (user.requiresQR) {
+      if (!qrToken) {
+        res.status(403).json({ error: 'El escaneo de código QR es obligatorio para finalizar la jornada.' });
+        return;
+      }
+
+      const validToken = await workCenterRepo.findOneBy({ companyId: auth.companyId, qrToken, status: 'active' });
+      if (!validToken) {
+        res.status(403).json({ error: 'El código QR no es válido para esta sede.' });
+        return;
+      }
+    }
+    // ----------------------------
+
     openFicha.endTime = endTime;
     openFicha.hoursWorked = parseFloat(((toMinutes(endTime) - toMinutes(openFicha.startTime)) / 60).toFixed(2));
     openFicha.status = 'confirmed';
@@ -899,6 +1050,8 @@ router.post(
         localDateTime: `${localDate}T${timeHHMM}${getMadridUtcOffset(now)}`,
         ip: req.ip,
         userAgent: req.get('user-agent'),
+        latitude: location?.lat,
+        longitude: location?.lng,
       });
     } catch (eventError) {
       console.error('Error registrando TimeEntry CLOCK_OUT:', eventError);

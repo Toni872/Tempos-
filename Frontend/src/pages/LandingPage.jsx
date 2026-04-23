@@ -1068,16 +1068,17 @@ export default function LandingPage() {
         flexWrap: 'wrap', gap: 20, position: 'relative', zIndex: 1,
         background: 'rgba(255,255,255,0.008)',
       }}>
-        <span style={{ fontFamily: 'var(--ff-head)', fontSize: 24, fontWeight: 600, letterSpacing: 1.5, color: 'var(--t0)' }}>
-          Tem<span style={{ color: 'var(--mg)' }}>pos</span>
-        </span>
-        <div style={{ display: 'flex', gap: 30 }}>
-          <Link to="/faqs" style={{ fontSize: 12.5, color: 'var(--t3)', textDecoration: 'none', transition: 'color 0.2s' }} onMouseEnter={e => e.target.style.color = 'var(--t0)'} onMouseLeave={e => e.target.style.color = 'var(--t3)'}>Legal</Link>
-          <Link to="/faqs" style={{ fontSize: 12.5, color: 'var(--t3)', textDecoration: 'none', transition: 'color 0.2s' }} onMouseEnter={e => e.target.style.color = 'var(--t0)'} onMouseLeave={e => e.target.style.color = 'var(--t3)'}>Privacidad</Link>
-          <Link to="/faqs" style={{ fontSize: 12.5, color: 'var(--t3)', textDecoration: 'none', transition: 'color 0.2s' }} onMouseEnter={e => e.target.style.color = 'var(--t0)'} onMouseLeave={e => e.target.style.color = 'var(--t3)'}>Cookies</Link>
-          <Link to="/contacto" style={{ fontSize: 12.5, color: 'var(--t3)', textDecoration: 'none', transition: 'color 0.2s' }} onMouseEnter={e => e.target.style.color = 'var(--t0)'} onMouseLeave={e => e.target.style.color = 'var(--t3)'}>Contacto</Link>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <span style={{ fontFamily: 'var(--ff-head)', fontSize: 24, fontWeight: 600, letterSpacing: 1.5, color: 'var(--t0)' }}>
+            Tem<span style={{ color: 'var(--mg)' }}>pos</span>
+            </span>
+            <p style={{ fontSize: 11.5, color: 'var(--t3)' }}>© 2026 Antonio Lloret Sánchez. Todos los derechos reservados.</p>
         </div>
-        <p style={{ fontSize: 11.5, color: 'var(--t3)' }}>© 2026 Tempos. Todos los derechos reservados.</p>
+        <div style={{ display: 'flex', gap: 30 }}>
+          <Link to="/legal/terminos" style={{ fontSize: 13, color: 'var(--t3)', textDecoration: 'none', transition: 'color 0.2s' }} onMouseEnter={e => e.target.style.color = 'var(--t0)'} onMouseLeave={e => e.target.style.color = 'var(--t3)'}>Términos de Servicio</Link>
+          <Link to="/legal/privacidad" style={{ fontSize: 13, color: 'var(--t3)', textDecoration: 'none', transition: 'color 0.2s' }} onMouseEnter={e => e.target.style.color = 'var(--t0)'} onMouseLeave={e => e.target.style.color = 'var(--t3)'}>Privacidad</Link>
+          <Link to="/contacto" style={{ fontSize: 13, color: 'var(--t3)', textDecoration: 'none', transition: 'color 0.2s' }} onMouseEnter={e => e.target.style.color = 'var(--t0)'} onMouseLeave={e => e.target.style.color = 'var(--t3)'}>Contacto</Link>
+        </div>
       </footer>
     </div>
   );

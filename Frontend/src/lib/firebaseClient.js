@@ -51,6 +51,21 @@ export async function signInAndGetIdToken(email, password) {
   return _ensureFirebase.signIn(email, password);
 }
 
+export async function signInWithGoogleAndGetIdToken() {
+  await _ensureFirebase();
+  if (!_auth) {
+    throw new Error('Firebase no está disponible');
+  }
+
+  const { GoogleAuthProvider, signInWithPopup } = await import('firebase/auth');
+  const provider = new GoogleAuthProvider();
+  const userCredential = await signInWithPopup(_auth, provider);
+  if (!userCredential) {
+    throw new Error('No se pudo autenticar con Google');
+  }
+  return userCredential.user.getIdToken();
+}
+
 export function initFirebase() {
   // Mantener por compatibilidad: intenta inicializar pero no lanza si falla, para permitir modo local
   return _ensureFirebase().then(() => ({ auth: _auth })).catch(() => null);

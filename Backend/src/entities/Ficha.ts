@@ -26,7 +26,7 @@ export class Ficha {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
 
-  @Column({ type: 'uuid' })
+  @Column({ type: 'varchar', length: 128 })
   userId!: string;
 
   @ManyToOne(() => User)

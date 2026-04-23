@@ -5,6 +5,7 @@ import { firebaseAuthMiddleware, DEFAULT_COMPANY_ID } from '../middleware/auth.m
 import { appUserContextMiddleware, getAuthContext } from '../middleware/request-context.middleware.js';
 import { asyncHandler } from '../middleware/errorHandler.js';
 import { buildValidationError, updateAuthProfileSchema } from '../utils/validation.js';
+import { randomUUID } from 'crypto';
 
 const router = Router();
 
@@ -19,12 +20,39 @@ router.post(
     const firebaseUser = (req as any).firebaseUser;
     const userRepository = AppDataSource.getRepository(User);
 
-    // Comprobar si existe
+    // Comprobar si existe por UID (login recurrente)
     let user = await userRepository.findOne({ where: { uid: firebaseUser.uid } });
 
+    if (!user && firebaseUser.email) {
+      // Comprobar si existe por Email (fue creado por un admin previamente)
+      user = await userRepository.findOne({ where: { email: firebaseUser.email } });
+      if (user) {
+        // Vincular el UID de Firebase al registro existente
+        user.uid = firebaseUser.uid;
+        user.emailVerified = firebaseUser.email_verified;
+        await userRepository.save(user);
+        
+        res.status(200).json({
+          message: 'Usuario vinculado correctamente',
+          user: { uid: user.uid, email: user.email, displayName: user.displayName },
+        });
+        return;
+      }
+    }
+
     if (user) {
-      res.status(409).json({ error: 'Usuario ya registrado' });
+      res.status(409).json({ error: 'Usuario ya registrado o vinculado' });
       return;
+    }
+
+    const bodyParams = req.body || {};
+    const requestedRole = bodyParams.role === 'admin' ? 'admin' : 'employee';
+    let companyId = DEFAULT_COMPANY_ID;
+    
+    if (requestedRole === 'admin') {
+      const companyName = typeof bodyParams.companyName === 'string' ? bodyParams.companyName.trim() : '';
+      const slug = companyName ? companyName.toLowerCase().replace(/[^a-z0-9]+/g, '-') : 'company';
+      companyId = `${slug}-${randomUUID().slice(0, 8)}`;
     }
 
     // Crear nuevo usuario
@@ -33,10 +61,11 @@ router.post(
       email: firebaseUser.email,
       displayName: firebaseUser.name || firebaseUser.email,
       emailVerified: firebaseUser.email_verified,
-      companyId: DEFAULT_COMPANY_ID,
-      role: 'employee',
+      companyId: companyId,
+      role: requestedRole,
       metadata: {
         createdAt: new Date().toISOString(),
+        companyName: bodyParams.companyName || '',
       },
     });
 
@@ -79,6 +108,8 @@ router.get(
       email: user.email,
       displayName: user.displayName,
       emailVerified: user.emailVerified,
+      role: user.role,
+      companyId: user.companyId,
       status: user.status,
       createdAt: user.createdAt,
     });

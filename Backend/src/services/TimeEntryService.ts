@@ -41,9 +41,12 @@ export class TimeEntryService {
   private timeEntryRepo: Repository<TimeEntry>;
   private changeLogRepo: Repository<TimeEntryChangeLog>;
 
-  constructor() {
-    this.timeEntryRepo = AppDataSource.getRepository(TimeEntry);
-    this.changeLogRepo = AppDataSource.getRepository(TimeEntryChangeLog);
+  constructor(
+    timeEntryRepo?: Repository<TimeEntry>,
+    changeLogRepo?: Repository<TimeEntryChangeLog>
+  ) {
+    this.timeEntryRepo = timeEntryRepo || AppDataSource.getRepository(TimeEntry);
+    this.changeLogRepo = changeLogRepo || AppDataSource.getRepository(TimeEntryChangeLog);
   }
 
   /**
@@ -152,33 +155,24 @@ export class TimeEntryService {
   }
 
   /**
-   * Registra la aprobación de cambios en TimeEntry tras corrección de ficha
-   * Se llama cuando manager aprueba una solicitud de corrección
-   * @param fichaId ID de la ficha corregida
-   * @param approvedBy UID del manager que aprueba
-   * @param reason Motivo de la corrección (ej: "Error zona horaria")
-   * @param beforeState Estado anterior de la ficha (para changeSet)
-   * @param afterState Estado nuevo de la ficha (para changeSet)
-   * @param ip IP del request
-   * @param userAgent userAgent del request
+   * Registra la solicitud de correcciones para todos los eventos de una ficha
+   * @param params datos de la solicitud
    */
-  async approveChanges(params: {
+  async requestCorrections(params: {
     fichaId: string;
-    approvedBy: string;
+    requestedBy: string;
     reason: string;
     beforeState: Record<string, unknown>;
     afterState: Record<string, unknown>;
     ip?: string;
     userAgent?: string;
   }): Promise<void> {
-    // Obtener todos los TimeEntry de la ficha
     const timeEntries = await this.getsFichaEvents(params.fichaId);
 
-    // Para cada evento, crear un changeLog indicando que fue corregido
     for (const entry of timeEntries) {
       await this.logChange({
         timeEntryId: entry.id,
-        changedBy: params.approvedBy,
+        changedBy: params.requestedBy,
         action: ChangeAction.CORRECTED,
         changeSet: {
           before: params.beforeState,
@@ -189,17 +183,42 @@ export class TimeEntryService {
         userAgent: params.userAgent,
       });
 
-      // Marcar el changeLog como aprobado (metadata)
-      const changeLogs = await this.getChangeHistory(entry.id);
-      const latestChangeLog = changeLogs[changeLogs.length - 1]; // último creado
-      if (latestChangeLog) {
-        latestChangeLog.metadata = {
-          ...latestChangeLog.metadata,
-          approvalStatus: 'approved',
-          approvedBy: params.approvedBy,
-          approvedAt: new Date().toISOString(),
+      // El método logChange ya establece approvalStatus: 'pending' por defecto en el constructor/creación
+    }
+  }
+
+  /**
+   * Revisa y cierra el ciclo de vida de las correcciones pendientes de una ficha
+   * @param params datos de la revisión
+   */
+  async reviewCorrections(params: {
+    fichaId: string;
+    reviewedBy: string;
+    decision: 'approved' | 'rejected';
+    comment?: string;
+    ip?: string;
+    userAgent?: string;
+  }): Promise<void> {
+    const timeEntries = await this.getsFichaEvents(params.fichaId);
+
+    for (const entry of timeEntries) {
+      // Buscamos por historial y filtramos en memoria para mayor compatibilidad de queries JSON
+      const history = await this.getChangeHistory(entry.id);
+      const pendingLog = history.reverse().find(log => 
+        (log.metadata as any)?.approvalStatus === 'pending'
+      );
+
+      if (pendingLog) {
+        pendingLog.metadata = {
+          ...(pendingLog.metadata || {}),
+          approvalStatus: params.decision,
+          reviewedBy: params.reviewedBy,
+          reviewedAt: new Date().toISOString(),
+          reviewComment: params.comment,
+          reviewIp: params.ip,
+          reviewUserAgent: params.userAgent,
         };
-        await this.changeLogRepo.save(latestChangeLog);
+        await this.changeLogRepo.save(pendingLog);
       }
     }
   }
