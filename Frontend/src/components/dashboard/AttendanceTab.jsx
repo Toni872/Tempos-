@@ -99,11 +99,13 @@ export default function AttendanceTab({
             <select 
               value={filters.employeeId || ''}
               onChange={(e) => setFilters({ ...filters, employeeId: e.target.value })}
-              className="w-full bg-white/[0.03] border border-white/5 rounded-2xl px-4 py-3 text-sm outline-none focus:border-blue-500/50 focus:bg-white/[0.05] transition-all cursor-pointer text-zinc-300"
+              className="w-full bg-[#1c1c1f] border border-white/10 rounded-2xl px-4 py-3 text-sm outline-none focus:border-blue-500/50 focus:bg-white/[0.05] transition-all cursor-pointer text-zinc-100"
             >
-              <option value="">Todos los empleados</option>
+              <option value="" className="bg-[#1c1c1f] text-white">Todos los empleados</option>
               {employees.map(emp => (
-                <option key={emp.uid || emp.id} value={emp.uid || emp.id}>{emp.displayName || emp.email}</option>
+                <option key={emp.uid || emp.id} value={emp.uid || emp.id} className="bg-[#1c1c1f] text-white">
+                  {emp.displayName || emp.email}
+                </option>
               ))}
             </select>
           </div>
@@ -114,7 +116,7 @@ export default function AttendanceTab({
               type="date" 
               value={filters.startDate || ''}
               onChange={(e) => setFilters({ ...filters, startDate: e.target.value })}
-              className="w-full bg-white/[0.03] border border-white/5 rounded-2xl px-4 py-3 text-sm outline-none focus:border-blue-500/50 focus:bg-white/[0.05] transition-all font-mono text-zinc-300"
+              className="w-full bg-[#1c1c1f] border border-white/10 rounded-2xl px-4 py-3 text-sm outline-none focus:border-blue-500/50 focus:bg-white/[0.05] transition-all font-mono text-zinc-100 color-scheme-dark"
             />
           </div>
 
@@ -124,7 +126,7 @@ export default function AttendanceTab({
               type="date" 
               value={filters.endDate || ''}
               onChange={(e) => setFilters({ ...filters, endDate: e.target.value })}
-              className="w-full bg-white/[0.03] border border-white/5 rounded-2xl px-4 py-3 text-sm outline-none focus:border-blue-500/50 focus:bg-white/[0.05] transition-all font-mono text-zinc-300"
+              className="w-full bg-[#1c1c1f] border border-white/10 rounded-2xl px-4 py-3 text-sm outline-none focus:border-blue-500/50 focus:bg-white/[0.05] transition-all font-mono text-zinc-100 color-scheme-dark"
             />
           </div>
 

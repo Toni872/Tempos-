@@ -49,6 +49,7 @@ import {
   getMe,
   getDailyStats,
   listEmployees,
+  createEmployee,
   deleteEmployee,
   listDocuments,
   uploadDocument,
@@ -69,7 +70,9 @@ import {
   listWorkCenters,
   deleteWorkCenter,
   listSchedules,
+  createSchedule,
   listShiftAssignments,
+  assignShift,
   getDashboardStats,
 } from '@/lib/api';
 
@@ -405,7 +408,7 @@ export default function DashboardPage() {
         await api.put(`/api/v1/schedules/${modalData.id}`, data, { token: session?.token });
         showFeedback('success', 'Plantilla actualizada.');
       } else {
-        await api.post('/api/v1/schedules', data, { token: session?.token });
+        await createSchedule(session.token, data);
         showFeedback('success', 'Nueva plantilla creada.');
       }
       await refreshAllData();
@@ -548,14 +551,10 @@ export default function DashboardPage() {
       {activeTab === 'Inicio' && (
         <OverviewTab 
           profile={profile}
-          stats={stats}
-          dailyStats={dailyStats}
-          activeFicha={activeFicha}
-          clockedIn={clockedIn}
-          handleClockToggle={handleClockToggle}
-          elapsedWorkingTime={elapsedWorkingTime}
-          reportSummary={reportSummary}
+          employees={employees}
+          registros={registros}
           dashboardStats={dashboardStats}
+          setActiveTab={setActiveTab}
         />
       )}
 
@@ -574,7 +573,7 @@ export default function DashboardPage() {
           registros={registros} 
           filters={registrosFilters}
           setFilters={setRegistrosFilters}
-          onExport={() => alert('Próximamente...')}
+          onExport={handleExportReport}
           employees={employees}
           workCenters={workCenters}
           onEdit={(row) => openModal('registros', 'edit', row)}
@@ -660,14 +659,23 @@ export default function DashboardPage() {
         />
       )}
 
-      {(activeTab === 'Mi Empresa' || activeTab === 'Ajustes') && (
+      {activeTab === 'Mi Empresa' && (
         <ConfiguracionTab 
           profile={profile}
           isAdmin={isAdmin}
         />
       )}
 
-      <ModalBase isOpen={!!modal} onClose={closeModal} title={modal}>
+      {activeTab === 'Ajustes' && (
+        <PerfilTab 
+          profile={profile}
+          consentGiven={consentGiven}
+          openRevokeModal={openRevokeModal}
+          isSettings={true}
+        />
+      )}
+
+      <ModalBase open={!!modal} onClose={closeModal} title={modal}>
         {modal === 'empleado' && (
           <EmpleadoForm 
             mode={modalMode} 
@@ -685,9 +693,16 @@ export default function DashboardPage() {
             loading={loading}
           />
         )}
-        {modal === 'workcenter' && <WorkCenterForm mode={modalMode} initialData={modalData} onSuccess={() => { closeModal(); refreshAllData(); }} />}
-        {modal === 'ausencia' && <AusenciaForm onSuccess={() => { closeModal(); refreshAllData(); }} />}
-        {modal === 'documento' && <DocumentoForm onSuccess={() => { closeModal(); refreshAllData(); }} />}
+        {modal === 'workcenter' && (
+          <WorkCenterForm 
+            initialData={modalData} 
+            onSubmit={handleWorkCenterSubmit} 
+            onCancel={closeModal} 
+            loading={loading} 
+          />
+        )}
+        {modal === 'ausencia' && <AusenciaForm onSubmit={handleAbsenceSubmit} onCancel={closeModal} loading={loading} />}
+        {modal === 'documento' && <DocumentoForm onSubmit={handleDocumentSubmit} onCancel={closeModal} loading={loading} />}
         {modal === 'schedule' && (
           <ScheduleForm 
             mode={modalMode}
@@ -700,10 +715,11 @@ export default function DashboardPage() {
         {modal === 'assign_shift' && <ShiftAssignForm initialValues={modalData} employees={employees} schedules={schedules} onSubmit={async (data) => { 
           try { 
             const session = getClientSession();
-            await api.post('/api/v1/schedules/assign', data, { token: session?.token }); 
+            await assignShift(session.token, data); 
             closeModal(); 
             refreshAllData(); 
-          } catch (err) { console.error(err); } 
+            showFeedback('success', 'Turno asignado.');
+          } catch (err) { showFeedback('error', 'Error al asignar turno.'); } 
         }} onCancel={closeModal} />}
       </ModalBase>
 

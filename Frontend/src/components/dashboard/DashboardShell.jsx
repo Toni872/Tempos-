@@ -13,7 +13,12 @@ import {
   LogOut, 
   Menu, 
   X,
-  Bell
+  Bell,
+  Building2,
+  ClipboardList,
+  FileCheck,
+  Wallet,
+  Settings
 } from 'lucide-react';
 import UserMenu from '@/components/UserMenu';
 import { cn } from '@/lib/utils';
@@ -22,22 +27,22 @@ const sidebarItems = [
   { group: 'General', items: [
     { name: 'Inicio', icon: LayoutDashboard },
     { name: 'Equipo', icon: Users },
-    { name: 'Registros', icon: FileText },
+    { name: 'Registros', icon: ClipboardList },
     { name: 'Sedes', icon: MapPin },
     { name: 'Horarios', icon: Clock },
     { name: 'Ausencias', icon: Calendar },
-    { name: 'Documentos', icon: FileText },
+    { name: 'Documentos', icon: FileCheck },
   ] },
   { group: 'Análisis', items: [
     { name: 'Análisis', icon: BarChart3 },
     { name: 'Informes', icon: FileText },
-    { name: 'Nóminas', icon: FileText },
+    { name: 'Nóminas', icon: Wallet },
     { name: 'Mensajes', icon: MessageSquare },
   ] },
   { group: 'Configuración', items: [
-    { name: 'Mi Empresa', icon: LayoutDashboard },
+    { name: 'Mi Empresa', icon: Building2 },
     { name: 'Mi Perfil', icon: UserCircle },
-    { name: 'Ajustes', icon: LayoutDashboard },
+    { name: 'Ajustes', icon: Settings },
   ] }
 ];
 
@@ -204,35 +209,44 @@ export default function DashboardShell({
               </div>
               
               <nav className="flex-1 overflow-y-auto p-4 py-2">
-                {sidebarItems.map((group) => (
-                  <div key={group.group} className="mb-6">
-                    <h3 className="px-4 text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-3">
-                      {group.group}
-                    </h3>
-                    <div className="space-y-1">
-                      {group.items.map((item) => {
-                        const Icon = item.icon;
-                        const isActive = activeTab === item.name;
-                        return (
-                          <button
-                            key={item.name}
-                            onClick={() => {
-                              setActiveTab(item.name);
-                              setIsMobileMenuOpen(false);
-                            }}
-                            className={cn(
-                              "w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium",
-                              isActive ? "text-blue-400 bg-blue-500/10" : "text-zinc-500"
-                            )}
-                          >
-                            <Icon className="w-5 h-5" />
-                            {item.name}
-                          </button>
-                        );
-                      })}
+                {sidebarItems.map((group) => {
+                  const isAdmin = profile?.role === 'admin';
+                  const filteredItems = group.items.filter(item => {
+                    if (isAdmin) return true;
+                    const employeeAllowed = ['Inicio', 'Horarios', 'Ausencias', 'Documentos', 'Mensajes', 'Mi Perfil', 'Ajustes'];
+                    return employeeAllowed.includes(item.name);
+                  });
+                  if (filteredItems.length === 0) return null;
+                  return (
+                    <div key={group.group} className="mb-6">
+                      <h3 className="px-4 text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-3">
+                        {group.group}
+                      </h3>
+                      <div className="space-y-1">
+                        {filteredItems.map((item) => {
+                          const Icon = item.icon;
+                          const isActive = activeTab === item.name;
+                          return (
+                            <button
+                              key={item.name}
+                              onClick={() => {
+                                setActiveTab(item.name);
+                                setIsMobileMenuOpen(false);
+                              }}
+                              className={cn(
+                                "w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium",
+                                isActive ? "text-blue-400 bg-blue-500/10" : "text-zinc-500"
+                              )}
+                            >
+                              <Icon className="w-5 h-5" />
+                              {item.name}
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </nav>
 
               <div className="p-6 border-t border-white/5">
