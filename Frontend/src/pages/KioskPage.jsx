@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 export default function KioskPage() {
@@ -30,16 +30,14 @@ export default function KioskPage() {
 
   useEffect(() => {
     if (pin.length === 4) {
-      // Simulate API call for PIN validation and clock-in
+      // TODO: Replace with backend kiosk-auth endpoint (POST /api/kiosk/identify)
+      // Currently in demo mode — no real PIN validation or clock event.
       setStatus({ type: 'loading', msg: 'Validando identidad...' });
       setTimeout(() => {
-        if (pin === '1234') {
-          setStatus({ type: 'success', msg: '¡Hola Jane! Entrada registrada a las ' + time.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }) });
-        } else if (pin === '5678') {
-          setStatus({ type: 'success', msg: '¡Hasta luego Carlos! Salida registrada.' });
-        } else {
-          setStatus({ type: 'error', msg: 'PIN incorrecto. Inténtalo de nuevo.' });
-        }
+        setStatus({
+          type: 'success',
+          msg: 'Modo demo — Fichaje por kiosco disponible próximamente. PIN introducido: ****',
+        });
         
         setTimeout(() => {
           setPin('');

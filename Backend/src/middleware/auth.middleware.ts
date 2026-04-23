@@ -82,11 +82,15 @@ if (!admin.apps.length) {
     console.warn('⚠️  Sin firebase-key.json — Auth desactivado en desarrollo (endpoints protegidos responden 503)');
   } else {
     // En producción, usar Application Default Credentials (Cloud Run las inyecta automáticamente)
+    const forcedProjectId = process.env.FIREBASE_PROJECT_ID || 'tempos-project-f1e77';
     admin.initializeApp({
-      projectId: process.env.FIREBASE_PROJECT_ID,
+      projectId: forcedProjectId,
     });
-    console.log('✅ Firebase Admin inicializado con Application Default Credentials');
+    console.log(`✅ Firebase Admin inicializado (ADC). Target Project: ${forcedProjectId}`);
   }
+} else {
+  const currentApp = admin.app();
+  console.log(`ℹ️ Firebase Admin ya estaba inicializado. App Name: ${currentApp.name}, Project: ${currentApp.options.projectId}`);
 }
 
 export const firebaseAuthMiddleware = async (req: Request, res: Response, next: NextFunction): Promise<void> => {

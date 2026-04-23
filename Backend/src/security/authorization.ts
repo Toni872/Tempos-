@@ -10,7 +10,11 @@ export type Permission =
   | 'view_employees'
   | 'create_employee'
   | 'update_employee'
-  | 'delete_employee';
+  | 'delete_employee'
+  | 'view_work_centers'
+  | 'manage_work_centers'
+  | 'view_settings'
+  | 'manage_settings';
 
 const PERMISSIONS_BY_ROLE: Record<AuthContext['role'], Permission[]> = {
   admin: [
@@ -24,6 +28,10 @@ const PERMISSIONS_BY_ROLE: Record<AuthContext['role'], Permission[]> = {
     'create_employee',
     'update_employee',
     'delete_employee',
+    'view_work_centers',
+    'manage_work_centers',
+    'view_settings',
+    'manage_settings',
   ],
   manager: [
     'view_company_absences',
@@ -35,13 +43,17 @@ const PERMISSIONS_BY_ROLE: Record<AuthContext['role'], Permission[]> = {
     'view_employees',
     'create_employee',
     'update_employee',
+    'view_work_centers',
+    'manage_work_centers',
+    'view_settings',
+    'manage_settings',
   ],
   auditor: [
     'view_company_absences',
     'view_company_audit_logs',
     'view_employees',
   ],
-  employee: [],
+  employee: ['view_work_centers'],
 };
 
 export function hasPermission(auth: AuthContext, permission: Permission): boolean {

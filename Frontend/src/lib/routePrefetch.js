@@ -20,6 +20,7 @@ export function prefetchRoute(path) {
     '/register':   () => import('../pages/AuthPage.jsx'),
     '/trial':      () => import('../pages/AuthPage.jsx'),
     '/dashboard':  () => import('../pages/DashboardPage.jsx'),
+    '/kiosk':      () => import('../pages/KioskPage.jsx'),
     '/marketing':  () => import('../pages/MarketingPage.jsx'),
   };
 
