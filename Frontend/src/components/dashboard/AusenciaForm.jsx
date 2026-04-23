@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { Calendar, Save, AlertCircle, Info, Plane, Thermometer, UserSquare2, Sparkles } from 'lucide-react';
 
-export default function AusenciaForm({ initialValues = {}, onSubmit, onCancel, loading }) {
-  const [motivo, setMotivo] = useState(initialValues.motivo || initialValues.reason || 'Vacaciones');
-  const [dias, setDias] = useState(initialValues.dias || initialValues.days || 1);
-  const [fechaInicio, setFechaInicio] = useState(initialValues.fechaInicio || initialValues.startDate || '');
-  const [fechaFin, setFechaFin] = useState(initialValues.fechaFin || initialValues.endDate || '');
+export default function AusenciaForm({ initialValues, onSubmit, onCancel, loading }) {
+  const safe = initialValues ?? {};
+  const [motivo, setMotivo] = useState(safe.motivo || safe.reason || 'Vacaciones');
+  const [dias, setDias] = useState(safe.dias || safe.days || 1);
+  const [fechaInicio, setFechaInicio] = useState(safe.fechaInicio || safe.startDate || '');
+  const [fechaFin, setFechaFin] = useState(safe.fechaFin || safe.endDate || '');
   const [error, setError] = useState('');
 
   const typeOptions = [
