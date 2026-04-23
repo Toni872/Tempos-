@@ -5,7 +5,7 @@ import { AppDataSource } from '../database.js';
 import { TimeEntry } from '../entities/TimeEntry.js';
 import { User } from '../entities/User.js';
 import { AuditLog } from '../entities/AuditLog.js';
-import { logger } from '../utils/logger';
+import { logger } from '../utils/logger.js';
 
 export class GdprController {
   /**
