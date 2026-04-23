@@ -6,6 +6,10 @@ import { Document } from './entities/Document.js';
 import { AuditLog } from './entities/AuditLog.js';
 import { TimeEntry } from './entities/TimeEntry.js';
 import { TimeEntryChangeLog } from './entities/TimeEntryChangeLog.js';
+import { WorkCenter } from './entities/WorkCenter.js';
+import { Schedule } from './entities/Schedule.js';
+import { Shift } from './entities/Shift.js';
+import { Message } from './entities/Message.js';
 
 const dbUrl = process.env.DATABASE_URL;
 if (!dbUrl) {
@@ -30,8 +34,8 @@ export const AppDataSource = new DataSource({
   url: dbUrl,
   synchronize: process.env.NODE_ENV === 'development', // Solo en dev
   logging: process.env.NODE_ENV === 'development',
-  entities: [User, Ficha, Absence, Document, AuditLog, TimeEntry, TimeEntryChangeLog],
-  migrations: ['dist/migrations/**/*.js'],
+  entities: [User, Ficha, Absence, Document, AuditLog, TimeEntry, TimeEntryChangeLog, WorkCenter, Schedule, Shift, Message],
+  migrations: process.env.NODE_ENV === 'production' ? ['dist/migrations/**/*.js'] : [],
   subscribers: [],
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
 });

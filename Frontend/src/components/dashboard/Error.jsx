@@ -1,4 +1,3 @@
-import React from 'react';
 
 export default function Error({ text = 'Ha ocurrido un error.' }) {
   return (

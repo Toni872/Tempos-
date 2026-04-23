@@ -1,4 +1,3 @@
-import React from 'react';
 
 export default function Success({ text = '¡Acción realizada con éxito!' }) {
   return (

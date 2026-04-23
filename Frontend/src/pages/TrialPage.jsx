@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 
 const PHONE_REGEX = /^[+]?[(]?[0-9\s-]{6,20}$/;
