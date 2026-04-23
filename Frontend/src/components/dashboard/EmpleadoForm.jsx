@@ -1,26 +1,10 @@
 import { useState } from 'react';
 
-export default function EmpleadoForm({ initialValues, onSubmit, onCancel, loading, mode = 'add' }) {
-  const safe = initialValues ?? {};
-  const [activeTab, setActiveTab] = useState('general');
-  
-  // State
-  const [formData, setFormData] = useState({
-    email: safe.email || '',
-    displayName: safe.displayName || safe.nombre || safe.name || '',
-    role: safe.role || safe.rol || 'employee',
-    status: safe.status || 'active',
-    // New fields
-    requiresGeolocation: safe.requiresGeolocation ?? false,
-    requiresKioskOnly: safe.requiresKioskOnly ?? false,
-    pushNotifications: safe.pushNotifications ?? false,
-    autoClock: safe.autoClock ?? false,
-    qrClock: safe.qrClock ?? false,
-    kioskPin: safe.kioskPin || '',
-    hourlyRate: safe.hourlyRate || 0,
-    overtimeRate: safe.overtimeRate || 0,
-  });
-
+export default function EmpleadoForm({ initialData = {}, onSubmit, onCancel, loading }) {
+  const [nombre, setNombre] = useState(initialData.nombre || '');
+  const [puesto, setPuesto] = useState(initialData.puesto || '');
+  const [sede, setSede] = useState(initialData.sede || '');
+  const [rol, setRol] = useState(initialData.rol || 'Usuario');
   const [error, setError] = useState('');
 
   const handleChange = (field, value) => {
