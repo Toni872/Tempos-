@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Clock, Calendar, Save, X, AlertCircle, Info } from 'lucide-react';
 
-export default function ScheduleForm({ initialValues = {}, onSubmit, onCancel, loading }) {
+export default function ScheduleForm({ initialValues, onSubmit, onCancel, loading }) {
+  const safe = initialValues ?? {};
   const [formData, setFormData] = useState({
-    name: initialValues.name || '',
-    startTime: initialValues.startTime || '09:00',
-    endTime: initialValues.endTime || '18:00',
-    daysOfWeek: initialValues.daysOfWeek || [1, 2, 3, 4, 5],
-    gracePeriodMinutes: initialValues.gracePeriodMinutes || 15
+    name: safe.name || '',
+    startTime: safe.startTime || '09:00',
+    endTime: safe.endTime || '18:00',
+    daysOfWeek: safe.daysOfWeek || [1, 2, 3, 4, 5],
+    gracePeriodMinutes: safe.gracePeriodMinutes || 15
   });
 
   const [error, setError] = useState(null);
@@ -168,7 +169,7 @@ export default function ScheduleForm({ initialValues = {}, onSubmit, onCancel, l
           ) : (
             <>
               <Save className="w-4 h-4" />
-              {initialValues.id ? 'Actualizar Plantilla' : 'Crear Plantilla'}
+              {safe.id ? 'Actualizar Plantilla' : 'Crear Plantilla'}
             </>
           )}
         </button>

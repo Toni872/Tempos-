@@ -1,23 +1,24 @@
 import { useState } from 'react';
 
-export default function EmpleadoForm({ initialValues = {}, onSubmit, onCancel, loading, mode = 'add' }) {
+export default function EmpleadoForm({ initialValues, onSubmit, onCancel, loading, mode = 'add' }) {
+  const safe = initialValues ?? {};
   const [activeTab, setActiveTab] = useState('general');
   
   // State
   const [formData, setFormData] = useState({
-    email: initialValues.email || '',
-    displayName: initialValues.displayName || initialValues.nombre || initialValues.name || '',
-    role: initialValues.role || initialValues.rol || 'employee',
-    status: initialValues.status || 'active',
+    email: safe.email || '',
+    displayName: safe.displayName || safe.nombre || safe.name || '',
+    role: safe.role || safe.rol || 'employee',
+    status: safe.status || 'active',
     // New fields
-    requiresGeolocation: initialValues.requiresGeolocation ?? false,
-    requiresKioskOnly: initialValues.requiresKioskOnly ?? false,
-    pushNotifications: initialValues.pushNotifications ?? false,
-    autoClock: initialValues.autoClock ?? false,
-    qrClock: initialValues.qrClock ?? false,
-    kioskPin: initialValues.kioskPin || '',
-    hourlyRate: initialValues.hourlyRate || 0,
-    overtimeRate: initialValues.overtimeRate || 0,
+    requiresGeolocation: safe.requiresGeolocation ?? false,
+    requiresKioskOnly: safe.requiresKioskOnly ?? false,
+    pushNotifications: safe.pushNotifications ?? false,
+    autoClock: safe.autoClock ?? false,
+    qrClock: safe.qrClock ?? false,
+    kioskPin: safe.kioskPin || '',
+    hourlyRate: safe.hourlyRate || 0,
+    overtimeRate: safe.overtimeRate || 0,
   });
 
   const [error, setError] = useState('');

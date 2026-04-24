@@ -2,13 +2,14 @@ import React, { useState } from 'react';
 import { Clock, Calendar, Save, X, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-export default function FichaForm({ initialData = {}, onSubmit, onCancel, loading }) {
+export default function FichaForm({ initialData, onSubmit, onCancel, loading }) {
+  const safe = initialData ?? {};
   const [formData, setFormData] = useState({
-    date: initialData.date ? new Date(initialData.date).toISOString().split('T')[0] : '',
-    startTime: initialData.startTime || '',
-    endTime: initialData.endTime || '',
-    description: initialData.description || '',
-    status: initialData.status || 'confirmed'
+    date: safe.date ? new Date(safe.date).toISOString().split('T')[0] : '',
+    startTime: safe.startTime || '',
+    endTime: safe.endTime || '',
+    description: safe.description || '',
+    status: safe.status || 'confirmed'
   });
 
   const [error, setError] = useState(null);
