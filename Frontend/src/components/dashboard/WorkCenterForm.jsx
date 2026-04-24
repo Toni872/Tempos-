@@ -21,12 +21,13 @@ function MapEvents({ onClick }) {
   return null;
 }
 
-export default function WorkCenterForm({ initialData = {}, onSubmit, onCancel, loading }) {
+export default function WorkCenterForm({ initialData, onSubmit, onCancel, loading }) {
+  const safe = initialData ?? {};
   const [formData, setFormData] = useState({
-    name: initialData.name || '',
-    latitude: initialData.latitude || 40.4167,
-    longitude: initialData.longitude || -3.7037,
-    radiusMeters: initialData.radiusMeters || 100,
+    name: safe.name || '',
+    latitude: safe.latitude || 40.4167,
+    longitude: safe.longitude || -3.7037,
+    radiusMeters: safe.radiusMeters || 100,
   });
 
   const [error, setError] = useState('');
@@ -177,7 +178,7 @@ export default function WorkCenterForm({ initialData = {}, onSubmit, onCancel, l
           className="flex-1 px-6 py-4 rounded-2xl bg-blue-600 text-white font-black text-[11px] uppercase tracking-widest hover:bg-blue-500 transition-all shadow-xl shadow-blue-600/20"
           disabled={loading}
         >
-          {loading ? 'Guardando...' : initialData.id ? 'Actualizar Sede' : 'Registrar Centro'}
+          {loading ? 'Guardando...' : safe.id ? 'Actualizar Sede' : 'Registrar Centro'}
         </button>
       </div>
     </form>

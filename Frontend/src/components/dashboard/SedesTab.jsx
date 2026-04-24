@@ -16,7 +16,7 @@ export default function SedesTab({ workCenters, onAdd, onEdit, onDelete }) {
             <div className="font-bold text-white text-base">{row.name}</div>
             <div className="flex items-center gap-1.5 text-xs text-zinc-500 font-medium">
               <Navigation className="w-3 h-3" />
-              {row.latitude?.toFixed(4)}, {row.longitude?.toFixed(4)}
+              {Number(row.latitude || 0).toFixed(4)}, {Number(row.longitude || 0).toFixed(4)}
             </div>
           </div>
         </div>
