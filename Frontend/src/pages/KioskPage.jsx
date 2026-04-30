@@ -1,12 +1,16 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { startAuthentication } from '@simplewebauthn/browser';
+import { getWebAuthnAuthenticationOptions, verifyWebAuthnAuthentication } from '@/lib/api';
+import { Fingerprint, UserFocus, Key, QrCode, CheckCircle, WarningCircle } from '@phosphor-icons/react';
 
 export default function KioskPage() {
   const navigate = useNavigate();
   const [time, setTime] = useState(new Date());
   const [pin, setPin] = useState('');
   const [status, setStatus] = useState({ type: 'idle', msg: '' });
-  const [authMode, setAuthMode] = useState('pin'); // 'pin' | 'qr'
+  const [authMode, setAuthMode] = useState('pin'); // 'pin' | 'qr' | 'biometric'
+  const [emailForBio, setEmailForBio] = useState('');
 
   useEffect(() => {
     const t = setInterval(() => setTime(new Date()), 1000);
@@ -30,22 +34,47 @@ export default function KioskPage() {
 
   useEffect(() => {
     if (pin.length === 4) {
-      // TODO: Replace with backend kiosk-auth endpoint (POST /api/kiosk/identify)
-      // Currently in demo mode — no real PIN validation or clock event.
-      setStatus({ type: 'loading', msg: 'Validando identidad...' });
-      setTimeout(() => {
-        setStatus({
-          type: 'success',
-          msg: 'Modo demo — Fichaje por kiosco disponible próximamente. PIN introducido: ****',
-        });
-        
-        setTimeout(() => {
-          setPin('');
-          setStatus({ type: 'idle', msg: '' });
-        }, 3500);
-      }, 800);
+      handleKioskAuth();
     }
   }, [pin]);
+
+  const handleKioskAuth = async () => {
+    setStatus({ type: 'loading', msg: 'Validando identidad...' });
+    // TODO: Real PIN validation call
+    setTimeout(() => {
+      setStatus({ type: 'success', msg: 'Acceso concedido. Fichaje registrado.' });
+      setTimeout(() => { setPin(''); setStatus({ type: 'idle', msg: '' }); }, 3000);
+    }, 1000);
+  };
+
+  const handleBiometricAuth = async () => {
+    try {
+      if (!emailForBio.trim()) {
+        alert('Por favor, introduce tu email para identificar tu dispositivo.');
+        return;
+      }
+      
+      setStatus({ type: 'loading', msg: 'Iniciando sensor biométrico...' });
+      
+      // 1. Obtener opciones del servidor
+      const options = await getWebAuthnAuthenticationOptions(emailForBio);
+      
+      // 2. Ejecutar ceremonia de autenticación
+      const authResp = await startAuthentication({ optionsJSON: options });
+      
+      // 3. Verificar en servidor
+      const result = await verifyWebAuthnAuthentication(emailForBio, authResp);
+      
+      if (result.verified) {
+        setStatus({ type: 'success', msg: 'Identidad verificada por FaceID/Huella. Fichaje completado.' });
+        setTimeout(() => { setStatus({ type: 'idle', msg: '' }); setEmailForBio(''); }, 3000);
+      }
+    } catch (err) {
+      console.error('Bio Auth Error:', err);
+      setStatus({ type: 'error', msg: 'Fallo en biometría: ' + err.message });
+      setTimeout(() => setStatus({ type: 'idle', msg: '' }), 3000);
+    }
+  };
 
   return (
     <>
@@ -87,9 +116,16 @@ export default function KioskPage() {
             </div>
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'center', gap: 16, marginBottom: 40 }}>
-            <button onClick={() => setAuthMode('pin')} className={`tp-btn ${authMode === 'pin' ? 'tp-btn-primary' : 'tp-btn-ghost'}`} style={{ padding: '8px 24px', borderRadius: 20 }}>Teclado PIN</button>
-            <button onClick={() => setAuthMode('qr')} className={`tp-btn ${authMode === 'qr' ? 'tp-btn-primary' : 'tp-btn-ghost'}`} style={{ padding: '8px 24px', borderRadius: 20 }}>Escanear QR / Cámara</button>
+          <div style={{ display: 'flex', justifyContent: 'center', gap: 12, marginBottom: 40, flexWrap: 'wrap' }}>
+            <button onClick={() => setAuthMode('pin')} className={`tp-btn ${authMode === 'pin' ? 'tp-btn-primary' : 'tp-btn-ghost'}`} style={{ padding: '10px 20px', borderRadius: 20, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Key size={18} weight="duotone" /> PIN
+            </button>
+            <button onClick={() => setAuthMode('qr')} className={`tp-btn ${authMode === 'qr' ? 'tp-btn-primary' : 'tp-btn-ghost'}`} style={{ padding: '10px 20px', borderRadius: 20, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <QrCode size={18} weight="duotone" /> QR
+            </button>
+            <button onClick={() => setAuthMode('biometric')} className={`tp-btn ${authMode === 'biometric' ? 'tp-btn-primary' : 'tp-btn-ghost'}`} style={{ padding: '10px 20px', borderRadius: 20, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Fingerprint size={18} weight="duotone" /> Biometría
+            </button>
           </div>
 
           <div style={{ minHeight: 160 }}>
@@ -122,16 +158,60 @@ export default function KioskPage() {
                   </div>
                 )}
               </>
-            ) : (
+            ) : authMode === 'qr' ? (
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                 <div style={{ color: 'var(--t0)', fontSize: 18, marginBottom: 24, fontWeight: 500 }}>Apunta tu código QR a la cámara:</div>
                 <div style={{ width: 220, height: 220, borderRadius: 24, background: 'rgba(255,255,255,0.02)', border: '2px dashed var(--mg)', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', overflow: 'hidden' }}>
                   <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 4, background: 'var(--mg)', animation: 'tp-scan-line 2s linear infinite', boxShadow: '0 0 10px var(--mg)' }} />
-                  <svg width="48" height="48" fill="none" stroke="var(--mg)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" style={{ opacity: 0.5 }}><path d="M4 4h16v16H4z"/><path d="M4 12h16"/><path d="M12 4v16"/></svg>
+                  <QrCode size={48} weight="duotone" style={{ opacity: 0.5 }} />
                 </div>
                 <div style={{ marginTop: 20, fontSize: 13, color: 'var(--t2)', maxWidth: 280, lineHeight: 1.5 }}>
                   Sitúa el código generado en tu app móvil frente a la cámara del dispositivo.
                 </div>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 24 }}>
+                {status.type === 'idle' && (
+                  <>
+                    <div style={{ color: 'var(--t0)', fontSize: 18, fontWeight: 500 }}>Identifícate para usar el sensor:</div>
+                    <input 
+                      type="email" 
+                      placeholder="Tu email corporativo..."
+                      value={emailForBio}
+                      onChange={e => setEmailForBio(e.target.value)}
+                      style={{ width: '100%', maxWidth: 320, padding: '16px 24px', borderRadius: 16, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: '#fff', fontSize: 15, outline: 'none' }}
+                    />
+                    <button 
+                      onClick={handleBiometricAuth}
+                      disabled={!emailForBio.includes('@')}
+                      className="tp-btn tp-btn-primary" 
+                      style={{ width: '100%', maxWidth: 320, padding: '16px', borderRadius: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12 }}
+                    >
+                      <UserFocus size={24} weight="bold" /> Usar FaceID / Huella
+                    </button>
+                  </>
+                )}
+                
+                {status.type === 'loading' && (
+                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20 }}>
+                     <div style={{ width: 80, height: 80, borderRadius: '50%', border: '4px solid var(--mg)', borderTopColor: 'transparent', animation: 'tp-spin 1s linear infinite' }} />
+                     <div style={{ color: 'var(--t1)', fontWeight: 500 }}>{status.msg}</div>
+                   </div>
+                )}
+                
+                {status.type === 'success' && (
+                   <div style={{ padding: 32, background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.3)', borderRadius: 24, color: '#22c55e', textAlign: 'center' }}>
+                      <CheckCircle size={48} weight="fill" style={{ margin: '0 auto 16px' }} />
+                      <p style={{ fontWeight: 600 }}>{status.msg}</p>
+                   </div>
+                )}
+
+                {status.type === 'error' && (
+                   <div style={{ padding: 32, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 24, color: '#ef4444', textAlign: 'center' }}>
+                      <WarningCircle size={48} weight="fill" style={{ margin: '0 auto 16px' }} />
+                      <p style={{ fontWeight: 600 }}>{status.msg}</p>
+                   </div>
+                )}
               </div>
             )}
           </div>

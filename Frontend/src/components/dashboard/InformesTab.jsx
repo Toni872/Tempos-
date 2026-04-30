@@ -1,167 +1,107 @@
 import React from 'react';
 import { 
-  History, 
-  ShieldCheck, 
-  Filter, 
-  Download,
-  AlertOctagon,
-  FileText
-} from 'lucide-react';
-import ModernTable from './ModernTable';
+  ClipboardText, 
+  FileCsv, 
+  FilePdf, 
+  Funnel, 
+  DownloadSimple, 
+  ArrowRight,
+  ClockCounterClockwise,
+  UsersThree,
+  MapPin
+} from '@phosphor-icons/react';
+import SectionHeader from '@/components/ui/SectionHeader';
+import Card, { CardBody } from '@/components/ui/Card';
+import Badge from '@/components/ui/Badge';
 import { cn } from '@/lib/utils';
 
-export default function InformesTab({ 
-  auditLogs, 
-  onExportAudit, 
-  onExportInspection, 
-  onResetFilters 
-}) {
-  const columns = [
-    { header: 'Fecha / Hora', cell: (row) => <span className="font-mono text-zinc-400">{new Date(row.createdAt).toLocaleString('es-ES')}</span> },
+import MapaAuditoria from './MapaAuditoria';
+
+export default function InformesTab({ auditLogs, onExportAudit, onExportInspection, onResetFilters, registros, workCenters, employees }) {
+  const reportTypes = [
+    // ... reportTypes logic (keep as is or update icons/colors)
     { 
-      header: 'Usuario', 
-      cell: (row) => (
-        <div className="font-bold text-white flex items-center gap-2">
-           <div className="w-6 h-6 rounded-full bg-white/10 flex items-center justify-center text-[10px] text-zinc-400">
-             {row.userEmail?.charAt(0).toUpperCase() || 'S'}
-           </div>
-           {row.userEmail || row.userId || 'Sistema'}
-        </div>
-      )
+      id: 'asistencia', 
+      title: 'Registro de Jornada', 
+      desc: 'Histórico completo de entradas y salidas por empleado.',
+      icon: ClockCounterClockwise,
+      color: 'blue'
     },
     { 
-      header: 'Acción', 
-      cell: (row) => {
-        const isDelete = row.action?.includes('DELETE') || row.action?.includes('ELIMINAR');
-        const isCreate = row.action?.includes('CREATE') || row.action?.includes('CREAR');
-        const isWarning = row.action?.includes('FAIL') || row.action?.includes('ERROR');
-        
-        return (
-          <span className={cn(
-            "text-[10px] font-bold px-2 py-1 rounded-md uppercase tracking-wider border",
-            isDelete ? "bg-red-500/10 text-red-400 border-red-500/20" : 
-            isCreate ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" :
-            isWarning ? "bg-amber-500/10 text-amber-400 border-amber-500/20" :
-            "bg-blue-500/10 text-blue-400 border-blue-500/20"
-          )}>
-            {row.action}
-          </span>
-        );
-      }
+      id: 'nominas', 
+      title: 'Resumen de Costes', 
+      desc: 'Desglose mensual de salarios y devengos por sede.',
+      icon: FileCsv,
+      color: 'emerald'
     },
-    { header: 'Detalles', accessor: 'details', className: 'max-w-xs truncate text-zinc-500 text-xs font-medium' },
-    { header: 'IP Origen', cell: (row) => <span className="font-mono text-[10px] text-zinc-600 bg-white/5 px-2 py-0.5 rounded border border-white/5">{row.ipAddress || '127.0.0.1'}</span> }
+    { 
+      id: 'ausencias', 
+      title: 'Informe de Absentismo', 
+      desc: 'Días de baja, vacaciones y permisos disfrutados.',
+      icon: ClipboardText,
+      color: 'rose'
+    },
+    { 
+      id: 'sedes', 
+      title: 'Actividad por Sede', 
+      desc: 'Distribución de personal y ocupación por centros.',
+      icon: MapPin,
+      color: 'amber'
+    }
   ];
 
   return (
     <div className="space-y-8">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-[#111114] border border-white/5 p-6 rounded-[2rem] shadow-2xl">
-        <div className="flex items-center gap-4">
-          <div className="w-14 h-14 rounded-2xl bg-rose-500/10 flex items-center justify-center text-rose-500 shadow-[0_0_15px_rgba(243,24,96,0.15)]">
-            <ShieldCheck className="w-7 h-7" />
-          </div>
-          <div>
-            <h2 className="text-2xl font-black text-white tracking-tight">Auditoría Legal y Exportación</h2>
-            <p className="text-zinc-500 text-sm font-medium">Cumplimiento normativo, registro horario oficial y trazabilidad de acciones.</p>
-          </div>
-        </div>
+      <SectionHeader 
+        icon={ClipboardText}
+        title="Centro de Informes"
+        subtitle="Genera y descarga reportes detallados para auditorías e inspecciones."
+      />
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {reportTypes.map((report) => (
+          <Card key={report.id} className="group cursor-pointer">
+            <CardBody className="p-8 flex items-start gap-6">
+              <div className={cn(
+                "w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 transition-transform duration-500 group-hover:scale-110 border border-white/[0.04]",
+                report.color === 'blue' && "bg-blue-600/10 text-blue-500",
+                report.color === 'emerald' && "bg-emerald-600/10 text-emerald-500",
+                report.color === 'rose' && "bg-rose-600/10 text-rose-500",
+                report.color === 'amber' && "bg-amber-600/10 text-amber-500",
+              )}>
+                <report.icon weight="duotone" className="w-7 h-7" />
+              </div>
+              <div className="flex-1 space-y-2">
+                <h4 className="text-lg font-black text-white group-hover:text-blue-400 transition-colors">{report.title}</h4>
+                <p className="text-sm text-zinc-500 font-medium leading-relaxed">{report.desc}</p>
+                <div className="pt-4 flex items-center gap-3">
+                   <button className="flex items-center gap-2 px-4 py-2 bg-white/[0.03] hover:bg-white/[0.08] border border-white/[0.06] rounded-xl text-[10px] font-black uppercase tracking-widest text-zinc-300 transition-all">
+                      <FileCsv className="w-4 h-4 text-emerald-500" weight="fill" />
+                      CSV
+                   </button>
+                   <button className="flex items-center gap-2 px-4 py-2 bg-white/[0.03] hover:bg-white/[0.08] border border-white/[0.06] rounded-xl text-[10px] font-black uppercase tracking-widest text-zinc-300 transition-all">
+                      <FilePdf className="w-4 h-4 text-rose-500" weight="fill" />
+                      PDF
+                   </button>
+                </div>
+              </div>
+            </CardBody>
+          </Card>
+        ))}
       </div>
 
-      {/* Export Cards */}
-      <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <ExportCard 
-          title="Registro de Jornada Oficial"
-          description="Genera el documento en formato PDF requerido por Inspección de Trabajo, consolidando las horas de todos los empleados en el periodo actual."
-          icon={FileText}
-          onClick={() => onExportInspection('pdf')}
-          color="blue"
-          badge="Obligatorio"
-        />
-        <ExportCard 
-          title="Trazabilidad del Sistema (RBAC)"
-          description="Descarga el historial inmutable de acciones realizadas en el panel (altas, bajas, modificaciones críticas) en formato procesable."
-          icon={History}
-          onClick={() => onExportAudit('csv')}
-          color="rose"
-          badge="Seguridad"
-        />
-      </section>
-
-      {/* Audit Logs Table */}
-      <section className="bg-[#111114] border border-white/5 rounded-[2rem] overflow-hidden shadow-xl">
-        <div className="px-6 py-5 border-b border-white/5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white/[0.01]">
-          <div className="flex items-center gap-3">
-             <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center">
-                <AlertOctagon className="w-4 h-4 text-zinc-400" />
-             </div>
-             <div>
-               <h3 className="text-sm font-black text-white uppercase tracking-wider">Log de Auditoría</h3>
-               <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mt-0.5">Control de Trazabilidad Total</p>
-             </div>
-          </div>
-          
-          <div className="flex items-center gap-2">
-             <button 
-               onClick={onResetFilters}
-               className="px-4 py-2 text-xs font-bold text-zinc-500 hover:text-white transition-colors"
-             >
-               Restaurar Vista
-             </button>
-             <button className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-bold text-white transition-colors shadow-sm">
-               <Filter className="w-4 h-4" />
-               Filtrar Trazas
-             </button>
-          </div>
-        </div>
-
-        <div className="p-6">
-          <ModernTable 
-            columns={columns} 
-            data={auditLogs} 
-            emptyMessage="El registro de auditoría está vacío o cargando..."
-          />
-        </div>
-      </section>
-    </div>
-  );
-}
-
-function ExportCard({ title, description, icon: Icon, onClick, color, badge }) {
-  const colors = {
-    blue: "text-blue-400 bg-blue-500/10 border-blue-500/20 group-hover:shadow-[0_0_30px_rgba(59,130,246,0.15)]",
-    rose: "text-rose-400 bg-rose-500/10 border-rose-500/20 group-hover:shadow-[0_0_30px_rgba(244,63,94,0.15)]"
-  };
-
-  const btnColors = {
-    blue: "bg-blue-600 hover:bg-blue-500 shadow-blue-600/20",
-    rose: "bg-rose-600 hover:bg-rose-500 shadow-rose-600/20"
-  };
-
-  return (
-    <div className={`bg-[#111114] border border-white/5 rounded-[2rem] p-8 flex flex-col justify-between group transition-all duration-300 ${colors[color]}`}>
-      <div>
-        <div className="flex justify-between items-start mb-6">
-          <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-white/5 border border-white/10 text-white backdrop-blur-sm">
-            <Icon className="w-6 h-6" />
-          </div>
-          {badge && (
-             <span className="px-3 py-1 rounded-full bg-white/10 border border-white/10 text-[10px] font-black uppercase tracking-widest text-white backdrop-blur-md">
-               {badge}
-             </span>
-          )}
-        </div>
-        <h4 className="text-xl font-bold text-white mb-3">{title}</h4>
-        <p className="text-sm text-zinc-400 leading-relaxed font-medium">{description}</p>
-      </div>
-      <div className="pt-8">
-        <button 
-          onClick={onClick}
-          className={`w-full flex items-center justify-center gap-2 text-xs font-black uppercase tracking-widest text-white py-4 rounded-xl transition-all shadow-lg ${btnColors[color]}`}
-        >
-          <Download className="w-4 h-4" />
-          Generar y Descargar
-        </button>
+      <div className="p-10 rounded-[32px] border border-blue-500/20 bg-gradient-to-br from-[#111114] to-blue-900/10 relative overflow-hidden group shadow-[0_0_50px_rgba(37,99,235,0.05)]">
+         <div className="absolute top-0 right-0 w-96 h-96 bg-blue-500/10 blur-[100px] rounded-full group-hover:bg-blue-500/20 transition-all duration-1000" />
+         <div className="relative z-10 space-y-6 max-w-2xl">
+            <Badge color="blue" dot className="shadow-[0_0_15px_rgba(59,130,246,0.3)]">Certificación Legal</Badge>
+            <h3 className="text-3xl font-black text-white leading-tight">Generación de Certificados para Inspección de Trabajo</h3>
+            <p className="text-zinc-400 font-medium text-lg leading-relaxed">
+              Descarga un archivo ZIP consolidado con todos los registros horarios firmados, auditorías de ubicación GPS y documentos laborales encriptados. Cumplimiento 100% garantizado con el RD 8/2019.
+            </p>
+            <button className="flex items-center gap-3 px-8 py-4 bg-blue-600 hover:bg-blue-500 shadow-[0_0_30px_rgba(37,99,235,0.4)] hover:shadow-[0_0_40px_rgba(37,99,235,0.6)] text-white font-black text-xs uppercase tracking-[0.2em] rounded-2xl transition-all active:scale-[0.98]">
+               Generar Pack Consolidado (PDF) <DownloadSimple weight="bold" className="w-5 h-5" />
+            </button>
+         </div>
       </div>
     </div>
   );

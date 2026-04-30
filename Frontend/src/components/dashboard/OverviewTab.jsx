@@ -1,27 +1,31 @@
 import React, { useState, useMemo } from 'react';
 import { 
-  Users, 
-  Clock, 
-  MapPin, 
-  ChevronRight, 
+  UsersThree, 
+  ClockCountdown, 
   UserPlus, 
-  CalendarDays, 
-  Smartphone,
-  CheckCircle2,
+  CalendarBlank, 
+  DeviceMobileCamera,
+  CheckCircle,
   Circle,
-  Coffee,
-  XCircle,
-  Search,
-  Activity
-} from 'lucide-react';
+  CoffeeBean,
+  Prohibit,
+  MagnifyingGlass,
+  CaretRight,
+} from '@phosphor-icons/react';
+import StatCard from '@/components/ui/StatCard';
+import EmptyState from '@/components/ui/EmptyState';
 import { cn } from '@/lib/utils';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+
+import MapaAuditoria from './MapaAuditoria';
 
 export default function OverviewTab({ 
   profile, 
   employees = [],
   registros = [],
   dashboardStats,
-  setActiveTab
+  setActiveTab,
+  workCenters = []
 }) {
   const isAdmin = profile?.role === 'admin' || profile?.role === 'manager';
   const [searchQuery, setSearchQuery] = useState('');
@@ -31,11 +35,10 @@ export default function OverviewTab({
     if (dashboardStats?.employeeStatusList?.length > 0) {
       return dashboardStats.employeeStatusList;
     }
-    // Derive from employees array
     return employees.map(emp => {
       const isWorking = emp.isWorking || emp.status === 'working';
       const isOnBreak = emp.status === 'break';
-      let color = 'zinc'; // fuera de jornada
+      let color = 'zinc';
       if (isWorking) color = 'blue';
       else if (isOnBreak) color = 'orange';
       
@@ -51,24 +54,16 @@ export default function OverviewTab({
     });
   }, [employees, dashboardStats]);
 
-  // Compute metrics from real data
   const metrics = useMemo(() => {
     if (dashboardStats?.metrics) return dashboardStats.metrics;
     const working = employeeStatusList.filter(e => e.color === 'blue').length;
     const onBreak = employeeStatusList.filter(e => e.color === 'orange').length;
     const outside = employeeStatusList.filter(e => e.color === 'zinc' || e.color === 'cyan').length;
-    return {
-      working,
-      onBreak,
-      outside,
-      registered: employees.length
-    };
+    return { working, onBreak, outside, registered: employees.length };
   }, [employees, employeeStatusList, dashboardStats]);
 
-  // Build recent activity from registros
   const recentActivity = useMemo(() => {
     if (dashboardStats?.recentActivity?.length > 0) return dashboardStats.recentActivity;
-    // Build from registros (fichas)
     const today = new Date().toISOString().split('T')[0];
     return registros
       .filter(r => {
@@ -84,7 +79,6 @@ export default function OverviewTab({
       }));
   }, [registros, dashboardStats]);
 
-  // Filter status list by search
   const filteredStatusList = useMemo(() => {
     if (!searchQuery.trim()) return employeeStatusList;
     const q = searchQuery.toLowerCase();
@@ -94,120 +88,135 @@ export default function OverviewTab({
     );
   }, [employeeStatusList, searchQuery]);
 
-  // Determine onboarding progress
   const hasEmployees = employees.length > 0;
   const hasSchedules = dashboardStats?.hasSchedules || false;
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
+    <div className="space-y-8">
       
-      {/* 1. Onboarding Header (Pasos) */}
+      {/* Onboarding Steps */}
       {isAdmin && (
-        <section className="grid grid-cols-1 md:grid-cols-3 gap-0 overflow-hidden rounded-xl border border-white/5 bg-[#111114]">
+        <section className="grid grid-cols-1 md:grid-cols-3 gap-0 overflow-hidden rounded-[20px] border border-white/[0.06] bg-[#111114]">
           <OnboardingStep 
             step={1} 
             title="Alta empleados" 
-            description="Crea un usuario para cada empleado para que puedan acceder a la app de fichaje o consultar sus datos."
+            description="Crea un usuario para cada empleado para que puedan acceder a la app."
             active={true}
             completed={hasEmployees}
             icon={UserPlus}
-            color="bg-blue-700"
             onClick={() => setActiveTab?.('Equipo')}
           />
           <OnboardingStep 
             step={2} 
-            title="Asigna el horario laboral" 
-            description="Cada empleado deberá tener un horario y recibirá recordatorios de fichajes a sus horas de entrada y salida."
+            title="Asigna el horario" 
+            description="Cada empleado recibirá recordatorios de fichajes a sus horas de turno."
             active={hasEmployees}
             completed={hasSchedules}
-            icon={CalendarDays}
-            color={hasEmployees ? "bg-blue-700" : "bg-zinc-800"}
+            icon={CalendarBlank}
             onClick={() => setActiveTab?.('Horarios')}
           />
           <OnboardingStep 
             step={3} 
             title="Descarga APP" 
-            description="Una vez creados, proporciona a tus empleados su usuario y contraseña para que comiencen a usar la app."
+            description="Proporciona a tus empleados su usuario y contraseña para la app."
             active={hasEmployees && hasSchedules}
-            icon={Smartphone}
-            color={hasEmployees && hasSchedules ? "bg-blue-700" : "bg-zinc-800"}
+            icon={DeviceMobileCamera}
           />
         </section>
       )}
 
-      {/* 2. Resumen de Estados (4 Contadores de Color) */}
+      {/* Metrics Grid */}
       <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <MetricBox 
-          label="Empleados Trabajando" 
-          value={metrics.working} 
-          icon={Clock} 
-          color="bg-[#0028a3]" 
-        />
-        <MetricBox 
-          label="Empleados en Pausa" 
-          value={metrics.onBreak} 
-          icon={Coffee} 
-          color="bg-[#ed8115]" 
-        />
-        <MetricBox 
-          label="Fuera de Jornada Laboral" 
-          value={metrics.outside} 
-          icon={XCircle} 
-          color="bg-[#00a8c2]" 
-        />
-        <MetricBox 
-          label="Empleados Registrados" 
-          value={metrics.registered} 
-          icon={Users} 
-          color="bg-[#2a8d55]" 
-        />
+        <StatCard label="Trabajando" value={metrics.working} icon={ClockCountdown} color="blue" />
+        <StatCard label="En Pausa" value={metrics.onBreak} icon={CoffeeBean} color="orange" />
+        <StatCard label="Fuera de Jornada" value={metrics.outside} icon={Prohibit} color="cyan" />
+        <StatCard label="Registrados" value={metrics.registered} icon={UsersThree} color="emerald" />
       </section>
 
-      {/* 3. Main Content: Table & Activity */}
+      {/* Gráfico Analítico Recharts */}
+      <section className="rounded-[24px] border border-white/[0.06] bg-[#111114] overflow-hidden p-6 relative group">
+        <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+        <h3 className="font-extrabold text-[11px] uppercase tracking-[0.15em] text-zinc-500 mb-6 relative z-10">Productividad Semanal (Horas)</h3>
+        <div className="h-[220px] w-full relative z-10">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={[
+              { name: 'Lun', horas: 8.5 }, { name: 'Mar', horas: 7.2 }, { name: 'Mié', horas: 9.1 },
+              { name: 'Jue', horas: 8.0 }, { name: 'Vie', horas: 6.5 }, { name: 'Sáb', horas: 0 }, { name: 'Dom', horas: 0 }
+            ]}>
+              <XAxis dataKey="name" stroke="#52525b" fontSize={10} tickLine={false} axisLine={false} dy={10} />
+              <YAxis stroke="#52525b" fontSize={10} tickLine={false} axisLine={false} dx={-10} />
+              <Tooltip 
+                cursor={{ fill: 'rgba(255,255,255,0.02)' }}
+                contentStyle={{ backgroundColor: '#18181b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '16px', fontSize: '12px', color: '#fff', boxShadow: '0 10px 30px -10px rgba(0,0,0,0.5)' }}
+                itemStyle={{ color: '#3b82f6', fontWeight: 'bold' }}
+              />
+              <Bar dataKey="horas" radius={[6, 6, 0, 0]} barSize={32}>
+                {
+                  [8.5, 7.2, 9.1, 8.0, 6.5, 0, 0].map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry > 8 ? '#3b82f6' : entry > 0 ? '#6366f1' : '#27272a'} />
+                  ))
+                }
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </section>
+
+      {/* Mini Mapa de Actividad */}
+      <section className="rounded-[24px] border border-white/[0.06] bg-[#111114] overflow-hidden">
+        <div className="px-6 py-4 border-b border-white/[0.04]">
+           <h3 className="font-extrabold text-[11px] uppercase tracking-[0.15em] text-zinc-500">Actividad Geográfica Hoy</h3>
+        </div>
+        <div className="h-[300px]">
+          <MapaAuditoria 
+            fichas={registros} 
+            workCenters={workCenters} 
+            employees={employees} 
+          />
+        </div>
+      </section>
+
+      {/* Main Content: Table & Activity */}
       <section className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         
-        {/* Tabla: Estado de los Empleados */}
-        <div className="xl:col-span-2 bg-[#111114] border border-white/5 rounded-xl shadow-sm overflow-hidden">
-          <div className="px-6 py-4 border-b border-white/5 flex items-center justify-between bg-zinc-900/40">
-            <h3 className="font-bold text-sm uppercase tracking-wider text-zinc-400">Estado de los Empleados</h3>
+        {/* Employee Status Table */}
+        <div className="xl:col-span-2 bg-[#111114] border border-white/[0.06] rounded-[20px] overflow-hidden">
+          <div className="px-6 py-4 border-b border-white/[0.04] flex items-center justify-between">
+            <h3 className="font-extrabold text-[11px] uppercase tracking-[0.15em] text-zinc-500">Estado de los Empleados</h3>
             <div className="relative">
-              <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-600" />
+              <MagnifyingGlass className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-600" weight="bold" />
               <input 
                 type="text" 
                 placeholder="Buscar..." 
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="bg-zinc-800 border-none rounded-md py-1.5 pl-8 pr-4 text-[11px] focus:ring-1 focus:ring-blue-600/50 outline-none w-48 text-zinc-300" 
+                className="bg-white/[0.03] border border-white/[0.06] rounded-xl py-1.5 pl-8 pr-4 text-[11px] focus:ring-1 focus:ring-blue-600/50 outline-none w-48 text-zinc-300 placeholder:text-zinc-700 font-medium transition-all" 
               />
             </div>
           </div>
           <div className="overflow-x-auto min-h-[400px]">
             <table className="w-full text-left">
               <thead>
-                <tr className="border-b border-white/5">
-                  <th className="px-6 py-3 text-[10px] font-bold text-zinc-500 uppercase tracking-widest text-center w-16">Estado</th>
-                  <th className="px-6 py-3 text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Nombre</th>
-                  <th className="px-6 py-3 text-[10px] font-bold text-zinc-500 uppercase tracking-widest text-right">Última Acción</th>
+                <tr className="border-b border-white/[0.04]">
+                  <th className="px-6 py-3 text-[10px] font-extrabold text-zinc-600 uppercase tracking-[0.15em] text-center w-16">Estado</th>
+                  <th className="px-6 py-3 text-[10px] font-extrabold text-zinc-600 uppercase tracking-[0.15em]">Nombre</th>
+                  <th className="px-6 py-3 text-[10px] font-extrabold text-zinc-600 uppercase tracking-[0.15em] text-right">Última Acción</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-white/5">
+              <tbody className="divide-y divide-white/[0.03]">
                 {filteredStatusList.length > 0 ? filteredStatusList.map((emp) => (
                   <tr key={emp.uid} className="hover:bg-white/[0.02] transition-colors group">
-                    <td className="px-6 py-4 text-center">
+                    <td className="px-6 py-3.5 text-center">
                        <StatusBullet color={emp.color} />
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-6 py-3.5">
                       <div className="flex flex-col">
-                        <span className="text-sm font-medium text-zinc-300 group-hover:text-white transition-colors">
-                          {emp.name}
-                        </span>
-                        {emp.email && (
-                          <span className="text-[10px] text-zinc-600">{emp.email}</span>
-                        )}
+                        <span className="text-sm font-semibold text-zinc-300 group-hover:text-white transition-colors">{emp.name}</span>
+                        {emp.email && <span className="text-[10px] text-zinc-700 font-medium">{emp.email}</span>}
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-right">
-                      <span className="text-[10px] text-zinc-500 font-mono">
+                    <td className="px-6 py-3.5 text-right">
+                      <span className="text-[11px] text-zinc-600 font-mono font-semibold">
                         {emp.lastAction !== 'Ninguna' ? emp.lastAction : '—'}
                       </span>
                     </td>
@@ -216,18 +225,13 @@ export default function OverviewTab({
                   <tr>
                     <td colSpan="3" className="px-6 py-12 text-center">
                       {employees.length === 0 ? (
-                        <div className="space-y-3">
-                          <Users className="w-10 h-10 text-zinc-800 mx-auto" />
-                          <p className="text-sm text-zinc-600 font-medium">No hay empleados registrados</p>
-                          {isAdmin && (
-                            <button 
-                              onClick={() => setActiveTab?.('Equipo')}
-                              className="text-xs text-blue-500 hover:text-blue-400 font-bold"
-                            >
-                              Añadir tu primer empleado →
-                            </button>
-                          )}
-                        </div>
+                        <EmptyState
+                          icon={UsersThree}
+                          title="Sin empleados"
+                          subtitle="Añade tu primer empleado para empezar."
+                          actionLabel={isAdmin ? "Añadir empleado" : undefined}
+                          onAction={isAdmin ? () => setActiveTab?.('Equipo') : undefined}
+                        />
                       ) : (
                         <p className="text-sm text-zinc-600 italic">No se encontraron resultados para "{searchQuery}"</p>
                       )}
@@ -237,50 +241,48 @@ export default function OverviewTab({
               </tbody>
             </table>
           </div>
-          <div className="px-6 py-4 border-t border-white/5 bg-zinc-900/40 flex items-center justify-between">
-            <p className="text-[10px] text-zinc-500">
-              Mostrando {filteredStatusList.length} de {employees.length} empleados registrados
+          <div className="px-6 py-3.5 border-t border-white/[0.04] flex items-center justify-between">
+            <p className="text-[10px] text-zinc-600 font-medium">
+              {filteredStatusList.length} de {employees.length} empleados
             </p>
             <button 
               onClick={() => setActiveTab?.('Equipo')}
-              className="bg-blue-700/80 hover:bg-blue-700 text-white text-[10px] font-bold py-1.5 px-3 rounded uppercase tracking-wider transition-all flex items-center gap-1.5"
+              className="bg-blue-600/80 hover:bg-blue-600 text-white text-[10px] font-extrabold py-1.5 px-4 rounded-lg uppercase tracking-wider transition-all flex items-center gap-1.5"
             >
-              Ver listado empleados
-              <ChevronRight className="w-3 h-3" />
+              Ver listado
+              <CaretRight className="w-3 h-3" weight="bold" />
             </button>
           </div>
         </div>
 
-        {/* Listado: Fichajes del día */}
-        <div className="bg-[#111114] border border-white/5 rounded-xl shadow-sm flex flex-col overflow-hidden">
-          <div className="px-6 py-4 border-b border-white/5 bg-zinc-900/40 flex items-center justify-between">
-            <h3 className="font-bold text-sm uppercase tracking-wider text-zinc-400">Fichajes del día</h3>
-            <span className="text-[10px] text-zinc-500 font-medium">
-              {new Date().toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })}
+        {/* Today's Activity */}
+        <div className="bg-[#111114] border border-white/[0.06] rounded-[20px] flex flex-col overflow-hidden">
+          <div className="px-6 py-4 border-b border-white/[0.04] flex items-center justify-between">
+            <h3 className="font-extrabold text-[11px] uppercase tracking-[0.15em] text-zinc-500">Fichajes del día</h3>
+            <span className="text-[10px] text-zinc-600 font-semibold">
+              {new Date().toLocaleDateString('es-ES', { day: 'numeric', month: 'long' })}
             </span>
           </div>
-          <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar max-h-[480px]">
+          <div className="flex-1 overflow-y-auto p-5 space-y-3 scrollbar-hide max-h-[480px]">
             {recentActivity.length > 0 ? recentActivity.map((event) => (
               <ActivityItem key={event.id} event={event} />
             )) : (
-              <div className="h-full flex flex-col items-center justify-center py-20 text-center px-4">
-                <div className="w-12 h-12 bg-zinc-800/50 rounded-full flex items-center justify-center mb-4">
-                  <Clock className="w-5 h-5 text-zinc-700" />
-                </div>
-                <p className="text-xs text-zinc-600 font-bold uppercase tracking-tight">No hay fichajes registrados hoy</p>
-                <p className="text-[10px] text-zinc-700 mt-1">Los fichajes aparecerán aquí en tiempo real</p>
-              </div>
+              <EmptyState
+                icon={ClockCountdown}
+                title="Sin fichajes hoy"
+                subtitle="Los fichajes aparecerán aquí en tiempo real."
+              />
             )}
           </div>
-          <div className="p-4 border-t border-white/5 flex items-center justify-between">
-            <span className="text-[9px] text-zinc-600 uppercase tracking-widest font-bold">
+          <div className="px-5 py-3.5 border-t border-white/[0.04] flex items-center justify-between">
+            <span className="text-[10px] text-zinc-600 uppercase tracking-[0.12em] font-extrabold">
               {recentActivity.length} fichaje{recentActivity.length !== 1 ? 's' : ''} hoy
             </span>
             <button 
               onClick={() => setActiveTab?.('Registros')}
-              className="text-[10px] text-blue-500 hover:text-blue-400 font-bold flex items-center gap-1"
+              className="text-[10px] text-blue-400 hover:text-blue-300 font-extrabold flex items-center gap-1 transition-colors"
             >
-              Ver todos <ChevronRight className="w-3 h-3" />
+              Ver todos <CaretRight className="w-3 h-3" weight="bold" />
             </button>
           </div>
         </div>
@@ -290,42 +292,26 @@ export default function OverviewTab({
   );
 }
 
-function OnboardingStep({ step, title, description, active, completed, icon: Icon, color, onClick }) {
+function OnboardingStep({ step, title, description, active, completed, icon: Icon, onClick }) {
   return (
     <div 
       className={cn(
-        "p-6 flex gap-4 transition-all border-r border-white/5 last:border-r-0",
-        active ? "opacity-100 cursor-pointer hover:bg-white/[0.02]" : "opacity-40 grayscale cursor-not-allowed"
+        "p-6 flex gap-4 transition-all border-r border-white/[0.04] last:border-r-0",
+        active ? "opacity-100 cursor-pointer hover:bg-white/[0.02]" : "opacity-30 grayscale cursor-not-allowed"
       )}
       onClick={active ? onClick : undefined}
     >
       <div className={cn(
-        "w-10 h-10 rounded-full shrink-0 flex items-center justify-center font-bold text-white shadow-lg relative", 
-        completed ? "bg-emerald-600" : color
+        "w-10 h-10 rounded-full shrink-0 flex items-center justify-center font-extrabold text-white shadow-lg relative", 
+        completed ? "bg-emerald-600 shadow-emerald-600/20" : "bg-blue-600 shadow-blue-600/20"
       )}>
-        {completed ? <CheckCircle2 className="w-5 h-5" /> : step}
+        {completed ? <CheckCircle className="w-5 h-5" weight="fill" /> : step}
       </div>
-      <div className="space-y-1">
-        <h4 className={cn("text-xs font-bold uppercase tracking-wider", active ? "text-white" : "text-zinc-500")}>
+      <div className="space-y-1 min-w-0">
+        <h4 className={cn("text-xs font-extrabold uppercase tracking-wider", active ? "text-white" : "text-zinc-500")}>
           {title}
         </h4>
-        <p className="text-[10px] leading-relaxed text-zinc-500 line-clamp-2">
-          {description}
-        </p>
-      </div>
-    </div>
-  );
-}
-
-function MetricBox({ label, value, icon: Icon, color }) {
-  return (
-    <div className={cn("p-6 rounded-md shadow-lg flex items-center justify-between transition-transform hover:scale-[1.02] cursor-default", color)}>
-      <div className="space-y-1">
-        <p className="text-[10px] font-bold text-white/70 uppercase tracking-wider">{label}</p>
-        <p className="text-3xl font-extrabold text-white">{value}</p>
-      </div>
-      <div className="w-10 h-10 bg-black/10 rounded-full flex items-center justify-center">
-        <Icon className="w-5 h-5 text-white/40" />
+        <p className="text-[10px] leading-relaxed text-zinc-600 line-clamp-2">{description}</p>
       </div>
     </div>
   );
@@ -333,18 +319,16 @@ function MetricBox({ label, value, icon: Icon, color }) {
 
 function StatusBullet({ color }) {
   const colors = {
-    blue: "bg-[#0028a3]",
-    orange: "bg-[#ed8115]",
-    cyan: "bg-[#00a8c2]",
-    green: "bg-emerald-600",
-    zinc: "bg-zinc-700"
+    blue: "bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.4)]",
+    orange: "bg-orange-500 shadow-[0_0_8px_rgba(249,115,22,0.4)]",
+    cyan: "bg-cyan-500 shadow-[0_0_8px_rgba(34,211,238,0.4)]",
+    green: "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]",
+    zinc: "bg-zinc-600"
   };
   
   return (
     <div className="flex justify-center">
-      <div className={cn("w-6 h-6 rounded-full flex items-center justify-center shadow-inner pt-0.5", colors[color] || colors.zinc)}>
-        <Circle className="w-3 h-3 text-white/50 fill-white/10" />
-      </div>
+      <div className={cn("w-2.5 h-2.5 rounded-full transition-all", colors[color] || colors.zinc)} />
     </div>
   );
 }
@@ -356,18 +340,18 @@ function ActivityItem({ event }) {
   const isBreak = action.includes('break') || action.includes('pausa');
 
   const actionText = isClockIn ? 'ENTRADA' : isClockOut ? 'SALIDA' : isBreak ? 'PAUSA' : (event.action || 'ACCIÓN').toUpperCase();
-  const actionColor = isClockIn ? 'text-emerald-500' : isClockOut ? 'text-rose-400' : isBreak ? 'text-amber-500' : 'text-blue-400';
+  const actionColor = isClockIn ? 'text-emerald-400' : isClockOut ? 'text-rose-400' : isBreak ? 'text-amber-400' : 'text-blue-400';
+  const dotColor = isClockIn ? 'bg-emerald-400' : isClockOut ? 'bg-rose-400' : isBreak ? 'bg-amber-400' : 'bg-blue-400';
   const timeStr = new Date(event.createdAt).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
   
   return (
-    <div className="flex items-center justify-between gap-4 p-3 rounded-lg bg-zinc-900/50 border border-white/5 hover:border-white/10 transition-all">
-      <div className="space-y-0.5 min-w-0">
-        <p className="text-[11px] font-bold text-zinc-300 truncate">{event.user?.displayName || 'Empleado'}</p>
-        <p className={cn("text-[9px] font-bold tracking-wider", actionColor)}>{actionText}</p>
+    <div className="flex items-center gap-3.5 p-3 rounded-[14px] bg-white/[0.02] border border-white/[0.04] hover:border-white/[0.08] transition-all group">
+      <div className={cn("w-2 h-2 rounded-full shrink-0", dotColor)} />
+      <div className="flex-1 min-w-0">
+        <p className="text-[12px] font-semibold text-zinc-300 truncate group-hover:text-white transition-colors">{event.user?.displayName || 'Empleado'}</p>
+        <p className={cn("text-[9px] font-extrabold tracking-wider", actionColor)}>{actionText}</p>
       </div>
-      <div className="px-2 py-1 bg-black/20 rounded border border-white/5">
-        <span className="text-[11px] font-mono font-bold text-blue-500">{timeStr}</span>
-      </div>
+      <span className="text-[11px] font-mono font-semibold text-zinc-500 tabular-nums">{timeStr}</span>
     </div>
   );
 }

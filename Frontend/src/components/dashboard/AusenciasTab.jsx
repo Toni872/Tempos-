@@ -1,123 +1,196 @@
 import React from 'react';
-import { Calendar, CheckCircle2, XCircle, Clock, Info } from 'lucide-react';
+import { 
+  CalendarX, 
+  Plus, 
+  AirplaneTilt, 
+  ThermometerHot, 
+  WarningCircle, 
+  CheckCircle,
+  Clock,
+  TrashSimple,
+  PencilSimple,
+  Suitcase
+} from '@phosphor-icons/react';
+import ModernTable from './ModernTable';
+import SectionHeader from '@/components/ui/SectionHeader';
+import { 
+  flexRender, 
+  getCoreRowModel, 
+  useReactTable, 
+  getPaginationRowModel 
+} from '@tanstack/react-table';
+import { motion } from 'framer-motion';
 
-export default function AusenciasTab({ 
-  pendingAbsences = [], 
-  isAdmin = false, 
-  onActOnAbsence, 
-  onRequestAbsence 
-}) {
+export default function AusenciasTab({ absences = [], onAdd, onEdit, onDelete, profile = {} }) {
+  const pendingCount = absences.filter(a => a.status?.toLowerCase() === 'pending').length;
+  const approvedCount = absences.filter(a => a.status?.toLowerCase() === 'approved').length;
+  const rejectedCount = absences.filter(a => a.status?.toLowerCase() === 'rejected').length;
+  const columns = React.useMemo(() => [
+    { 
+      accessorKey: 'employee',
+      header: 'Empleado Solicitante', 
+      cell: ({ row }) => {
+        const data = row.original;
+        return (
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-[10px] font-black text-indigo-400 uppercase">
+               {data.userName?.charAt(0) || 'U'}
+            </div>
+            <span className="font-bold text-zinc-200">{data.userName || data.user?.displayName || 'Empleado'}</span>
+          </div>
+        )
+      }
+    },
+    { 
+      accessorKey: 'type',
+      header: 'Tipo de Ausencia', 
+      cell: ({ row }) => {
+        const data = row.original;
+        const type = data.type?.toLowerCase();
+        let color = 'zinc';
+        let Icon = Suitcase;
+        
+        if (type?.includes('vaca')) { color = 'emerald'; Icon = AirplaneTilt; }
+        else if (type?.includes('enfer')) { color = 'rose'; Icon = ThermometerHot; }
+        else if (type?.includes('perso')) { color = 'blue'; Icon = User; }
+        
+        return (
+          <Badge color={color}>
+            <Icon className="w-3.5 h-3.5" weight="duotone" />
+            {data.type}
+          </Badge>
+        );
+      }
+    },
+    {
+      accessorKey: 'date',
+      header: 'Periodo', 
+      cell: ({ row }) => {
+        const data = row.original;
+        return (
+          <div className="flex flex-col gap-0.5">
+            <div className="flex items-center gap-2 text-[13px] font-semibold text-zinc-300">
+              {new Date(data.startDate).toLocaleDateString()} — {new Date(data.endDate).toLocaleDateString()}
+            </div>
+            <span className="text-[10px] text-zinc-600 font-extrabold uppercase tracking-tighter">
+              {Math.ceil((new Date(data.endDate) - new Date(data.startDate)) / (1000 * 60 * 60 * 24)) + 1} días naturales
+            </span>
+          </div>
+        )
+      }
+    },
+    {
+      accessorKey: 'status',
+      header: 'Estado de Aprobación', 
+      cell: ({ row }) => {
+        const data = row.original;
+        const status = data.status?.toLowerCase() || 'pending';
+        const isApproved = status === 'approved' || status === 'aprobado';
+        const isPending = status === 'pending' || status === 'pendiente';
+        
+        return (
+          <div className="flex items-center gap-3">
+            <Badge color={isApproved ? 'emerald' : isPending ? 'amber' : 'rose'} className="animate-in fade-in zoom-in">
+              {isApproved ? <CheckCircle className="w-3.5 h-3.5" weight="fill" /> : isPending ? <Clock className="w-3.5 h-3.5 animate-pulse" weight="fill" /> : <WarningCircle className="w-3.5 h-3.5" weight="fill" />}
+              {status.toUpperCase()}
+            </Badge>
+            {isPending && profile?.role === 'admin' && (
+              <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <button onClick={(e) => { e.stopPropagation(); onEdit({...data, status: 'approved'}); }} className="p-1 rounded bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500 hover:text-white transition-colors" title="Aprobar"><CheckCircle className="w-3 h-3" weight="bold"/></button>
+                <button onClick={(e) => { e.stopPropagation(); onEdit({...data, status: 'rejected'}); }} className="p-1 rounded bg-rose-500/10 text-rose-500 hover:bg-rose-500 hover:text-white transition-colors" title="Rechazar"><WarningCircle className="w-3 h-3" weight="bold"/></button>
+              </div>
+            )}
+          </div>
+        );
+      }
+    }
+  ], [profile]);
+
+  const table = useReactTable({
+    data: absences,
+    columns,
+    getCoreRowModel: getCoreRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    initialState: { pagination: { pageSize: 8 } }
+  });
+
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center bg-[#111114] border border-white/5 p-6 rounded-[2rem] shadow-2xl">
-        <div className="flex items-center gap-4">
-          <div className="w-14 h-14 rounded-2xl bg-orange-500/10 flex items-center justify-center text-orange-500 shadow-[0_0_15px_rgba(249,115,22,0.15)]">
-            <Calendar className="w-7 h-7" />
-          </div>
-          <div>
-            <h2 className="text-2xl font-black text-white tracking-tight">Gestión de Ausencias</h2>
-            <p className="text-zinc-500 text-sm font-medium">Control de vacaciones, permisos y bajas médicas</p>
-          </div>
+      <SectionHeader 
+        icon={CalendarX}
+        title="Control de Ausencias"
+        subtitle="Gestiona vacaciones, bajas médicas y permisos especiales."
+        actionLabel="Registrar Ausencia"
+        actionIcon={Plus}
+        onAction={onAdd}
+      />
+
+      {/* Métricas Superiores */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="bg-[#111114] border border-amber-500/20 rounded-[20px] p-5 flex items-center justify-between shadow-[0_0_20px_rgba(245,158,11,0.05)]">
+           <div><p className="text-[10px] text-amber-500 font-extrabold uppercase tracking-widest">Pendientes</p><p className="text-3xl font-black text-white mt-1">{pendingCount}</p></div>
+           <div className="w-12 h-12 rounded-full bg-amber-500/10 flex items-center justify-center"><Clock className="w-6 h-6 text-amber-500" weight="duotone"/></div>
         </div>
-        <button 
-          onClick={onRequestAbsence} 
-          className="bg-orange-600 hover:bg-orange-500 text-white px-6 py-3 rounded-xl font-bold text-sm shadow-xl shadow-orange-600/20 transition-all flex items-center gap-2"
-        >
-          <span>Nueva Solicitud</span>
-        </button>
+        <div className="bg-[#111114] border border-emerald-500/20 rounded-[20px] p-5 flex items-center justify-between shadow-[0_0_20px_rgba(16,185,129,0.05)]">
+           <div><p className="text-[10px] text-emerald-500 font-extrabold uppercase tracking-widest">Aprobadas</p><p className="text-3xl font-black text-white mt-1">{approvedCount}</p></div>
+           <div className="w-12 h-12 rounded-full bg-emerald-500/10 flex items-center justify-center"><CheckCircle className="w-6 h-6 text-emerald-500" weight="duotone"/></div>
+        </div>
+        <div className="bg-[#111114] border border-rose-500/20 rounded-[20px] p-5 flex items-center justify-between shadow-[0_0_20px_rgba(244,63,94,0.05)]">
+           <div><p className="text-[10px] text-rose-500 font-extrabold uppercase tracking-widest">Rechazadas</p><p className="text-3xl font-black text-white mt-1">{rejectedCount}</p></div>
+           <div className="w-12 h-12 rounded-full bg-rose-500/10 flex items-center justify-center"><WarningCircle className="w-6 h-6 text-rose-500" weight="duotone"/></div>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="col-span-1 md:col-span-2 space-y-4">
-          <h3 className="text-lg font-bold text-white px-2">Solicitudes Pendientes</h3>
-          {pendingAbsences.length === 0 ? (
-            <div className="p-12 text-center text-zinc-500 bg-white/[0.02] border border-dashed border-white/10 rounded-[2rem] flex flex-col items-center">
-              <CheckCircle2 className="w-12 h-12 text-zinc-600 mb-3 opacity-50" />
-              <p className="font-bold">Todo al día</p>
-              <p className="text-sm">No hay solicitudes pendientes de revisión.</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 gap-4">
-              {pendingAbsences.map((a) => (
-                <div key={a.id} className="bg-[#111114] border border-white/5 rounded-[2rem] p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:border-white/10 transition-colors">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-2xl bg-white/[0.03] border border-white/5 flex items-center justify-center text-zinc-400">
-                      <Clock className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <h4 className="font-bold text-white text-lg">{a.type || a.motivo || 'Ausencia'}</h4>
-                      <p className="text-sm text-zinc-500 font-mono mt-0.5">
-                        {new Date(a.startDate).toLocaleDateString('es-ES')} <span className="text-zinc-700">→</span> {new Date(a.endDate).toLocaleDateString('es-ES')}
-                      </p>
-                      {a.employee && (
-                        <p className="text-xs text-blue-400 font-medium mt-1">
-                          👤 {a.employee.name}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                  {isAdmin && (
-                    <div className="flex sm:flex-col gap-2">
-                      <button 
-                        onClick={() => onActOnAbsence(a.id, 'approve')} 
-                        className="px-5 py-2.5 bg-emerald-500/10 rounded-xl text-emerald-500 font-black text-xs hover:bg-emerald-500/20 transition-all border border-emerald-500/20 flex items-center justify-center gap-1.5"
-                      >
-                        <CheckCircle2 className="w-3.5 h-3.5" />
-                        Autorizar
-                      </button>
-                      <button 
-                        onClick={() => onActOnAbsence(a.id, 'reject')} 
-                        className="px-5 py-2.5 bg-rose-500/10 rounded-xl text-rose-500 font-black text-xs hover:bg-rose-500/20 transition-all border border-rose-500/20 flex items-center justify-center gap-1.5"
-                      >
-                        <XCircle className="w-3.5 h-3.5" />
-                        Rechazar
-                      </button>
-                    </div>
-                  )}
-                </div>
+      <div className="bg-[#0d0d0f] rounded-[24px] overflow-hidden border border-white/[0.04]">
+        <div className="overflow-x-auto min-h-[300px]">
+          <table className="w-full text-left">
+            <thead className="bg-[#111114]">
+              {table.getHeaderGroups().map(headerGroup => (
+                <tr key={headerGroup.id} className="border-b border-white/[0.06]">
+                  {headerGroup.headers.map(header => (
+                    <th key={header.id} className="px-6 py-4 text-[10px] font-extrabold text-zinc-500 uppercase tracking-widest">
+                      {flexRender(header.column.columnDef.header, header.getContext())}
+                    </th>
+                  ))}
+                  <th className="px-6 py-4 text-[10px] font-extrabold text-zinc-500 uppercase tracking-widest text-right">Acciones</th>
+                </tr>
               ))}
-            </div>
-          )}
+            </thead>
+            <tbody className="divide-y divide-white/[0.04]">
+              {table.getRowModel().rows.length ? table.getRowModel().rows.map((row, idx) => (
+                <motion.tr 
+                  initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: idx * 0.05 }}
+                  key={row.id} 
+                  className="hover:bg-white/[0.02] cursor-default group transition-colors"
+                >
+                  {row.getVisibleCells().map(cell => (
+                    <td key={cell.id} className="px-6 py-4">
+                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    </td>
+                  ))}
+                  <td className="px-6 py-4 text-right">
+                    <div className="flex items-center justify-end gap-2 opacity-50 group-hover:opacity-100 transition-opacity">
+                      <button onClick={(e) => { e.stopPropagation(); onEdit(row.original); }} className="p-2 rounded-xl bg-white/[0.03] text-zinc-500 hover:text-white transition-all"><PencilSimple className="w-4 h-4" /></button>
+                      <button onClick={(e) => { e.stopPropagation(); onDelete(row.original); }} className="p-2 rounded-xl bg-rose-500/5 text-rose-500/40 hover:text-rose-500 transition-all"><TrashSimple className="w-4 h-4" /></button>
+                    </div>
+                  </td>
+                </motion.tr>
+              )) : (
+                <tr><td colSpan={columns.length + 1} className="py-12 text-center text-zinc-500 text-sm">No hay solicitudes de ausencia registradas.</td></tr>
+              )}
+            </tbody>
+          </table>
         </div>
-
-        <div className="col-span-1">
-           <div className="bg-[#111114] border border-white/5 rounded-[2rem] p-6 lg:sticky top-6">
-              <h3 className="text-sm font-black text-zinc-500 uppercase tracking-widest mb-6">Resumen Anual</h3>
-              
-              <div className="space-y-6">
-                 <div>
-                   <div className="flex justify-between text-sm mb-2">
-                     <span className="text-zinc-400 font-bold">Días Disponibles</span>
-                     <span className="text-white font-mono">22</span>
-                   </div>
-                   <div className="w-full h-2 bg-white/5 rounded-full overflow-hidden">
-                     <div className="w-[30%] h-full bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.5)] rounded-full" />
-                   </div>
-                   <p className="text-[10px] text-zinc-500 mt-2 font-medium">8 días consumidos de 30 totales (Ref. España)</p>
-                 </div>
-
-                 <div className="pt-6 border-t border-white/5">
-                   <div className="flex justify-between text-sm mb-2">
-                     <span className="text-zinc-400 font-bold">Bajas Médicas</span>
-                     <span className="text-rose-400 font-mono">0</span>
-                   </div>
-                 </div>
-
-                 <div className="pt-6 border-t border-white/5">
-                   <div className="flex justify-between text-sm mb-2">
-                     <span className="text-zinc-400 font-bold">Asuntos Propios</span>
-                     <span className="text-amber-400 font-mono">1</span>
-                   </div>
-                 </div>
-              </div>
-
-              <div className="mt-8 p-4 bg-orange-500/10 border border-orange-500/20 rounded-2xl flex items-start gap-3">
-                 <Info className="w-4 h-4 text-orange-400 shrink-0 mt-0.5" />
-                 <p className="text-[10px] text-orange-200 leading-relaxed font-medium">
-                   Las solicitudes deben realizarse con al menos 15 días de antelación según convenio colectivo.
-                 </p>
-              </div>
-           </div>
+        
+        {/* Paginación */}
+        <div className="px-6 py-4 border-t border-white/[0.04] bg-[#111114] flex items-center justify-between">
+          <span className="text-xs text-zinc-500 font-semibold">
+            Página {table.getState().pagination.pageIndex + 1} de {table.getPageCount() || 1}
+          </span>
+          <div className="flex gap-2">
+            <button onClick={() => table.previousPage()} disabled={!table.getCanPreviousPage()} className="px-4 py-2 rounded-xl bg-white/[0.03] disabled:opacity-30 text-xs font-bold text-zinc-400 hover:text-white">Anterior</button>
+            <button onClick={() => table.nextPage()} disabled={!table.getCanNextPage()} className="px-4 py-2 rounded-xl bg-white/[0.03] disabled:opacity-30 text-xs font-bold text-zinc-400 hover:text-white">Siguiente</button>
+          </div>
         </div>
       </div>
     </div>

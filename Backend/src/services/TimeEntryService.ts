@@ -1,7 +1,14 @@
-import { Repository } from 'typeorm';
-import { TimeEntry, TimeEntryType, TimeEntrySource } from '../entities/TimeEntry.js';
-import { TimeEntryChangeLog, ChangeAction } from '../entities/TimeEntryChangeLog.js';
-import { AppDataSource } from '../database.js';
+import { Repository } from "typeorm";
+import {
+  TimeEntry,
+  TimeEntryType,
+  TimeEntrySource,
+} from "../entities/TimeEntry.js";
+import {
+  TimeEntryChangeLog,
+  ChangeAction,
+} from "../entities/TimeEntryChangeLog.js";
+import { AppDataSource } from "../database.js";
 
 export interface RecordClockEventParams {
   userId: string;
@@ -14,6 +21,7 @@ export interface RecordClockEventParams {
   userAgent?: string;
   latitude?: number;
   longitude?: number;
+  deviceId?: string;
 }
 
 export interface LogChangeParams {
@@ -43,10 +51,12 @@ export class TimeEntryService {
 
   constructor(
     timeEntryRepo?: Repository<TimeEntry>,
-    changeLogRepo?: Repository<TimeEntryChangeLog>
+    changeLogRepo?: Repository<TimeEntryChangeLog>,
   ) {
-    this.timeEntryRepo = timeEntryRepo || AppDataSource.getRepository(TimeEntry);
-    this.changeLogRepo = changeLogRepo || AppDataSource.getRepository(TimeEntryChangeLog);
+    this.timeEntryRepo =
+      timeEntryRepo || AppDataSource.getRepository(TimeEntry);
+    this.changeLogRepo =
+      changeLogRepo || AppDataSource.getRepository(TimeEntryChangeLog);
   }
 
   /**
@@ -66,8 +76,9 @@ export class TimeEntryService {
       userAgent: params.userAgent,
       latitude: params.latitude,
       longitude: params.longitude,
+      deviceId: params.deviceId,
       metadata: {
-        deviceId: undefined, // puede extraerse de userAgent si es necesario
+        deviceId: params.deviceId,
       },
     });
 
@@ -89,7 +100,7 @@ export class TimeEntryService {
       ip: params.ip,
       userAgent: params.userAgent,
       metadata: {
-        approvalStatus: 'pending', // por defecto pendiente de aprobación
+        approvalStatus: "pending", // por defecto pendiente de aprobación
       },
     });
 
@@ -103,9 +114,9 @@ export class TimeEntryService {
    */
   async getChangeHistory(timeEntryId: string): Promise<TimeEntryChangeLog[]> {
     return this.changeLogRepo
-      .createQueryBuilder('log')
-      .where('log.timeEntryId = :timeEntryId', { timeEntryId })
-      .orderBy('log.createdAt', 'ASC')
+      .createQueryBuilder("log")
+      .where("log.timeEntryId = :timeEntryId", { timeEntryId })
+      .orderBy("log.createdAt", "ASC")
       .getMany();
   }
 
@@ -116,9 +127,9 @@ export class TimeEntryService {
    */
   async getsFichaEvents(fichaId: string): Promise<TimeEntry[]> {
     return this.timeEntryRepo
-      .createQueryBuilder('entry')
-      .where('entry.fichaId = :fichaId', { fichaId })
-      .orderBy('entry.timestampUtc', 'ASC')
+      .createQueryBuilder("entry")
+      .where("entry.fichaId = :fichaId", { fichaId })
+      .orderBy("entry.timestampUtc", "ASC")
       .getMany();
   }
 
@@ -130,13 +141,21 @@ export class TimeEntryService {
    * @param endDate fecha fin (ISO)
    * @returns array de TimeEntry
    */
-  async getUserEventsByDateRange(userId: string, startDate: string, endDate: string): Promise<TimeEntry[]> {
+  async getUserEventsByDateRange(
+    userId: string,
+    startDate: string,
+    endDate: string,
+  ): Promise<TimeEntry[]> {
     return this.timeEntryRepo
-      .createQueryBuilder('entry')
-      .where('entry.userId = :userId', { userId })
-      .andWhere('DATE(entry.timestampUtc AT TIME ZONE \'UTC\') >= :startDate', { startDate })
-      .andWhere('DATE(entry.timestampUtc AT TIME ZONE \'UTC\') <= :endDate', { endDate })
-      .orderBy('entry.timestampUtc', 'ASC')
+      .createQueryBuilder("entry")
+      .where("entry.userId = :userId", { userId })
+      .andWhere("DATE(entry.timestampUtc AT TIME ZONE 'UTC') >= :startDate", {
+        startDate,
+      })
+      .andWhere("DATE(entry.timestampUtc AT TIME ZONE 'UTC') <= :endDate", {
+        endDate,
+      })
+      .orderBy("entry.timestampUtc", "ASC")
       .getMany();
   }
 
@@ -147,9 +166,9 @@ export class TimeEntryService {
    */
   async getLastEventForUser(userId: string): Promise<TimeEntry | null> {
     return this.timeEntryRepo
-      .createQueryBuilder('entry')
-      .where('entry.userId = :userId', { userId })
-      .orderBy('entry.timestampUtc', 'DESC')
+      .createQueryBuilder("entry")
+      .where("entry.userId = :userId", { userId })
+      .orderBy("entry.timestampUtc", "DESC")
       .limit(1)
       .getOne();
   }
@@ -194,7 +213,7 @@ export class TimeEntryService {
   async reviewCorrections(params: {
     fichaId: string;
     reviewedBy: string;
-    decision: 'approved' | 'rejected';
+    decision: "approved" | "rejected";
     comment?: string;
     ip?: string;
     userAgent?: string;
@@ -204,9 +223,9 @@ export class TimeEntryService {
     for (const entry of timeEntries) {
       // Buscamos por historial y filtramos en memoria para mayor compatibilidad de queries JSON
       const history = await this.getChangeHistory(entry.id);
-      const pendingLog = history.reverse().find(log => 
-        (log.metadata as any)?.approvalStatus === 'pending'
-      );
+      const pendingLog = history
+        .reverse()
+        .find((log) => (log.metadata as any)?.approvalStatus === "pending");
 
       if (pendingLog) {
         pendingLog.metadata = {
@@ -221,6 +240,47 @@ export class TimeEntryService {
         await this.changeLogRepo.save(pendingLog);
       }
     }
+  }
+
+  /**
+   * Calcula las horas trabajadas totales para una ficha, descontando las pausas.
+   * Lógica:
+   * - CLOCK_IN -> Sumar desde aquí
+   * - BREAK_START -> Parar de sumar
+   * - BREAK_END -> Volver a sumar
+   * - CLOCK_OUT -> Finalizar suma
+   * @param fichaId ID de la ficha
+   * @returns total de horas trabajadas (float)
+   */
+  async calculateWorkingHours(fichaId: string): Promise<number> {
+    const events = await this.getsFichaEvents(fichaId);
+    if (events.length === 0) return 0;
+
+    let totalMs = 0;
+    let lastStartTime: number | null = null;
+
+    for (const event of events) {
+      const timestamp = new Date(event.timestampUtc).getTime();
+
+      switch (event.type) {
+        case "CLOCK_IN":
+        case "BREAK_END":
+          if (lastStartTime === null) {
+            lastStartTime = timestamp;
+          }
+          break;
+
+        case "BREAK_START":
+        case "CLOCK_OUT":
+          if (lastStartTime !== null) {
+            totalMs += timestamp - lastStartTime;
+            lastStartTime = null;
+          }
+          break;
+      }
+    }
+
+    return parseFloat((totalMs / 3600000).toFixed(2));
   }
 }
 

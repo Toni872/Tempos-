@@ -35,7 +35,7 @@
   --mg: #3b82f6;      /* Vibrant Blue 500 */
   --mg-dark: #2563eb; /* Blue 600 */
   --mg-light: #60a5fa; /* Blue 400 */
-  --mg-glow: rgba(59, 130, 246, 0.2);
+  --mg-light: #60a5fa; /* Blue 400 */
   
   --bg0: #0a0a0c;     /* Deep Obsidian */
   --bg1: #111114;     /* Raised Surfaces */
@@ -58,6 +58,18 @@
   --ease-spring: cubic-bezier(0.16, 1, 0.3, 1);
   --radius-xl: 16px;
   --radius-2xl: 24px;
+  --radius-card: 20px;
+}
+
+/* Hide scrollbar for Chrome, Safari and Opera */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Hide scrollbar for IE, Edge and Firefox */
+.scrollbar-hide {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
 }
 
 html { scroll-behavior: smooth; }
@@ -92,10 +104,6 @@ body { background: var(--bg0); }
 @keyframes tp-pulse-ring {
   0%   { transform: scale(1); opacity: 0.8; }
   100% { transform: scale(2.6); opacity: 0; }
-}
-@keyframes tp-glow-breathe {
-  0%,100% { box-shadow: 0 0 24px var(--mg-glow), 0 8px 40px rgba(0,0,0,0.5); }
-  50%      { box-shadow: 0 0 48px rgba(37,99,235,0.28), 0 8px 40px rgba(0,0,0,0.5); }
 }
 @keyframes tp-reveal-up {
   from { opacity: 0; transform: translateY(36px); }
@@ -335,10 +343,10 @@ body { background: var(--bg0); }
 }
 
 /* ── Scrollbar ── */
-::-webkit-scrollbar { width: 4px; }
-::-webkit-scrollbar-track { background: var(--bg0); }
-::-webkit-scrollbar-thumb { background: var(--bg3); border-radius: 2px; }
-::-webkit-scrollbar-thumb:hover { background: rgba(37,99,235,0.4); }
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.05); border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(59, 130, 246, 0.2); }
 
 /* ── Section label ── */
 .tp-label {

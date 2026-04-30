@@ -1,157 +1,146 @@
 import React, { useState } from 'react';
-import { Calendar, Save, AlertCircle, Info, Plane, Thermometer, UserSquare2, Sparkles } from 'lucide-react';
+import { 
+  CalendarX, 
+  AirplaneTilt, 
+  ThermometerHot, 
+  Suitcase, 
+  Calendar,
+  Note,
+  FloppyDisk,
+  CheckCircle,
+  Clock
+} from '@phosphor-icons/react';
+import { cn } from '@/lib/utils';
 
-export default function AusenciaForm({ initialValues, onSubmit, onCancel, loading }) {
-  const safe = initialValues ?? {};
-  const [motivo, setMotivo] = useState(safe.motivo || safe.reason || 'Vacaciones');
-  const [dias, setDias] = useState(safe.dias || safe.days || 1);
-  const [fechaInicio, setFechaInicio] = useState(safe.fechaInicio || safe.startDate || '');
-  const [fechaFin, setFechaFin] = useState(safe.fechaFin || safe.endDate || '');
-  const [error, setError] = useState('');
+export default function AusenciaForm({ initialValues, onSubmit, onCancel }) {
+  const [formData, setFormData] = useState(initialValues ?? {
+    type: 'Vacaciones',
+    startDate: '',
+    endDate: '',
+    status: 'Pending',
+    notes: ''
+  });
 
-  const typeOptions = [
-    { value: 'Vacaciones', icon: Plane, label: 'Vacaciones', color: 'text-blue-400', bg: 'bg-blue-400/10', border: 'border-blue-500/20' },
-    { value: 'Baja médica', icon: Thermometer, label: 'Baja médica', color: 'text-rose-400', bg: 'bg-rose-400/10', border: 'border-rose-500/20' },
-    { value: 'Asuntos propios', icon: UserSquare2, label: 'Asuntos Propios', color: 'text-amber-400', bg: 'bg-amber-400/10', border: 'border-amber-500/20' },
-    { value: 'Otro', icon: Sparkles, label: 'Otro', color: 'text-purple-400', bg: 'bg-purple-400/10', border: 'border-purple-500/20' }
-  ];
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!fechaInicio || !fechaFin || dias < 1) {
-      setError('Completa todos los campos correctamente.');
-      return;
-    }
-    if (fechaFin < fechaInicio) {
-      setError('La fecha de fin no puede ser anterior a la fecha de inicio.');
-      return;
-    }
-    setError('');
-    onSubmit({ motivo, dias, fechaInicio, fechaFin });
+    onSubmit(formData);
   };
 
+  const types = [
+    { id: 'Vacaciones', icon: AirplaneTilt, color: 'text-emerald-500' },
+    { id: 'Enfermedad', icon: ThermometerHot, color: 'text-rose-500' },
+    { id: 'Asuntos Propios', icon: Suitcase, color: 'text-blue-500' },
+  ];
+
   return (
-    <form onSubmit={handleSubmit} className="p-6 space-y-6">
-      <div className="flex items-center gap-3 mb-2">
-        <div className="w-10 h-10 rounded-xl bg-orange-500/10 flex items-center justify-center text-orange-500 shadow-[0_0_15px_rgba(249,115,22,0.2)]">
-          <Calendar className="w-5 h-5" />
-        </div>
-        <div>
-          <h3 className="text-lg font-bold text-white">Solicitar Ausencia</h3>
-          <p className="text-[10px] text-zinc-500 uppercase tracking-widest font-black">Permisos y Vacaciones</p>
-        </div>
-      </div>
-
-      {error && (
-        <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl flex items-center gap-3 animate-in fade-in slide-in-from-top-1">
-          <AlertCircle className="w-5 h-5 text-red-500" />
-          <p className="text-sm text-red-200 font-medium">{error}</p>
-        </div>
-      )}
-
-      <div className="space-y-5">
+    <form onSubmit={handleSubmit} className="space-y-8">
+      <div className="space-y-6">
         <div className="space-y-3">
-          <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-1">Motivo de Ausencia</label>
-          <div className="grid grid-cols-2 gap-3">
-            {typeOptions.map((opt) => {
-              const Icon = opt.icon;
-              const isActive = motivo === opt.value;
-              return (
-                <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() => setMotivo(opt.value)}
-                  className={`flex items-center gap-3 p-3 rounded-xl border text-left transition-all ${
-                    isActive 
-                      ? `${opt.bg} ${opt.border} shadow-lg` 
-                      : 'bg-white/[0.03] border-white/5 hover:bg-white/5'
-                  }`}
-                >
-                  <div className={`p-2 rounded-lg ${isActive ? 'bg-white/10' : 'bg-white/5'}`}>
-                    <Icon className={`w-4 h-4 ${isActive ? opt.color : 'text-zinc-500'}`} />
-                  </div>
-                  <span className={`text-xs font-bold ${isActive ? 'text-white' : 'text-zinc-400'}`}>
-                    {opt.label}
-                  </span>
-                </button>
-              );
-            })}
+          <label className="text-[10px] font-black text-zinc-600 uppercase tracking-[0.2em] ml-1">Tipo de Ausencia</label>
+          <div className="grid grid-cols-3 gap-2">
+            {types.map(t => (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => setFormData(p => ({ ...p, type: t.id }))}
+                className={cn(
+                  "flex flex-col items-center justify-center gap-2 p-4 rounded-2xl border transition-all",
+                  formData.type === t.id 
+                    ? "bg-white/[0.05] border-blue-500/40 text-white shadow-lg" 
+                    : "bg-white/[0.02] border-white/[0.06] text-zinc-600 hover:text-zinc-400"
+                )}
+              >
+                <t.icon weight={formData.type === t.id ? "fill" : "duotone"} className={cn("w-6 h-6", formData.type === t.id ? t.color : "text-zinc-700")} />
+                <span className="text-[9px] font-black uppercase tracking-tighter text-center">{t.id}</span>
+              </button>
+            ))}
           </div>
         </div>
 
-        <div className="space-y-3 p-4 bg-zinc-500/5 border border-white/5 rounded-2xl relative overflow-hidden">
-           <div className="absolute top-0 right-0 p-4 opacity-10 pointer-events-none">
-             <Calendar className="w-24 h-24 stroke-1" />
-           </div>
-           
-           <div className="relative z-10 flex gap-4">
-              <div className="flex-1 space-y-2">
-                <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest ml-1">Inicio Rango</label>
-                <input
-                  type="date"
-                  value={fechaInicio}
-                  onChange={e => setFechaInicio(e.target.value)}
-                  className="w-full bg-white/[0.05] border border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:border-blue-500/50 transition-all text-white font-mono"
-                  required
-                />
-              </div>
-              <div className="flex-1 space-y-2">
-                <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest ml-1">Fin Rango</label>
-                <input
-                  type="date"
-                  value={fechaFin}
-                  onChange={e => setFechaFin(e.target.value)}
-                  className="w-full bg-white/[0.05] border border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:border-blue-500/50 transition-all text-white font-mono"
-                  required
-                />
-              </div>
-           </div>
+        <div className="grid grid-cols-2 gap-4">
+          <FormInput 
+            label="Fecha Inicio" 
+            name="startDate" 
+            value={formData.startDate} 
+            onChange={handleChange} 
+            icon={Calendar} 
+            type="date" 
+          />
+          <FormInput 
+            label="Fecha Fin" 
+            name="endDate" 
+            value={formData.endDate} 
+            onChange={handleChange} 
+            icon={Calendar} 
+            type="date" 
+          />
         </div>
 
         <div className="space-y-2">
-          <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-1 flex justify-between items-center">
-            <span>Días Solicitados</span>
-            <span className="text-orange-400 font-mono">{dias} {dias === 1 ? 'Día' : 'Días'}</span>
-          </label>
-          <input
-            type="range"
-            min="1"
-            max="30"
-            step="1"
-            value={dias}
-            onChange={e => setDias(parseInt(e.target.value))}
-            className="w-full accent-orange-500 h-1.5 bg-white/5 rounded-full appearance-none cursor-pointer mt-2"
-          />
-          <p className="text-[9px] text-zinc-500 font-medium flex items-center gap-1.5 pt-1">
-            <Info className="w-3 h-3" />
-            Asegúrate de ajustar los días hábiles manualmente.
-          </p>
+          <label className="text-[10px] font-black text-zinc-600 uppercase tracking-widest ml-1">Estado de Aprobación</label>
+          <div className="flex gap-2">
+            {['Pending', 'Approved', 'Rejected'].map(s => (
+              <button
+                key={s}
+                type="button"
+                onClick={() => setFormData(p => ({ ...p, status: s }))}
+                className={cn(
+                  "flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border text-[10px] font-black uppercase tracking-wider transition-all",
+                  formData.status === s 
+                    ? (s === 'Approved' ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-500" : s === 'Rejected' ? "bg-rose-500/10 border-rose-500/30 text-rose-500" : "bg-amber-500/10 border-amber-500/30 text-amber-500") 
+                    : "bg-white/[0.02] border-white/[0.06] text-zinc-600 hover:text-zinc-400"
+                )}
+              >
+                {s === 'Approved' ? <CheckCircle className="w-4 h-4" /> : s === 'Rejected' ? <XCircle className="w-4 h-4" /> : <Clock className="w-4 h-4" />}
+                {s === 'Pending' ? 'Pendiente' : s === 'Approved' ? 'Aprobar' : 'Denegar'}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <label className="text-[10px] font-black text-zinc-600 uppercase tracking-widest ml-1">Justificante / Notas</label>
+          <div className="relative group">
+            <Note className="absolute left-4 top-4 w-4 h-4 text-zinc-600 group-focus-within:text-blue-500 transition-colors" weight="bold" />
+            <textarea 
+              name="notes"
+              value={formData.notes}
+              onChange={handleChange}
+              placeholder="Añade detalles adicionales..."
+              className="w-full bg-white/[0.03] border border-white/[0.06] rounded-2xl py-3.5 pl-11 pr-4 text-sm font-semibold text-zinc-300 outline-none focus:border-blue-500/40 transition-all min-h-[80px] resize-none"
+            />
+          </div>
         </div>
       </div>
 
-      <div className="flex gap-3 pt-6 border-t border-white/5">
-        <button
-          type="button"
-          onClick={onCancel}
-          className="flex-1 px-6 py-4 rounded-2xl bg-[#111114] border border-white/5 text-zinc-400 font-black text-[11px] uppercase tracking-widest hover:text-white transition-all"
-        >
+      <div className="pt-6 border-t border-white/[0.04] flex items-center justify-end gap-4">
+        <button type="button" onClick={onCancel} className="px-6 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest text-zinc-500 hover:text-white transition-all">
           Cancelar
         </button>
-        <button
-          type="submit"
-          className="flex-1 px-6 py-4 rounded-2xl bg-orange-600 text-white font-black text-[11px] uppercase tracking-widest hover:bg-orange-500 transition-all shadow-xl shadow-orange-600/20 disabled:opacity-50 flex items-center justify-center gap-2"
-          disabled={loading}
-        >
-          {loading ? (
-             <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
-          ) : (
-            <>
-              <Save className="w-4 h-4" />
-              Solicitar
-            </>
-          )}
+        <button type="submit" className="px-8 py-3.5 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white text-[11px] font-black uppercase tracking-[0.15em] transition-all shadow-lg shadow-blue-600/20 active:scale-[0.98]">
+           {initialValues?.id ? 'Actualizar Ausencia' : 'Registrar Ausencia'}
         </button>
       </div>
     </form>
+  );
+}
+
+function FormInput({ label, icon: Icon, ...props }) {
+  return (
+    <div className="space-y-2">
+      <label className="text-[10px] font-black text-zinc-600 uppercase tracking-widest ml-1">{label}</label>
+      <div className="relative group">
+        <Icon className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-600 group-focus-within:text-blue-500 transition-colors" weight="bold" />
+        <input 
+          {...props}
+          className="w-full bg-white/[0.03] border border-white/[0.06] rounded-2xl py-3.5 pl-11 pr-4 text-sm font-semibold text-zinc-300 outline-none focus:border-blue-500/40 transition-all placeholder:text-zinc-700"
+        />
+      </div>
+    </div>
   );
 }

@@ -1,37 +1,44 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
-import { User } from './User.js';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  ManyToOne,
+  JoinColumn,
+} from "typeorm";
+import { User } from "./User.js";
 
-@Entity('absences')
+@Entity("absences")
 export class Absence {
-  @PrimaryGeneratedColumn('uuid')
+  @PrimaryGeneratedColumn("uuid")
   id!: string;
 
-  @Column({ type: 'varchar', length: 128 })
+  @Column({ type: "varchar", length: 128 })
   userId!: string;
 
   @ManyToOne(() => User)
-  @JoinColumn({ name: 'userId' })
+  @JoinColumn({ name: "userId" })
   user!: User;
 
-  @Column({ type: 'varchar' })
-  type!: 'vacation' | 'sick_leave' | 'personal_days' | 'other';
+  @Column({ type: "varchar" })
+  type!: "vacation" | "sick_leave" | "personal_days" | "other";
 
-  @Column({ type: 'date' })
+  @Column({ type: "date" })
   startDate!: Date;
 
-  @Column({ type: 'date' })
+  @Column({ type: "date" })
   endDate!: Date;
 
   @Column({
-    type: 'varchar',
-    default: 'pending'
+    type: "varchar",
+    default: "pending",
   })
-  status!: 'pending' | 'approved' | 'rejected' | 'cancelled';
+  status!: "pending" | "approved" | "rejected" | "cancelled";
 
-  @Column({ type: 'text', nullable: true })
+  @Column({ type: "text", nullable: true })
   reason?: string;
 
-  @Column({ type: 'text', nullable: true })
+  @Column({ type: "text", nullable: true })
   adminComment?: string;
 
   @CreateDateColumn()
