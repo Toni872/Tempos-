@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from "react";
+import { motion } from "framer-motion";
 import { Link, useNavigate } from 'react-router-dom';
 import { prefetchRoute } from '@/lib/routePrefetch';
+import Logo from '@/components/ui/Logo';
 import '../styles/landing.css';
 
 // ─── HOOKS ────────────────────────────────────────────────────────────────────
@@ -361,10 +363,10 @@ export default function LandingPage() {
   const [pricingRef, pricingVis]   = useReveal(0.08);
 
   const benefits = [
-    { Icon: Icon.Shield, title: 'Cumplimiento legal real', desc: 'Registro de jornada conforme al marco legal en España. Historial trazable y documentación lista para una inspección.' },
-    { Icon: Icon.Clock,  title: 'Control de horas y extras',  desc: 'Cálculo automático de horas ordinarias, extra y descansos para evitar errores manuales y discusiones internas.' },
-    { Icon: Icon.Mobile, title: 'Fichaje flexible', desc: 'Tus empleados fichan por móvil, web, QR o punto de oficina según su puesto y forma de trabajo.' },
-    { Icon: Icon.Chart,  title: 'Informes accionables',   desc: 'Exporta datos en PDF y Excel para RRHH, gestoría y dirección con visibilidad clara de jornada y ausencias.' },
+    { Icon: Icon.Shield, title: 'Blindaje Legal Integral', desc: 'Cumplimiento estricto del RDL 8/2019 en España. Generamos registros inalterables con firma digital, listos para cualquier inspección de trabajo.' },
+    { Icon: Icon.Clock,  title: 'Gestión Inteligente de Jornada',  desc: 'Controla horas ordinarias, extraordinarias y complementarias. Automatiza el cálculo de descansos y evita errores en el pago de nóminas.' },
+    { Icon: Icon.Mobile, title: 'Movilidad Sin Fricciones', desc: 'App nativa para empleados: fichaje por geolocalización, QR o PIN. El equipo gestiona sus ausencias y vacaciones desde su bolsillo.' },
+    { Icon: Icon.Chart,  title: 'Analítica Estratégica',   desc: 'No solo datos, sino información. Visualiza picos de actividad, absentismo y rentabilidad por proyecto o sede en tiempo real.' },
   ];
 
   const modules = [
@@ -485,9 +487,11 @@ export default function LandingPage() {
   ];
 
   const steps = [
-    { n: '01', title: 'Crea tu cuenta', desc: 'Registro en 30 segundos. Sin tarjeta de crédito. Configura tu empresa o perfil de autónomo de forma inmediata.' },
-    { n: '02', title: 'Invita a tu equipo', desc: 'Añade empleados por correo electrónico. Cada usuario accede con sus propias credenciales de forma segura.' },
-    { n: '03', title: 'Control desde el primer minuto', desc: 'Visualiza fichajes, horas y alertas en tiempo real. Exporta cuando lo necesites, sin complicaciones.' },
+    { n: '01', title: 'Registro y Configuración', desc: 'Crea tu cuenta en 30 segundos. Define la razón social de tu empresa y configura tus sedes de trabajo para tener un control geográfico preciso.' },
+    { n: '02', title: 'Diseño de Horarios', desc: 'Crea plantillas de horarios fijos, turnos rotativos o jornadas flexibles. Asigna estas plantillas a tus empleados para automatizar el control.' },
+    { n: '03', title: 'Alta de Equipo', desc: 'Invita a tus empleados por email. Cada uno recibirá sus credenciales únicas para acceder a la App móvil o al panel web de fichaje.' },
+    { n: '04', title: 'Registro y Ausencias', desc: 'Tus empleados fichan su jornada y gestionan sus vacaciones o bajas desde la App. Tú validas las solicitudes en tiempo real desde el panel.' },
+    { n: '05', title: 'Informes e Inspección', desc: 'Exporta en un clic informes PDF certificados con validez legal ante la Inspección de Trabajo. Datos trazables, seguros e inalterables.' },
   ];
 
   return (
@@ -500,23 +504,7 @@ export default function LandingPage() {
             className="tp-brand"
             aria-label="Ir al inicio"
           >
-            <span className="tp-brand-mark" aria-hidden="true">
-              <svg width="30" height="30" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0 }}>
-                <circle cx="50" cy="50" r="45" fill="none" stroke="var(--mg2)" strokeWidth="2.5" opacity="0.2"/>
-                <circle cx="50" cy="50" r="40" fill="none" stroke="var(--mg)" strokeWidth="2.8"/>
-                <circle cx="50" cy="12" r="2.2" fill="var(--mg)"/>
-                <circle cx="88" cy="50" r="2.2" fill="var(--mg)"/>
-                <circle cx="50" cy="88" r="2.2" fill="var(--mg)"/>
-                <circle cx="12" cy="50" r="2.2" fill="var(--mg)"/>
-                <line x1="50" y1="50" x2="50" y2="28" stroke="var(--mg)" strokeWidth="2.5" strokeLinecap="round" opacity="0.85"/>
-                <line x1="50" y1="50" x2="68" y2="44" stroke="var(--mg2)" strokeWidth="2" strokeLinecap="round" opacity="0.78"/>
-                <circle cx="50" cy="50" r="3.5" fill="var(--mg)"/>
-              </svg>
-            </span>
-            <span className="tp-brand-copy">
-              <span className="tp-brand-name">Tem<span>pos</span></span>
-              <span className="tp-brand-tag">Control horario legal</span>
-            </span>
+            <Logo />
           </button>
 
           <span className="tp-brand-proof">Cumplimiento laboral verificado</span>
@@ -592,7 +580,13 @@ export default function LandingPage() {
           <div className="tp-hero-wrap">
 
             {/* Left copy */}
-            <div className={`tp-reveal-l ${heroVis ? 'tp-visible' : ''}`} style={{ flex: 1, maxWidth: 560 }}>
+            <motion.div 
+              initial={{ opacity: 0, x: -30 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true }}
+              className="tp-reveal-l tp-visible" 
+              style={{ flex: 1, maxWidth: 560 }}
+            >
               <div style={{ display: 'inline-flex', alignItems: 'center', gap: 9, borderRadius: 100, border: '1px solid var(--border-mg)', background: 'rgba(37,99,235,0.06)', padding: '5px 16px', marginBottom: 36 }}>
                 <div style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--mg)', boxShadow: '0 0 10px var(--mg)' }}/>
                 <span style={{ fontSize: 11.5, color: 'var(--mg)', letterSpacing: 0.4, fontWeight: 600 }}>Normativa 2026 · Datos alojados en España</span>
@@ -627,7 +621,7 @@ export default function LandingPage() {
                   </div>
                 ))}
               </div>
-            </div>
+            </motion.div>
 
             {/* Right — Slider */}
             <div className={`tp-reveal-r tp-hero-right ${heroVis ? 'tp-visible' : ''}`} style={{ flexShrink: 0 }}>
@@ -977,18 +971,25 @@ export default function LandingPage() {
             <p style={{ fontSize: 15, color: 'var(--t1)', fontWeight: 300 }}>14 días de prueba gratuita. Sin tarjeta de crédito. Sin permanencia.</p>
           </div>
 
-          <div className="tp-grid-2">
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 24 }}>
 
-            {/* Autónomos */}
-            <div className={`tp-card tp-reveal ${pricingVis ? 'tp-visible' : ''}`} style={{ borderRadius: 24, padding: 44 }}>
-              <div style={{ fontSize: 10.5, letterSpacing: 2.5, textTransform: 'uppercase', color: 'var(--t2)', marginBottom: 22, fontWeight: 600 }}>Autónomos</div>
+            {/* Starter */}
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              whileHover={{ y: -8 }}
+              className="tp-card" 
+              style={{ borderRadius: 24, padding: '40px 32px', display: 'flex', flexDirection: 'column', border: '1px solid var(--border)' }}
+            >
+              <div style={{ fontSize: 10.5, letterSpacing: 2.5, textTransform: 'uppercase', color: 'var(--t2)', marginBottom: 22, fontWeight: 600 }}>Plan Starter</div>
               <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, marginBottom: 8 }}>
-                <span style={{ fontFamily: 'var(--ff-head)', fontSize: 52, fontWeight: 600, letterSpacing: 0, color: 'var(--t0)', lineHeight: 1 }}>9€</span>
+                <span style={{ fontFamily: 'var(--ff-head)', fontSize: 48, fontWeight: 600, letterSpacing: 0, color: 'var(--t0)', lineHeight: 1 }}>1.99€</span>
                 <span style={{ fontSize: 13, color: 'var(--t2)', marginBottom: 8, fontWeight: 300 }}>/mes</span>
               </div>
-              <p style={{ fontSize: 13, color: 'var(--t1)', marginBottom: 32, lineHeight: 1.6, fontWeight: 300 }}>Para trabajadores por cuenta propia que necesitan registrar su jornada con precisión.</p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 13, marginBottom: 36 }}>
-                {['1 usuario', 'Registro de jornada ilimitado', 'Exportación PDF y Excel', 'Acceso web y móvil', 'Soporte por correo'].map(f => (
+              <p style={{ fontSize: 13, color: 'var(--t1)', marginBottom: 32, lineHeight: 1.6, fontWeight: 300 }}>Para autónomos y micro-pymes que buscan cumplimiento legal sin complicaciones.</p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 13, marginBottom: 36, flex: 1 }}>
+                {['Hasta 5 usuarios', 'Registro de jornada legal', 'Exportación PDF/Excel', 'App Móvil Básica', 'Soporte Estándar'].map(f => (
                   <div key={f} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13.5, color: 'var(--t1)' }}>
                     <span style={{ color: 'var(--mg)', flexShrink: 0 }}><Icon.Check /></span> {f}
                   </div>
@@ -1000,42 +1001,87 @@ export default function LandingPage() {
                 border: '1px solid rgba(37,99,235,0.25)',
                 color: 'var(--mg)', fontSize: 14.5, cursor: 'pointer',
               }}>
-                {ctaCopy.pricingPrimary}
+                Empezar Gratis
               </button>
-            </div>
+            </motion.div>
 
-            {/* Empresas */}
-            <div className={`tp-price-featured tp-reveal tp-d1 ${pricingVis ? 'tp-visible' : ''}`} style={{ borderRadius: 24, padding: 44, background: 'var(--bg2)', position: 'relative', overflow: 'hidden' }}>
+            {/* Business (Featured) */}
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ delay: 0.1 }}
+              whileHover={{ y: -8 }}
+              className="tp-price-featured" 
+              style={{ borderRadius: 24, padding: '40px 32px', background: 'var(--bg2)', position: 'relative', overflow: 'hidden', display: 'flex', flexDirection: 'column', border: '2px solid var(--mg)', boxShadow: '0 20px 40px -12px rgba(37,99,235,0.25)' }}
+            >
               <div style={{ position: 'absolute', top: -1, right: 32 }}>
                 <div style={{ background: 'var(--mg)', color: '#fff', fontSize: 10, fontWeight: 700, padding: '5px 14px', borderRadius: '0 0 10px 10px', letterSpacing: 1, textTransform: 'uppercase' }}>
-                  Más popular
+                  Recomendado
                 </div>
               </div>
-              {/* Ambient */}
-              <div style={{ position: 'absolute', top: -80, right: -80, width: 260, height: 260, borderRadius: '50%', background: 'radial-gradient(circle, rgba(37,99,235,0.09) 0%, transparent 70%)', pointerEvents: 'none' }}/>
-              <div style={{ fontSize: 10.5, letterSpacing: 2.5, textTransform: 'uppercase', color: 'rgba(37,99,235,0.65)', marginBottom: 22, fontWeight: 600, position: 'relative' }}>Empresas</div>
-              <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, marginBottom: 8, position: 'relative' }}>
-                <span style={{ fontFamily: 'var(--ff-head)', fontSize: 52, fontWeight: 600, letterSpacing: 0, color: 'var(--t0)', lineHeight: 1 }}>4€</span>
+              <div style={{ fontSize: 10.5, letterSpacing: 2.5, textTransform: 'uppercase', color: 'rgba(37,99,235,0.65)', marginBottom: 22, fontWeight: 600 }}>Plan Business</div>
+              <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, marginBottom: 8 }}>
+                <span style={{ fontFamily: 'var(--ff-head)', fontSize: 48, fontWeight: 600, letterSpacing: 0, color: 'var(--t0)', lineHeight: 1 }}>3.99€</span>
                 <span style={{ fontSize: 13, color: 'var(--t2)', marginBottom: 8, fontWeight: 300 }}>/empleado/mes</span>
               </div>
-              <p style={{ fontSize: 13, color: 'var(--t1)', marginBottom: 32, lineHeight: 1.6, fontWeight: 300, position: 'relative' }}>Para equipos de cualquier tamaño. Gestión completa sin límite de empleados ni sedes.</p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 13, marginBottom: 36, position: 'relative' }}>
-                {['Empleados ilimitados', 'Panel de administración completo', 'Gestión de turnos y ausencias', 'Informes para Inspección de Trabajo', 'Soporte prioritario', 'API e integraciones con nóminas'].map(f => (
+              <p style={{ fontSize: 13, color: 'var(--t1)', marginBottom: 32, lineHeight: 1.6, fontWeight: 300 }}>La solución completa para empresas en crecimiento y equipos dinámicos.</p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 13, marginBottom: 36, flex: 1 }}>
+                {['Usuarios Ilimitados', 'Sedes y Centros Ilimitados', 'Gestión de Vacaciones/Bajas', 'Geovallado (Geofencing)', 'Soporte Prioritario'].map(f => (
                   <div key={f} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13.5, color: 'var(--t1)' }}>
                     <span style={{ color: 'var(--mg)', flexShrink: 0 }}><Icon.Check /></span> {f}
                   </div>
                 ))}
               </div>
-              <button onClick={goToTrial} className="tp-btn tp-btn-primary" style={{ width: '100%', padding: '14px', borderRadius: 13, fontSize: 14.5, position: 'relative', cursor: 'pointer' }}>
-                {ctaCopy.pricingPrimary}
+              <button onClick={goToTrial} className="tp-btn tp-btn-primary" style={{ width: '100%', padding: '14px', borderRadius: 13, fontSize: 14.5, cursor: 'pointer' }}>
+                Prueba Gratuita
               </button>
-            </div>
+            </motion.div>
+
+            {/* Premium / IA */}
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ delay: 0.2 }}
+              whileHover={{ y: -8 }}
+              className="tp-card" 
+              style={{ borderRadius: 24, padding: '40px 32px', display: 'flex', flexDirection: 'column', border: '1px solid var(--border)' }}
+            >
+              <div style={{ fontSize: 10.5, letterSpacing: 2.5, textTransform: 'uppercase', color: 'var(--t2)', marginBottom: 22, fontWeight: 600 }}>Plan Enterprise</div>
+              <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, marginBottom: 8 }}>
+                <span style={{ fontFamily: 'var(--ff-head)', fontSize: 48, fontWeight: 600, letterSpacing: 0, color: 'var(--t0)', lineHeight: 1 }}>5.99€</span>
+                <span style={{ fontSize: 13, color: 'var(--t2)', marginBottom: 8, fontWeight: 300 }}>/empleado/mes</span>
+              </div>
+              <p style={{ fontSize: 13, color: 'var(--t1)', marginBottom: 32, lineHeight: 1.6, fontWeight: 300 }}>Análisis predictivo con IA y control avanzado para grandes corporaciones.</p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 13, marginBottom: 36, flex: 1 }}>
+                {['Todo lo del Plan Business', 'Análisis Predictivo IA', 'API para Nóminas', 'Gerente de Cuenta Dedicado', 'SLA Garantizado'].map(f => (
+                  <div key={f} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13.5, color: 'var(--t1)' }}>
+                    <span style={{ color: 'var(--mg)', flexShrink: 0 }}><Icon.Check /></span> {f}
+                  </div>
+                ))}
+              </div>
+              <button onClick={() => navigateWithTransition('/contacto')} className="tp-btn" style={{
+                width: '100%', padding: '14px', borderRadius: 13,
+                background: 'rgba(255,255,255,0.05)',
+                border: '1px solid var(--border)',
+                color: 'var(--t0)', fontSize: 14.5, cursor: 'pointer',
+              }}>
+                Contactar Ventas
+              </button>
+            </motion.div>
+
           </div>
 
-          <p style={{ textAlign: 'center', marginTop: 24, fontSize: 12.5, color: 'var(--t3)' }}>
-            ¿Más de 100 empleados?{' '}
-            <Link to="/contacto" style={{ color: 'var(--mg)', textDecoration: 'none', fontWeight: 600 }}>Contáctanos para un plan personalizado</Link>
-          </p>
+          <motion.p 
+            initial={{ opacity: 0 }}
+            whileInView={{ opacity: 1 }}
+            viewport={{ once: true }}
+            style={{ textAlign: 'center', marginTop: 40, fontSize: 13, color: 'var(--t3)' }}
+          >
+            ¿Necesitas una solución personalizada?{' '}
+            <Link to="/contacto" style={{ color: 'var(--mg)', textDecoration: 'none', fontWeight: 600 }}>Habla con nuestros consultores de RRHH</Link>
+          </motion.p>
         </div>
       </section>
 
@@ -1063,16 +1109,17 @@ export default function LandingPage() {
       {/* ── Footer ── */}
       <footer role="contentinfo" style={{
         borderTop: '1px solid var(--border)',
-        padding: '36px 48px',
-        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-        flexWrap: 'wrap', gap: 20, position: 'relative', zIndex: 1,
+        padding: '60px 48px',
+        display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
+        flexWrap: 'wrap', gap: 40, position: 'relative', zIndex: 1,
         background: 'rgba(255,255,255,0.008)',
       }}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <span style={{ fontFamily: 'var(--ff-head)', fontSize: 24, fontWeight: 600, letterSpacing: 1.5, color: 'var(--t0)' }}>
-            Tem<span style={{ color: 'var(--mg)' }}>pos</span>
-            </span>
-            <p style={{ fontSize: 11.5, color: 'var(--t3)' }}>© 2026 Antonio Lloret Sánchez. Todos los derechos reservados.</p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 300 }}>
+            <Logo />
+            <p style={{ fontSize: 13, color: 'var(--t2)', lineHeight: 1.6 }}>
+              Liderando la transformación digital de RRHH en España. Cumplimiento legal y eficiencia para empresas que miran al futuro.
+            </p>
+            <p style={{ fontSize: 11.5, color: 'var(--t3)', marginTop: 8 }}>© 2026 Antonio Lloret Sánchez. <br/>Todos los derechos reservados.</p>
         </div>
         <div style={{ display: 'flex', gap: 30 }}>
           <Link to="/legal/terminos" style={{ fontSize: 13, color: 'var(--t3)', textDecoration: 'none', transition: 'color 0.2s' }} onMouseEnter={e => e.target.style.color = 'var(--t0)'} onMouseLeave={e => e.target.style.color = 'var(--t3)'}>Términos de Servicio</Link>

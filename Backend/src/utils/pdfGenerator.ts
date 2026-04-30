@@ -16,141 +16,150 @@ export async function generateInspectionPDF(
     doc.on("end", () => resolve(Buffer.concat(chunks)));
     doc.on("error", (err) => reject(err));
 
+    // --- Configuration ---
+    const brandColor = "#2563EB"; // Tempos Primary Blue
+    const secondaryColor = "#64748B"; // Slate
+    const textColor = "#1E293B";
+    const lightBg = "#F8FAFC";
+
     // --- Header ---
+    doc.rect(0, 0, 600, 10).fill(brandColor); // Top accent line
+
+    doc.fillColor(brandColor).font("Helvetica-Bold").fontSize(24).text("TEMPOS", 50, 40);
     doc
-      .fillColor("#444444")
-      .fontSize(20)
-      .text("REGISTRO DIARIO DE JORNADA", { align: "center" });
-    doc
+      .fillColor(secondaryColor)
+      .font("Helvetica")
       .fontSize(10)
-      .text("CUMPLIMIENTO ARTÍCULO 34.9 DEL ESTATUTO DE LOS TRABAJADORES", {
-        align: "center",
-      });
-    doc.moveDown();
+      .text("SISTEMA DE GESTIÓN DE CAPITAL HUMANO", 50, 65);
 
-    doc.rect(50, doc.y, 495, 1).fill("#EEEEEE");
-    doc.moveDown();
+    doc.moveDown(2);
 
-    // --- Enterprise & Employee Info ---
-    doc.fillColor("#333333").fontSize(10).font("Helvetica-Bold");
+    // --- Title & Regulatory Text ---
     doc
-      .text(`EMPRESA:`, 50, doc.y, { continued: true })
-      .font("Helvetica")
-      .text(` ${employerName}`);
-    doc
+      .fillColor(textColor)
       .font("Helvetica-Bold")
-      .text(`SOFTWARE:`, { continued: true })
+      .fontSize(16)
+      .text("REGISTRO DIARIO DE JORNADA", { align: "right" });
+    doc
+      .fillColor(secondaryColor)
       .font("Helvetica")
-      .text(` Tempos (Control Horario)`);
+      .fontSize(8)
+      .text("CONFORME AL ARTÍCULO 34.9 DEL ESTATUTO DE LOS TRABAJADORES (RDL 8/2019)", {
+        align: "right",
+      });
 
+    doc.moveDown(2);
+    doc.rect(50, doc.y, 495, 1).fill("#E2E8F0");
+    doc.moveDown(1.5);
+
+    // --- Info Grid ---
+    const startY = doc.y;
+    doc.fillColor(secondaryColor).font("Helvetica-Bold").fontSize(8);
+    doc.text("DATOS DE LA EMPRESA", 50, startY);
+    doc.text("DATOS DEL EMPLEADO", 300, startY);
+    
+    doc.moveDown(0.5);
+    const gridY = doc.y;
+    
+    // Left Column (Enterprise)
+    doc.fillColor(textColor).font("Helvetica-Bold").fontSize(10).text("Razón Social:", 50, gridY);
+    doc.font("Helvetica").text(employerName, 120, gridY);
+    doc.font("Helvetica-Bold").text("Software:", 50, gridY + 15);
+    doc.font("Helvetica").text("Tempos v2.0 (Certificado)", 120, gridY + 15);
+
+    // Right Column (Employee)
     if (targetUser) {
-      doc
-        .font("Helvetica-Bold")
-        .text(`EMPLEADO:`, { continued: true })
-        .font("Helvetica")
-        .text(` ${targetUser.displayName} (${targetUser.email})`);
-      doc
-        .font("Helvetica-Bold")
-        .text(`UID:`, { continued: true })
-        .font("Helvetica")
-        .text(` ${targetUser.uid}`);
+      doc.font("Helvetica-Bold").text("Nombre:", 300, gridY);
+      doc.font("Helvetica").text(targetUser.displayName || "Empleado", 370, gridY);
+      doc.font("Helvetica-Bold").text("ID / Email:", 300, gridY + 15);
+      doc.font("Helvetica").text(targetUser.email || "Sin email", 370, gridY + 15);
     } else {
-      doc
-        .font("Helvetica-Bold")
-        .text(`REPORTE:`, { continued: true })
-        .font("Helvetica")
-        .text(` Global de Empresa`);
+      doc.font("Helvetica").text("REPORTE CONSOLIDADO GLOBAL", 300, gridY);
     }
 
-    doc
-      .font("Helvetica-Bold")
-      .text(`FECHA INFORME:`, { continued: true })
-      .font("Helvetica")
-      .text(` ${new Date().toLocaleString("es-ES")}`);
-    doc.moveDown();
+    doc.moveDown(3);
 
-    doc.rect(50, doc.y, 495, 20).fill("#F8F9FA");
-    doc
-      .fillColor("#333333")
-      .font("Helvetica-Bold")
-      .text("RESUMEN DEL PERIODO", 60, doc.y - 15);
-    doc.moveDown(0.5);
+    // --- Summary Box ---
+    const summaryY = doc.y;
+    doc.rect(50, summaryY, 495, 45).fill(lightBg);
+    doc.fillColor(brandColor).font("Helvetica-Bold").fontSize(9).text("RESUMEN DEL PERIODO", 65, summaryY + 10);
+    
+    doc.fillColor(textColor).font("Helvetica").fontSize(11);
+    doc.text(`Jornadas:`, 65, summaryY + 25, { continued: true });
+    doc.font("Helvetica-Bold").text(` ${fichas.length}`, { continued: true });
+    doc.font("Helvetica").text(`  |  Horas Efectivas:`, { continued: true });
+    doc.font("Helvetica-Bold").text(` ${totalHours.toFixed(2)}h`);
 
-    doc
-      .fontSize(11)
-      .font("Helvetica")
-      .text(`Total Jornadas: ${fichas.length}`, 60);
-    doc.text(`Horas Efectivas Confirmadas: ${totalHours.toFixed(2)}h`, 60);
-    doc.moveDown();
+    doc.moveDown(3);
 
     // --- Table Header ---
-    const tableTop = doc.y + 10;
-    doc.rect(50, tableTop, 495, 20).fill("#3B82F6");
-    doc.fillColor("#FFFFFF").font("Helvetica-Bold").fontSize(9);
-    doc.text("FECHA", 60, tableTop + 6);
-    doc.text("INICIO", 160, tableTop + 6);
-    doc.text("FIN", 230, tableTop + 6);
-    doc.text("HORAS", 300, tableTop + 6);
-    doc.text("PROYECTO", 370, tableTop + 6);
-    doc.text("ESTADO", 470, tableTop + 6);
+    const tableTop = doc.y;
+    doc.rect(50, tableTop, 495, 25).fill(brandColor);
+    doc.fillColor("#FFFFFF").font("Helvetica-Bold").fontSize(8);
+    
+    const col1 = 65, col2 = 145, col3 = 215, col4 = 285, col5 = 355, col6 = 485;
+    
+    doc.text("FECHA", col1, tableTop + 9);
+    doc.text("ENTRADA", col2, tableTop + 9);
+    doc.text("SALIDA", col3, tableTop + 9);
+    doc.text("DURACIÓN", col4, tableTop + 9);
+    doc.text("CENTRO / PROYECTO", col5, tableTop + 9);
+    doc.text("MÉTODO", col6, tableTop + 9);
 
     // --- Table Rows ---
     let y = tableTop + 25;
-    doc.fillColor("#333333").font("Helvetica").fontSize(9);
+    doc.fillColor(textColor).font("Helvetica").fontSize(8);
 
     fichas.forEach((f, i) => {
-      // Background for zebra effect
       if (i % 2 === 0) {
-        doc.rect(50, y - 5, 495, 20).fill("#F3F4F6");
-        doc.fillColor("#333333");
+        doc.rect(50, y, 495, 22).fill("#F1F5F9");
+        doc.fillColor(textColor);
       }
 
       const rawDate = f.date as unknown as string | Date;
-      const dateStr =
-        typeof rawDate === "string"
-          ? rawDate.split("T")[0]
-          : (rawDate as Date).toISOString().split("T")[0];
+      const dateStr = typeof rawDate === "string" 
+        ? rawDate.split("T")[0] 
+        : (rawDate as Date).toLocaleDateString("es-ES");
 
-      doc.text(dateStr, 60, y);
-      doc.text(f.startTime, 160, y);
-      doc.text(f.endTime || "--:--", 230, y);
-      doc.text(`${f.hoursWorked || 0}h`, 300, y);
-      doc.text((f.projectCode || "N/A").substring(0, 15), 370, y);
-      doc.text(f.status.toUpperCase(), 470, y);
+      const rowY = y + 7;
+      doc.text(dateStr, col1, rowY);
+      doc.text(f.startTime, col2, rowY);
+      doc.text(f.endTime || "--:--", col3, rowY);
+      doc.font("Helvetica-Bold").text(`${f.hoursWorked || 0}h`, col4, rowY).font("Helvetica");
+      doc.text((f.projectCode || "Sede Central").substring(0, 22), col5, rowY);
+      doc.text((f.clockInMethod || "BIO").toUpperCase(), col6, rowY);
 
-      y += 20;
+      y += 22;
 
-      // New page if needed
-      if (y > 700) {
+      if (y > 720) {
         doc.addPage();
         y = 50;
       }
     });
 
-    // --- Footer & Signatures ---
-    if (y > 600) doc.addPage();
-
-    const footerY = 650;
-    doc.rect(50, footerY - 40, 495, 1).fill("#EEEEEE");
-
+    // --- Footer ---
+    const footerY = 750;
+    doc.rect(50, footerY, 495, 0.5).fill("#CBD5E1");
     doc
-      .fillColor("#777777")
-      .fontSize(8)
+      .fillColor(secondaryColor)
+      .fontSize(7)
       .text(
-        "DECLARACIÓN: Los datos aquí contenidos son un fiel reflejo de la jornada laboral registrada. Este informe ha sido generado digitalmente mediante firma electrónica de eventos atómicos y es íntegro e inalterable en su origen conforme al RDL 8/2019.",
+        "Este documento constituye el registro fehaciente de la jornada laboral según el RDL 8/2019. Los datos han sido capturados mediante sistemas de verificación atómica y son inalterables.",
         50,
-        footerY - 30,
-        { align: "justify", width: 495 },
+        footerY + 10,
+        { align: "center", width: 495 }
       );
+    doc.text(`Página 1 de 1 - Generado por Tempos Cloud el ${new Date().toLocaleDateString("es-ES")}`, 50, footerY + 20, { align: "center" });
 
-    doc.moveDown(4);
-    const sigY = doc.y;
-    doc.fillColor("#333333").fontSize(10);
-    doc.text("Firma del Trabajador/a", 100, sigY);
-    doc.text("Firma de la Empresa / Sello", 350, sigY);
-
-    doc.rect(80, sigY + 20, 150, 0.5).stroke();
-    doc.rect(330, sigY + 20, 150, 0.5).stroke();
+    // --- Signatures ---
+    const sigY = y + 40;
+    if (sigY < 700) {
+        doc.fillColor(textColor).font("Helvetica-Bold").fontSize(9);
+        doc.text("Firma del Trabajador/a", 100, sigY);
+        doc.text("Sello y Firma de la Empresa", 350, sigY);
+        doc.rect(70, sigY + 15, 160, 0.5).stroke(secondaryColor);
+        doc.rect(320, sigY + 15, 160, 0.5).stroke(secondaryColor);
+    }
 
     doc.end();
   });

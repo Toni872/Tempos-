@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import Logo from '@/components/ui/Logo';
 
 const PHONE_REGEX = /^[+]?[(]?[0-9\s-]{6,20}$/;
 const TRIAL_FIELD_IDS = {
@@ -149,19 +150,8 @@ export default function TrialPage() {
     <div style={{ background: 'var(--bg0)', color: 'var(--t0)', minHeight: '100vh', fontFamily: 'var(--ff-body)', overflowX: 'hidden' }}>
       {/* Header Simplificado */}
       <header style={{ height: 100, display: 'flex', alignItems: 'center', padding: '0 4.5%', background: 'linear-gradient(to bottom, rgba(20,20,20,0.8), transparent)', position: 'absolute', width: '100%', zIndex: 10 }}>
-        <Link to="/" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 10 }}>
-          <svg width="30" height="30" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0 }}>
-            <circle cx="50" cy="50" r="45" fill="none" stroke="var(--mg)" strokeWidth="2.5" opacity="0.2"/>
-            <circle cx="50" cy="50" r="40" fill="none" stroke="var(--mg)" strokeWidth="2.8"/>
-            <circle cx="50" cy="12" r="2.2" fill="var(--mg)"/>
-            <circle cx="88" cy="50" r="2.2" fill="var(--mg)"/>
-            <circle cx="50" cy="88" r="2.2" fill="var(--mg)"/>
-            <circle cx="12" cy="50" r="2.2" fill="var(--mg)"/>
-            <line x1="50" y1="50" x2="50" y2="28" stroke="var(--mg)" strokeWidth="2.5" strokeLinecap="round" opacity="0.85"/>
-            <line x1="50" y1="50" x2="68" y2="44" stroke="var(--mg)" strokeWidth="2" strokeLinecap="round" opacity="0.6"/>
-            <circle cx="50" cy="50" r="3.5" fill="var(--mg)"/>
-          </svg>
-          <span style={{ fontFamily: 'var(--ff-head)', fontWeight: 700, fontSize: 32, letterSpacing: 1.5, color: '#fff' }}>TEM<span style={{ color: 'var(--mg)' }}>POS</span></span>
+        <Link to="/" style={{ textDecoration: 'none' }}>
+          <Logo />
         </Link>
       </header>
 
@@ -169,9 +159,9 @@ export default function TrialPage() {
         {/* Lado Izquierdo: Formulario */}
         <div style={{ flex: 1, padding: '60px 8%', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
           <div style={{ maxWidth: 500 }}>
-            <h1 style={{ fontFamily: 'var(--ff-head)', fontSize: 44, fontWeight: 600, letterSpacing: -1, marginBottom: 20 }}>Solicita tu prueba gratis de 7 días</h1>
+            <h1 style={{ fontFamily: 'var(--ff-head)', fontSize: 44, fontWeight: 600, letterSpacing: -1, marginBottom: 20 }}>Solicita tu prueba gratis de 14 días</h1>
             <p style={{ color: 'var(--t1)', fontSize: 16, lineHeight: 1.6, marginBottom: 40 }}>
-              Experimenta el futuro del control horario sin compromiso. Únete a la élite empresarial que ya optimiza su gestión de personal con Tempos. 7 días de acceso total para transformar tu cumplimiento legal en una ventaja competitiva de alto rendimiento.
+              Experimenta el futuro del control horario sin compromiso. Únete a la élite empresarial que ya optimiza su gestión de personal con Tempos. 14 días de acceso total para transformar tu cumplimiento legal en una ventaja competitiva de alto rendimiento.
             </p>
 
             <form noValidate onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>

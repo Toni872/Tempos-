@@ -22,6 +22,7 @@ import {
   ShieldCheck,
 } from '@phosphor-icons/react';
 import UserMenu from '@/components/UserMenu';
+import Logo from '@/components/ui/Logo';
 import { cn } from '@/lib/utils';
 
 const sidebarItems = [
@@ -127,11 +128,8 @@ export default function DashboardShell({
 
       {/* Sidebar - Desktop */}
       <aside className="hidden lg:flex flex-col w-[272px] border-r border-white/[0.04] bg-[#0d0d0f]/80 backdrop-blur-xl sticky top-0 h-screen z-30">
-        <div className="p-8 pb-4 flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-blue-600 flex items-center justify-center shadow-lg shadow-blue-600/20">
-            <ClockCountdown className="w-5 h-5 text-white" weight="fill" />
-          </div>
-          <span className="font-['Space_Grotesk'] text-[22px] font-bold tracking-tight">Tempos</span>
+        <div className="p-8 pb-4">
+          <Logo />
         </div>
         <SidebarContent />
       </aside>
@@ -200,12 +198,7 @@ export default function DashboardShell({
               className="fixed top-0 left-0 bottom-0 w-80 bg-[#0d0d0f] z-50 lg:hidden flex flex-col border-r border-white/[0.04]"
             >
               <div className="p-6 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center">
-                    <ClockCountdown className="w-4 h-4 text-white" weight="fill" />
-                  </div>
-                  <span className="font-bold text-xl">Tempos</span>
-                </div>
+                <Logo size="sm" />
                 <button 
                   onClick={() => setIsMobileMenuOpen(false)}
                   className="w-8 h-8 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] flex items-center justify-center text-zinc-500 hover:text-white transition-all"
