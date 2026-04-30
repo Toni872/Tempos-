@@ -63,9 +63,8 @@ export default function AuthPage({ mode }) {
   const [email, setEmail] = useState(() => trialState?.email || '');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
-  const [role, setRole] = useState(() => (trialState?.company ? 'admin' : 'employee')); // 'admin' | 'employee'
+  const [role] = useState('admin'); // Siempre admin para registros web
   const [companyName, setCompanyName] = useState(() => trialState?.company || '');
-  const [adminKey, setAdminKey] = useState('');
   const [errors, setErrors] = useState({});
   const [formError, setFormError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -97,8 +96,7 @@ export default function AuthPage({ mode }) {
   useEffect(() => {
     const existingSession = getClientSession();
     if (isLogin && existingSession?.token) {
-      const targetPath = existingSession.isAdmin ? '/dashboard' : '/employee-clock';
-      navigate(targetPath, { replace: true, state: { isAdmin: existingSession.isAdmin } });
+      navigate('/dashboard', { replace: true });
     }
   }, [isLogin, navigate]);
 
@@ -142,13 +140,6 @@ export default function AuthPage({ mode }) {
     return nextErrors;
   };
 
-  const handleRoleChange = (nextRole) => {
-    setRole(nextRole);
-    setFormError('');
-    if (nextRole !== 'admin') {
-      clearFieldError('companyName');
-    }
-  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -178,21 +169,7 @@ export default function AuthPage({ mode }) {
     setFormError('');
     setIsSubmitting(true);
 
-    if (isLocalEnv) {
-      try {
-        const session = await bootstrapLocalSession({ isAdmin: role === 'admin' });
-        const targetPath = session.isAdmin ? '/dashboard' : '/employee-clock';
-        navigate(targetPath, { state: { isAdmin: session.isAdmin, localMode: true } });
-        return;
-      } catch (error) {
-        const msg = error instanceof Error ? error.message : 'No se pudo conectar con la API local.';
-        setFormError(msg.includes('Failed to fetch') || msg.includes('NetworkError') ? 'No se pudo conectar con la API local. ¿Está levantada la API en http://localhost:8080?' : msg);
-        setIsSubmitting(false);
-        return;
-      }
-    }
-
-    // Entorno real: autenticar con Firebase, registrar usuario en backend si hace falta y obtener perfil
+    // Entorno real o local con formulario: autenticar con Firebase, registrar usuario en backend si hace falta y obtener perfil
     try {
       const idToken = await signInAndGetIdToken(email.trim(), password.trim());
       // Intentar registrar en backend (si existe devolverá 409 y continuamos)
@@ -203,15 +180,9 @@ export default function AuthPage({ mode }) {
       }
 
       const profile = await getMe(idToken);
-      if (profile.role === 'employee') {
-        setFormError('Los empleados deben acceder desde la app móvil. Contacta con tu administrador para más información.');
-        setIsSubmitting(false);
-        return;
-      }
-      const session = { token: idToken, isAdmin: profile.role === 'admin', localMode: false, profile };
+      const session = { token: idToken, isAdmin: true, localMode: false, profile };
       setClientSession(session);
-      const targetPath = session.isAdmin ? '/dashboard' : '/employee-clock';
-      navigate(targetPath, { state: { isAdmin: session.isAdmin } });
+      navigate('/dashboard');
       return;
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'No se pudo autenticar';
@@ -238,15 +209,9 @@ export default function AuthPage({ mode }) {
       }
 
       const profile = await getMe(idToken);
-      if (profile.role === 'employee') {
-        setFormError('Los empleados deben acceder desde la app móvil. Contacta con tu administrador para más información.');
-        setIsSubmitting(false);
-        return;
-      }
-      const session = { token: idToken, isAdmin: profile.role === 'admin', localMode: false, profile };
+      const session = { token: idToken, isAdmin: true, localMode: false, profile };
       setClientSession(session);
-      const targetPath = session.isAdmin ? '/dashboard' : '/employee-clock';
-      navigate(targetPath, { state: { isAdmin: session.isAdmin } });
+      navigate('/dashboard');
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Error en acceso con Google';
       if (!msg.includes('auth/popup-closed-by-user')) {
@@ -266,11 +231,10 @@ export default function AuthPage({ mode }) {
     setIsSubmitting(true);
 
     try {
-      const session = await bootstrapLocalSession({ isAdmin: targetRole === 'admin' });
-      const targetPath = session.isAdmin ? '/dashboard' : '/employee-clock';
-      navigate(targetPath, {
+      const session = await bootstrapLocalSession({ isAdmin: true });
+      navigate('/dashboard', {
         state: {
-          isAdmin: session.isAdmin,
+          isAdmin: true,
           localMode: true
         }
       });
@@ -332,21 +296,7 @@ export default function AuthPage({ mode }) {
               )}
             </div>
 
-            {/* Role Selector - only for register */}
-            {!isLogin && (
-              <div style={{ display: 'flex', gap: 12, marginBottom: 32, background: 'var(--bg1)', padding: 4, borderRadius: 12, border: '1px solid var(--border)' }}>
-                <button 
-                  onClick={() => handleRoleChange('employee')}
-                  type="button"
-                  style={{ flex: 1, padding: '10px', borderRadius: 10, background: role === 'employee' ? 'var(--mg)' : 'transparent', color: role === 'employee' ? '#fff' : 'var(--t2)', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600, transition: 'all 0.2s' }}
-                >Soy Empleado</button>
-                <button 
-                  onClick={() => handleRoleChange('admin')}
-                  type="button"
-                  style={{ flex: 1, padding: '10px', borderRadius: 10, background: role === 'admin' ? 'var(--mg)' : 'transparent', color: role === 'admin' ? '#fff' : 'var(--t2)', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600, transition: 'all 0.2s' }}
-                >Soy Administrador</button>
-              </div>
-            )}
+            {/* Registro de Empresa - Siempre Admin */}
 
             <form noValidate onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
               {isLogin && isLocalEnv && (
@@ -470,22 +420,6 @@ export default function AuthPage({ mode }) {
                 <ErrorText id="password-error" message={errors.password} />
               </div>
 
-              {role === 'admin' && (
-                <div>
-                  <label style={{ display: 'block', fontSize: 13, color: 'var(--t2)', marginBottom: 6, fontWeight: 500 }}>Admin Secret Key</label>
-                  <input 
-                    type="password"
-                    value={adminKey}
-                    onChange={e => {
-                      setAdminKey(e.target.value);
-                      setFormError('');
-                    }}
-                    autoComplete="off"
-                    placeholder="••••••••"
-                    style={getInputStyle(false)}
-                  />
-                </div>
-              )}
 
               <button
                 type="submit"

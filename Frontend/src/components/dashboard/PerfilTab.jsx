@@ -1,299 +1,304 @@
 import React, { useState } from 'react';
-import { User, ShieldAlert, Mail, MapPin, Smartphone, Lock, Bell, Globe, Moon, Sun, Monitor, Volume2 } from 'lucide-react';
+import { 
+  UserCircle, 
+  Lock, 
+  Bell, 
+  IdentificationCard, 
+  EnvelopeSimple, 
+  Phone, 
+  ShieldCheck,
+  FloppyDisk,
+  Key,
+  Fingerprint,
+  BellSlash,
+  ChatCircleText
+} from '@phosphor-icons/react';
+import { startRegistration } from '@simplewebauthn/browser';
+import { 
+  getWebAuthnRegistrationOptions, 
+  verifyWebAuthnRegistration, 
+  getClientSession,
+  subscribePush,
+  unsubscribePush,
+  sendTestPush 
+} from '@/lib/api';
+import SectionHeader from '@/components/ui/SectionHeader';
+import Card, { CardBody } from '@/components/ui/Card';
+import Badge from '@/components/ui/Badge';
 import { cn } from '@/lib/utils';
 
-export default function PerfilTab({ profile, consentGiven, openRevokeModal, isSettings = false }) {
-  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
-  const [emailNotifications, setEmailNotifications] = useState(true);
-  const [darkMode, setDarkMode] = useState('dark');
-  const [language, setLanguage] = useState('es');
-  const [soundEnabled, setSoundEnabled] = useState(true);
+export default function PerfilTab({ profile, onUpdate }) {
+  const [bioStatus, setBioStatus] = useState('idle'); 
+  const [pushEnabled, setPushEnabled] = useState(typeof Notification !== 'undefined' && Notification.permission === 'granted');
+  const [pushStatus, setPushStatus] = useState('idle');
 
-  // If opened as "Ajustes", show settings-specific UI
-  if (isSettings) {
-    return (
-      <div className="max-w-4xl space-y-8 animate-in fade-in duration-500">
-        {/* Settings Header */}
-        <div className="bg-[#111114] border border-white/5 rounded-[2rem] p-8 shadow-2xl">
-          <div className="flex items-center gap-4 mb-2">
-            <div className="w-12 h-12 rounded-2xl bg-zinc-800 flex items-center justify-center text-white">
-              <Monitor className="w-6 h-6" />
-            </div>
-            <div>
-              <h2 className="text-2xl font-black text-white tracking-tight">Ajustes de la Aplicación</h2>
-              <p className="text-zinc-500 text-sm font-medium">Personaliza tu experiencia en Tempos</p>
-            </div>
-          </div>
-        </div>
+  const handleTogglePush = async () => {
+    try {
+      if (pushEnabled) {
+        setPushStatus('loading');
+        const reg = await navigator.serviceWorker.ready;
+        const sub = await reg.pushManager.getSubscription();
+        if (sub) {
+          await unsubscribePush(sub.endpoint);
+          await sub.unsubscribe();
+        }
+        setPushEnabled(false);
+        setPushStatus('idle');
+      } else {
+        setPushStatus('loading');
+        const permission = await Notification.requestPermission();
+        if (permission !== 'granted') {
+          alert('Permiso denegado para notificaciones.');
+          setPushStatus('idle');
+          return;
+        }
 
-        {/* Notifications */}
-        <div className="bg-[#111114] border border-white/5 rounded-[2rem] p-8 shadow-xl">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-500">
-              <Bell className="w-5 h-5" />
-            </div>
-            <div>
-              <h3 className="text-lg font-bold text-white">Notificaciones</h3>
-              <p className="text-[10px] text-zinc-500 uppercase font-black tracking-widest">Alertas y Avisos</p>
-            </div>
-          </div>
-          <div className="space-y-4">
-            <ToggleRow 
-              label="Notificaciones Push" 
-              description="Recibe alertas en tiempo real sobre fichajes, ausencias y mensajes." 
-              enabled={notificationsEnabled} 
-              onChange={setNotificationsEnabled} 
-            />
-            <ToggleRow 
-              label="Notificaciones por Email" 
-              description="Recibe un resumen diario de la actividad en tu correo electrónico." 
-              enabled={emailNotifications} 
-              onChange={setEmailNotifications} 
-            />
-            <ToggleRow 
-              label="Sonidos" 
-              description="Reproducir un sonido al recibir notificaciones en la aplicación." 
-              enabled={soundEnabled} 
-              onChange={setSoundEnabled} 
-            />
-          </div>
-        </div>
+        const reg = await navigator.serviceWorker.ready;
+        const sub = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: 'BFD5Z6vJ_8-Y-hR9xW5yQn9n9f9v9x9v9v9x9v9v9x9v9v9x9v9v9x9v9v9x9v9v9x9v9v9x9v9v9x9v9w' 
+        });
 
-        {/* Appearance */}
-        <div className="bg-[#111114] border border-white/5 rounded-[2rem] p-8 shadow-xl">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 rounded-xl bg-purple-500/10 flex items-center justify-center text-purple-500">
-              <Moon className="w-5 h-5" />
-            </div>
-            <div>
-              <h3 className="text-lg font-bold text-white">Apariencia</h3>
-              <p className="text-[10px] text-zinc-500 uppercase font-black tracking-widest">Tema y visualización</p>
-            </div>
-          </div>
-          <div className="grid grid-cols-3 gap-3">
-            {[
-              { id: 'dark', label: 'Oscuro', icon: Moon },
-              { id: 'light', label: 'Claro', icon: Sun },
-              { id: 'system', label: 'Sistema', icon: Monitor }
-            ].map(theme => (
-              <button
-                key={theme.id}
-                onClick={() => setDarkMode(theme.id)}
-                className={cn(
-                  "flex flex-col items-center gap-2 p-4 rounded-xl border transition-all",
-                  darkMode === theme.id 
-                    ? "bg-blue-500/10 border-blue-500/30 text-blue-400" 
-                    : "bg-white/[0.02] border-white/5 text-zinc-500 hover:border-white/10"
-                )}
-              >
-                <theme.icon className="w-5 h-5" />
-                <span className="text-xs font-bold">{theme.label}</span>
-              </button>
-            ))}
-          </div>
-        </div>
+        await subscribePush(sub);
+        setPushEnabled(true);
+        setPushStatus('success');
+        setTimeout(() => setPushStatus('idle'), 2000);
+      }
+    } catch (err) {
+      console.error('Push Error:', err);
+      setPushStatus('error');
+    }
+  };
 
-        {/* Language */}
-        <div className="bg-[#111114] border border-white/5 rounded-[2rem] p-8 shadow-xl">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-500">
-              <Globe className="w-5 h-5" />
+  const handleTestPush = async () => {
+    try {
+      await sendTestPush();
+      alert('¡Notificación de prueba enviada!');
+    } catch (err) {
+      alert('Error enviando prueba: ' + err.message);
+    }
+  };
+
+  const handleRegisterBiometric = async () => {
+    try {
+      const session = getClientSession();
+      if (!session?.token) throw new Error('No hay sesión activa');
+
+      // 1. Obtener opciones del servidor
+      const options = await getWebAuthnRegistrationOptions(session.token);
+
+      // 2. Ejecutar ceremonia de registro en el navegador
+      const regResp = await startRegistration({ optionsJSON: options });
+
+      // 3. Verificar respuesta en el servidor
+      await verifyWebAuthnRegistration(session.token, regResp);
+
+      alert('¡Dispositivo registrado correctamente!');
+    } catch (err) {
+      console.error('Error WebAuthn:', err);
+      alert('Error al registrar biometría: ' + err.message);
+    }
+  };
+
+  return (
+    <div className="space-y-8">
+      <SectionHeader 
+        icon={UserCircle}
+        title="Mi Perfil"
+        subtitle="Gestiona tu información personal, seguridad y preferencias de acceso."
+        actionLabel="Actualizar Perfil"
+        actionIcon={FloppyDisk}
+        onAction={() => {}}
+      />
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* User Identity Card */}
+        <div className="lg:col-span-1 space-y-6">
+          <Card className="overflow-hidden">
+            <div className="h-24 bg-gradient-to-r from-blue-600 to-indigo-600 relative">
+               <div className="absolute inset-0 bg-black/20" />
             </div>
-            <div>
-              <h3 className="text-lg font-bold text-white">Idioma y Región</h3>
-              <p className="text-[10px] text-zinc-500 uppercase font-black tracking-widest">Preferencias regionales</p>
-            </div>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Idioma de la interfaz</label>
-              <select 
-                value={language} 
-                onChange={(e) => setLanguage(e.target.value)}
-                className="w-full bg-[#0a0a0c] border border-white/10 rounded-xl p-3 text-sm text-white focus:border-blue-500/50 outline-none appearance-none"
-              >
-                <option value="es">🇪🇸 Español</option>
-                <option value="en">🇬🇧 English</option>
-                <option value="ca">Català</option>
-                <option value="eu">Euskara</option>
-                <option value="gl">Galego</option>
-              </select>
-            </div>
-            <div className="space-y-2">
-              <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Zona Horaria</label>
-              <div className="w-full bg-[#0a0a0c] border border-white/10 rounded-xl p-3 text-sm text-white">
-                Europe/Madrid (GMT+2)
+            <CardBody className="pt-0 relative">
+              <div className="flex flex-col items-center -mt-16">
+                <div className="w-32 h-32 rounded-full bg-[#111114] border-[8px] border-[#111114] shadow-2xl flex items-center justify-center overflow-hidden relative group">
+                  <div className="w-full h-full bg-blue-600/10 flex items-center justify-center text-blue-500 text-5xl font-black">
+                     {profile?.displayName?.charAt(0) || profile?.email?.charAt(0)}
+                  </div>
+                  <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer backdrop-blur-sm">
+                     <span className="text-xs font-bold text-white uppercase tracking-widest">Cambiar Foto</span>
+                  </div>
+                </div>
+                <div className="mt-5 text-center">
+                  <h3 className="text-xl font-black text-white">{profile?.displayName || 'Usuario Tempos'}</h3>
+                  <p className="text-sm text-zinc-500 font-semibold">{profile?.email}</p>
+                </div>
+                <div className="mt-6 flex flex-wrap justify-center gap-2">
+                  <Badge color="blue" dot>
+                    <ShieldCheck weight="fill" className="w-3.5 h-3.5" />
+                    {profile?.role === 'admin' ? 'Administrador' : 'Empleado'}
+                  </Badge>
+                  <Badge color="zinc">V2.4 PRO</Badge>
+                </div>
               </div>
-            </div>
-          </div>
+              
+              <div className="mt-10 pt-8 border-t border-white/[0.04] space-y-4">
+                 <ProfileDetail icon={EnvelopeSimple} label="Email corporativo" value={profile?.email} />
+                 <ProfileDetail icon={Phone} label="Teléfono" value={profile?.phone || 'No configurado'} />
+                 <ProfileDetail icon={IdentificationCard} label="DNI / NIE" value={profile?.dni || 'Pendiente'} />
+              </div>
+            </CardBody>
+          </Card>
+
+          <Card className="bg-amber-500/5 border-amber-500/20 relative overflow-hidden group">
+             <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/10 blur-[40px] group-hover:bg-amber-500/20 transition-all" />
+             <CardBody className="p-6 flex items-start gap-4 relative z-10">
+                <div className="w-12 h-12 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-500 shrink-0 shadow-[0_0_15px_rgba(245,158,11,0.2)]">
+                   <Key weight="duotone" className="w-6 h-6" />
+                </div>
+                <div>
+                   <h5 className="text-sm font-black text-amber-500 uppercase tracking-widest">Seguridad de la Cuenta</h5>
+                   <p className="text-xs text-amber-500/60 font-medium mt-1.5 leading-relaxed">Último cambio de contraseña hace 3 meses. Recomendamos actualizarla periódicamente para mantener el grado de encriptación fuerte.</p>
+                   <button className="mt-4 text-[10px] font-black text-amber-400 hover:text-white bg-amber-500/10 hover:bg-amber-500/20 px-4 py-2 rounded-lg uppercase tracking-[0.2em] transition-colors">
+                      Modificar Credenciales →
+                   </button>
+                </div>
+             </CardBody>
+          </Card>
+
+          <Card className="bg-blue-500/5 border-blue-500/20 relative overflow-hidden group">
+             <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 blur-[40px] group-hover:bg-blue-500/20 transition-all" />
+             <CardBody className="p-6 flex items-start gap-4 relative z-10">
+                <div className="w-12 h-12 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-500 shrink-0 shadow-[0_0_15px_rgba(59,130,246,0.2)]">
+                   <Fingerprint weight="duotone" className="w-6 h-6" />
+                </div>
+                <div>
+                   <h5 className="text-sm font-black text-blue-500 uppercase tracking-widest">Autenticación Biométrica</h5>
+                   <p className="text-xs text-blue-500/60 font-medium mt-1.5 leading-relaxed">
+                     Registra tu huella dactilar o FaceID para fichar sin contraseñas de forma segura.
+                   </p>
+                   <button 
+                     onClick={handleRegisterBiometric}
+                     className="mt-4 text-[10px] font-black text-blue-400 hover:text-white bg-blue-500/10 hover:bg-blue-500/20 px-4 py-2 rounded-lg uppercase tracking-[0.2em] transition-colors"
+                   >
+                     Registrar Dispositivo →
+                   </button>
+                </div>
+             </CardBody>
+          </Card>
+
+          <Card className="bg-orange-500/5 border-orange-500/20 relative overflow-hidden group">
+             <div className="absolute top-0 right-0 w-32 h-32 bg-orange-500/10 blur-[40px] group-hover:bg-orange-500/20 transition-all" />
+             <CardBody className="p-6 flex items-start gap-4 relative z-10">
+                <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 shadow-[0_0_15px_rgba(249,115,22,0.2)] ${pushEnabled ? 'bg-orange-500/10 text-orange-500' : 'bg-zinc-500/10 text-zinc-500'}`}>
+                   {pushEnabled ? <Bell weight="duotone" className="w-6 h-6" /> : <BellSlash weight="duotone" className="w-6 h-6" />}
+                </div>
+                <div className="flex-1">
+                   <h5 className="text-sm font-black text-orange-500 uppercase tracking-widest">Alertas de Jornada</h5>
+                   <p className="text-xs text-orange-500/60 font-medium mt-1.5 leading-relaxed">Recibe recordatorios de fichaje y avisos del sistema en tiempo real.</p>
+                   <div className="flex flex-col gap-2 mt-4">
+                     <button 
+                       onClick={handleTogglePush}
+                       disabled={pushStatus === 'loading'}
+                       className={`text-[10px] font-black px-4 py-2 rounded-lg uppercase tracking-[0.2em] transition-all border ${
+                         pushEnabled 
+                         ? 'border-orange-500/20 text-orange-400 bg-orange-500/5 hover:bg-orange-500/10' 
+                         : 'border-zinc-500/20 text-zinc-500 bg-zinc-500/5 hover:bg-zinc-500/10'
+                       }`}
+                     >
+                       {pushStatus === 'loading' ? 'Procesando...' : pushEnabled ? 'Desactivar Notificaciones' : 'Activar Notificaciones'}
+                     </button>
+                     {pushEnabled && (
+                       <button 
+                         onClick={handleTestPush}
+                         className="text-[9px] font-bold text-zinc-500 hover:text-orange-400 transition-colors flex items-center gap-1.5"
+                       >
+                         <ChatCircleText size={14} /> Probar envío
+                       </button>
+                     )}
+                   </div>
+                </div>
+             </CardBody>
+          </Card>
         </div>
 
-        {/* Privacy (Geolocation) */}
-        <div className="bg-[#111114] border border-white/5 rounded-[2rem] p-8 shadow-xl">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-500">
-              <MapPin className="w-5 h-5" />
-            </div>
-            <div>
-              <h3 className="text-lg font-bold text-white">Privacidad</h3>
-              <p className="text-[10px] text-zinc-500 uppercase font-black tracking-widest">Datos y Consentimiento</p>
-            </div>
-          </div>
-          <div className="space-y-4">
-            <div className="flex items-start justify-between gap-4 p-4 bg-white/[0.02] border border-white/5 rounded-xl">
-              <div className="flex-1">
-                <h4 className="text-sm font-bold text-white">Geolocalización</h4>
-                <p className="text-xs text-zinc-400 mt-1">
-                  {consentGiven 
-                    ? 'Consentimiento otorgado. Tu ubicación se registra al fichar.' 
-                    : 'No has otorgado permisos de geolocalización.'}
-                </p>
-              </div>
-              {consentGiven ? (
-                <button
-                  onClick={openRevokeModal}
-                  className="px-4 py-2 bg-rose-500/10 border border-rose-500/20 text-rose-500 font-bold text-xs rounded-xl hover:bg-rose-500/20 transition-all whitespace-nowrap"
-                >
-                  Revocar
-                </button>
-              ) : (
-                <span className="px-4 py-2 bg-white/5 border border-white/10 text-zinc-600 font-bold text-xs rounded-xl">
-                  Sin permisos
-                </span>
-              )}
-            </div>
-          </div>
+        {/* Edit Form */}
+        <div className="lg:col-span-2 space-y-6">
+          <Card>
+            <CardBody className="p-8">
+               <h4 className="text-[11px] font-black text-zinc-600 uppercase tracking-[0.3em] mb-8">Información Personal</h4>
+               <form className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
+                  <InputGroup label="Nombre Completo" placeholder="Ej. Antonio García" value={profile?.displayName} />
+                  <InputGroup label="DNI / NIE" placeholder="12345678X" value={profile?.dni} />
+                  <InputGroup label="Correo Electrónico" placeholder="email@empresa.com" value={profile?.email} disabled />
+                  <InputGroup label="Teléfono" placeholder="+34 600 000 000" value={profile?.phone} />
+                  
+                  <div className="md:col-span-2 space-y-2 mt-2">
+                    <label className="text-[10px] font-black text-zinc-600 uppercase tracking-widest ml-1">Bio / Notas</label>
+                    <textarea 
+                      placeholder="Una breve descripción sobre ti..."
+                      className="w-full bg-white/[0.03] border border-white/[0.06] rounded-2xl p-4 text-sm font-semibold text-zinc-300 outline-none focus:border-blue-500/40 transition-all min-h-[120px] resize-none"
+                    />
+                  </div>
+               </form>
+            </CardBody>
+          </Card>
+
+          <Card>
+            <CardBody className="p-8">
+               <h4 className="text-[11px] font-black text-zinc-600 uppercase tracking-[0.3em] mb-8">Preferencias de Sesión</h4>
+               <div className="space-y-4">
+                  <div 
+                    onClick={handleTogglePush}
+                    className="flex items-center justify-between p-4 bg-white/[0.02] border border-white/[0.04] rounded-2xl cursor-pointer hover:bg-white/[0.04] transition-all group"
+                  >
+                     <div className="flex items-center gap-4">
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${pushEnabled ? 'bg-orange-500/10 text-orange-500' : 'bg-zinc-800 text-zinc-600'}`}>
+                           {pushEnabled ? <Bell weight="duotone" className="w-5 h-5" /> : <BellSlash weight="duotone" className="w-5 h-5" />}
+                        </div>
+                        <div>
+                           <p className="text-sm font-bold text-white">Notificaciones Push</p>
+                           <p className="text-xs text-zinc-600 font-medium">Estado: {pushEnabled ? 'Activadas' : 'Desactivadas'}</p>
+                        </div>
+                     </div>
+                     <div className={`w-12 h-6 rounded-full flex items-center px-1 transition-all ${pushEnabled ? 'bg-orange-600' : 'bg-zinc-800 shadow-inner'}`}>
+                        <div className={`w-4 h-4 bg-white rounded-full transition-all ${pushEnabled ? 'ml-auto shadow-[0_0_8px_rgba(255,255,255,0.4)]' : 'ml-0'}`} />
+                     </div>
+                  </div>
+               </div>
+            </CardBody>
+          </Card>
         </div>
       </div>
-    );
-  }
-
-  // Default: Profile View
-  return (
-    <div className="max-w-4xl space-y-8 animate-in fade-in duration-500">
-       
-       {/* Profile Header Card */}
-       <div className="bg-[#111114] border border-white/5 rounded-[2rem] p-8 shadow-2xl relative overflow-hidden">
-         <div className="absolute top-0 right-0 w-64 h-64 bg-blue-600/5 blur-[100px] rounded-full pointer-events-none" />
-         
-         <div className="flex flex-col sm:flex-row items-center sm:items-start gap-8 relative z-10">
-            <div className="w-32 h-32 rounded-[2rem] bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center text-5xl font-black text-white shadow-xl shadow-blue-600/20 border-4 border-[#0a0a0c]">
-               {profile?.displayName?.charAt(0) || <User className="w-12 h-12" />}
-            </div>
-            
-            <div className="text-center sm:text-left pt-2 flex-1">
-               <h2 className="text-3xl font-black text-white tracking-tight">{profile?.displayName || 'Usuario Tempos'}</h2>
-               <div className="flex items-center justify-center sm:justify-start gap-2 mt-2">
-                 <Mail className="w-4 h-4 text-zinc-500" />
-                 <p className="text-zinc-400 font-medium">{profile?.email}</p>
-               </div>
-               
-               <div className="mt-6 flex flex-wrap justify-center sm:justify-start gap-3">
-                 <span className="px-3 py-1.5 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-400 text-[10px] uppercase font-black tracking-widest">
-                   Rol: {profile?.role === 'admin' ? 'Administrador' : profile?.role === 'manager' ? 'Manager' : 'Empleado'}
-                 </span>
-                 <span className="px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] uppercase font-black tracking-widest">
-                   Cuenta Activa
-                 </span>
-               </div>
-            </div>
-         </div>
-       </div>
-
-       {/* Privacy and Security Settings */}
-       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-         
-         {/* Geolocation */}
-         <div className="bg-[#111114] border border-white/5 rounded-[2rem] p-8 shadow-xl flex flex-col">
-           <div className="flex items-center gap-3 mb-6">
-             <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-500">
-               <MapPin className="w-5 h-5" />
-             </div>
-             <div>
-               <h3 className="text-lg font-bold text-white">Geolocalización</h3>
-               <p className="text-[10px] text-zinc-500 uppercase font-black tracking-widest">Privacidad de Ubicación</p>
-             </div>
-           </div>
-           
-           <div className="flex-1">
-             <p className="text-sm text-zinc-400 leading-relaxed mb-6">
-               {consentGiven 
-                 ? 'Has otorgado permiso al sistema Tempos para capturar tus coordenadas GPS de forma segura durante el acto de fichaje. Esta información es requerida por tu empresa.' 
-                 : 'Actualmente no has otorgado permisos de geolocalización. Las fichas desde dispositivos móviles podrían requerir aprobación o fallar.'}
-             </p>
-           </div>
-           
-           <div className="pt-6 border-t border-white/5 flex justify-end">
-             {consentGiven ? (
-               <button
-                 onClick={openRevokeModal}
-                 className="px-5 py-2.5 bg-rose-500/10 border border-rose-500/20 text-rose-500 font-bold text-xs rounded-xl hover:bg-rose-500/20 transition-all flex items-center gap-2"
-               >
-                 <ShieldAlert className="w-4 h-4" />
-                 Revocar Consentimiento
-               </button>
-             ) : (
-               <div className="px-5 py-2.5 bg-white/5 border border-white/10 text-zinc-500 font-bold text-xs rounded-xl">
-                 Sin Permisos
-               </div>
-             )}
-           </div>
-         </div>
-
-         {/* Security */}
-         <div className="bg-[#111114] border border-white/5 rounded-[2rem] p-8 shadow-xl flex flex-col">
-           <div className="flex items-center gap-3 mb-6">
-             <div className="w-10 h-10 rounded-xl bg-purple-500/10 flex items-center justify-center text-purple-500">
-               <Lock className="w-5 h-5" />
-             </div>
-             <div>
-               <h3 className="text-lg font-bold text-white">Seguridad de la Cuenta</h3>
-               <p className="text-[10px] text-zinc-500 uppercase font-black tracking-widest">Contraseñas y Sesión</p>
-             </div>
-           </div>
-           
-           <div className="flex-1 space-y-4">
-             <div className="flex items-center justify-between p-4 bg-white/[0.02] border border-white/5 rounded-xl">
-               <div className="flex items-center gap-3">
-                 <Smartphone className="w-4 h-4 text-zinc-400" />
-                 <span className="text-sm font-medium text-white">Autenticación 2FA</span>
-               </div>
-               <span className="text-[10px] uppercase font-black tracking-widest text-zinc-600">Inactiva</span>
-             </div>
-             <div className="flex items-center justify-between p-4 bg-white/[0.02] border border-white/5 rounded-xl">
-               <div className="flex items-center gap-3">
-                 <Lock className="w-4 h-4 text-zinc-400" />
-                 <span className="text-sm font-medium text-white">Cambio de Contraseña</span>
-               </div>
-               <button className="text-[10px] uppercase font-black tracking-widest text-blue-400 hover:text-blue-300">Solicitar</button>
-             </div>
-           </div>
-         </div>
-
-       </div>
     </div>
   );
 }
 
-function ToggleRow({ label, description, enabled, onChange }) {
+function ProfileDetail({ icon: Icon, label, value }) {
   return (
-    <label className="flex items-start gap-4 p-4 bg-white/[0.02] border border-white/5 rounded-xl cursor-pointer hover:bg-white/5 transition-colors">
-      <div className="flex-1">
-        <h4 className="text-sm font-bold text-white">{label}</h4>
-        <p className="text-xs text-zinc-400 mt-1">{description}</p>
+    <div className="flex items-center gap-3.5 group">
+      <Icon className="w-4 h-4 text-zinc-600 group-hover:text-blue-400 transition-colors" weight="duotone" />
+      <div>
+        <p className="text-[9px] font-black text-zinc-700 uppercase tracking-widest leading-none">{label}</p>
+        <p className="text-xs font-bold text-zinc-300 group-hover:text-white transition-colors">{value}</p>
       </div>
-      <button 
-        onClick={(e) => { e.preventDefault(); onChange(!enabled); }}
+    </div>
+  );
+}
+
+function InputGroup({ label, placeholder, value, disabled }) {
+  return (
+    <div className="space-y-2">
+      <label className="text-[10px] font-black text-zinc-600 uppercase tracking-widest ml-1">{label}</label>
+      <input 
+        type="text" 
+        defaultValue={value}
+        disabled={disabled}
+        placeholder={placeholder}
         className={cn(
-          "w-10 h-6 rounded-full relative flex items-center shrink-0 transition-colors",
-          enabled ? "bg-blue-600" : "bg-zinc-700"
+          "w-full bg-white/[0.03] border border-white/[0.06] rounded-2xl px-5 py-3.5 text-sm font-semibold text-zinc-300 outline-none transition-all",
+          disabled ? "opacity-50 cursor-not-allowed" : "focus:border-blue-500/40 hover:border-white/10"
         )}
-      >
-        <div className={cn(
-          "w-4 h-4 bg-white rounded-full absolute shadow-sm transition-all",
-          enabled ? "right-1" : "left-1"
-        )} />
-      </button>
-    </label>
+      />
+    </div>
   );
 }

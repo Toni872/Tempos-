@@ -103,6 +103,18 @@ export function clearClientSession() {
   localStorage.removeItem(SESSION_STORAGE_KEY);
 }
 
+export function getDeviceId() {
+  const DEVICE_ID_KEY = 'tempos.device_id';
+  let deviceId = localStorage.getItem(DEVICE_ID_KEY);
+  
+  if (!deviceId) {
+    deviceId = crypto.randomUUID?.() || `dev_${Math.random().toString(36).substring(2)}_${Date.now()}`;
+    localStorage.setItem(DEVICE_ID_KEY, deviceId);
+  }
+  
+  return deviceId;
+}
+
 export async function registerMe(token, data = {}) {
   return request('/api/v1/auth/register', {
     method: 'POST',
@@ -235,6 +247,10 @@ export async function signDocument(token, id, data = {}) {
   });
 }
 
+export async function acceptTerms(token) {
+  return request('/api/v1/auth/accept-terms', { method: 'POST', token });
+}
+
 export async function listDocuments(token, params = {}) {
   const qs = toQueryString(params);
   const path = `/api/v1/documents${qs ? `?${qs}` : ''}`;
@@ -297,11 +313,27 @@ export async function exportReport(token, params = {}) {
 
 // Clock in/out
 export async function clockIn(token, payload = {}) {
-  return request('/api/v1/fichas/clockin', { method: 'POST', token, body: JSON.stringify(payload) });
+  const deviceId = getDeviceId();
+  const body = { ...payload, deviceId };
+  return request('/api/v1/fichas/clockin', { method: 'POST', token, body: JSON.stringify(body) });
 }
 
 export async function clockOut(token, payload = {}) {
-  return request('/api/v1/fichas/clockout', { method: 'POST', token, body: JSON.stringify(payload) });
+  const deviceId = getDeviceId();
+  const body = { ...payload, deviceId };
+  return request('/api/v1/fichas/clockout', { method: 'POST', token, body: JSON.stringify(body) });
+}
+
+export async function breakStart(token, payload = {}) {
+  const deviceId = getDeviceId();
+  const body = { ...payload, deviceId };
+  return request('/api/v1/fichas/break-start', { method: 'POST', token, body: JSON.stringify(body) });
+}
+
+export async function breakEnd(token, payload = {}) {
+  const deviceId = getDeviceId();
+  const body = { ...payload, deviceId };
+  return request('/api/v1/fichas/break-end', { method: 'POST', token, body: JSON.stringify(body) });
 }
 
 export async function getActiveFicha(token) {
@@ -345,6 +377,50 @@ export async function bootstrapLocalSession({ isAdmin = false } = {}) {
 
   setClientSession(session);
   return session;
+}
+
+// WebAuthn
+export async function getWebAuthnRegistrationOptions(token) {
+  return request('/api/v1/webauthn/generate-registration-options', { method: 'GET', token });
+}
+
+export async function verifyWebAuthnRegistration(token, body) {
+  return request('/api/v1/webauthn/verify-registration', { 
+    method: 'POST', 
+    token, 
+    body: JSON.stringify(body) 
+  });
+}
+
+export async function getWebAuthnAuthenticationOptions(email) {
+  const path = `/api/v1/webauthn/generate-authentication-options${email ? `?email=${encodeURIComponent(email)}` : ''}`;
+  return request(path, { method: 'GET' });
+}
+
+export async function verifyWebAuthnAuthentication(email, body) {
+  return request('/api/v1/webauthn/verify-authentication', { 
+    method: 'POST', 
+    body: JSON.stringify({ email, body }) 
+  });
+}
+
+// Push Notifications
+export async function subscribePush(subscription) {
+  return request('/api/v1/push/subscribe', { 
+    method: 'POST', 
+    body: JSON.stringify(subscription) 
+  });
+}
+
+export async function unsubscribePush(endpoint) {
+  return request('/api/v1/push/unsubscribe', { 
+    method: 'POST', 
+    body: JSON.stringify({ endpoint }) 
+  });
+}
+
+export async function sendTestPush() {
+  return request('/api/v1/push/send-test', { method: 'POST' });
 }
 
 const api = {

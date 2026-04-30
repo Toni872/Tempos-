@@ -1,9 +1,9 @@
-import { Storage } from '@google-cloud/storage';
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import { Storage } from "@google-cloud/storage";
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
 
-type StorageDriver = 'local' | 'gcs';
+type StorageDriver = "local" | "gcs";
 
 export type UploadInput = {
   filename: string;
@@ -18,14 +18,16 @@ export type UploadResult = {
 };
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const UPLOADS_DIR = path.join(__dirname, '../../uploads');
-const driverFromEnv = String(process.env.DOCUMENTS_STORAGE_DRIVER || '').toLowerCase();
+const UPLOADS_DIR = path.join(__dirname, "../../uploads");
+const driverFromEnv = String(
+  process.env.DOCUMENTS_STORAGE_DRIVER || "",
+).toLowerCase();
 const bucketName = process.env.GCS_BUCKET;
 
 function resolveDriver(): StorageDriver {
-  if (driverFromEnv === 'gcs') return 'gcs';
-  if (driverFromEnv === 'local') return 'local';
-  return bucketName ? 'gcs' : 'local';
+  if (driverFromEnv === "gcs") return "gcs";
+  if (driverFromEnv === "local") return "local";
+  return bucketName ? "gcs" : "local";
 }
 
 function ensureLocalDir(): void {
@@ -35,7 +37,7 @@ function ensureLocalDir(): void {
 }
 
 function makeSafeFilename(original: string): string {
-  return original.replace(/[^a-zA-Z0-9._-]/g, '_');
+  return original.replace(/[^a-zA-Z0-9._-]/g, "_");
 }
 
 function buildGcsObjectPath(userId: string, filename: string): string {
@@ -48,18 +50,18 @@ export class DocumentStorageService {
 
   constructor() {
     this.driver = resolveDriver();
-    this.storage = this.driver === 'gcs' ? new Storage() : null;
-    if (this.driver === 'local') {
+    this.storage = this.driver === "gcs" ? new Storage() : null;
+    if (this.driver === "local") {
       ensureLocalDir();
     }
   }
 
   async save(input: UploadInput): Promise<UploadResult> {
-    const safeName = makeSafeFilename(input.filename || 'documento.bin');
+    const safeName = makeSafeFilename(input.filename || "documento.bin");
 
-    if (this.driver === 'gcs') {
+    if (this.driver === "gcs") {
       if (!bucketName || !this.storage) {
-        throw new Error('GCS_BUCKET no definido para almacenamiento en GCS');
+        throw new Error("GCS_BUCKET no definido para almacenamiento en GCS");
       }
 
       const objectPath = buildGcsObjectPath(input.userId, safeName);
@@ -68,9 +70,9 @@ export class DocumentStorageService {
 
       await gcsFile.save(input.content, {
         resumable: false,
-        contentType: input.mimeType || 'application/octet-stream',
+        contentType: input.mimeType || "application/octet-stream",
         metadata: {
-          cacheControl: 'private, max-age=0, no-store',
+          cacheControl: "private, max-age=0, no-store",
         },
       });
 
@@ -95,7 +97,7 @@ export class DocumentStorageService {
       return null;
     }
 
-    if (fileUrl.startsWith('gs://')) {
+    if (fileUrl.startsWith("gs://")) {
       if (!this.storage) {
         return null;
       }
@@ -122,8 +124,8 @@ export class DocumentStorageService {
   }
 
   private parseGcsUrl(fileUrl: string): [string, string] | null {
-    const withoutScheme = fileUrl.replace('gs://', '');
-    const slashIndex = withoutScheme.indexOf('/');
+    const withoutScheme = fileUrl.replace("gs://", "");
+    const slashIndex = withoutScheme.indexOf("/");
     if (slashIndex <= 0) {
       return null;
     }
