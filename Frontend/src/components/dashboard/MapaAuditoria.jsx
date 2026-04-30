@@ -1,41 +1,30 @@
-import { useMemo, useEffect, useState, memo } from 'react';
+import { useMemo, useEffect, useState, memo, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from 'react-leaflet';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
+// Mapbox GL JS Implementation
+import mapboxgl from 'mapbox-gl';
+import 'mapbox-gl/dist/mapbox-gl.css';
 
-delete L.Icon.Default.prototype._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-});
+// Usar token desde variables de entorno (Vite)
+mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN || '';
 
-const clockInIcon = new L.DivIcon({
-  className: '',
-  html: '<div style="width:12px;height:12px;background:#10b981;border:2px solid #065f46;border-radius:50%;box-shadow:0 0 8px rgba(16,185,129,0.6)"></div>',
-  iconSize: [12, 12],
-  iconAnchor: [6, 6],
-});
-
-const clockOutIcon = new L.DivIcon({
-  className: '',
-  html: '<div style="width:12px;height:12px;background:#ef4444;border:2px solid #7f1d1d;border-radius:50%;box-shadow:0 0 8px rgba(239,68,68,0.6)"></div>',
-  iconSize: [12, 12],
-  iconAnchor: [6, 6],
-});
-
-const DEFAULT_CENTER = [40.4168, -3.7038];
+const DEFAULT_CENTER = [-3.7038, 40.4168]; // [lng, lat] para Mapbox
 
 function parseLocation(ficha) {
-  const loc = ficha?.metadata?.location;
-  if (!loc) return null;
-  if (typeof loc === 'string') {
-    const [lat, lng] = loc.split(',').map(Number);
-    if (!isNaN(lat) && !isNaN(lng)) return { lat, lng };
+  if (ficha?.latitude && ficha?.longitude) {
+    return { lat: Number(ficha.latitude), lng: Number(ficha.longitude) };
   }
-  if (typeof loc === 'object' && loc.lat && loc.lng) {
-    return { lat: Number(loc.lat), lng: Number(loc.lng) };
+  const loc = ficha?.metadata?.location;
+  if (loc) {
+    if (typeof loc === 'string') {
+      const [lat, lng] = loc.split(',').map(Number);
+      if (!isNaN(lat) && !isNaN(lng)) return { lat, lng };
+    }
+    if (typeof loc === 'object' && loc.lat && loc.lng) {
+      return { lat: Number(loc.lat), lng: Number(loc.lng) };
+    }
+  }
+  if (ficha?.metadata?.latitude && ficha?.metadata?.longitude) {
+    return { lat: Number(ficha.metadata.latitude), lng: Number(ficha.metadata.longitude) };
   }
   return null;
 }
@@ -44,73 +33,90 @@ function formatTime(v) {
   return v ? String(v).slice(0, 5) : '—';
 }
 
-function InvalidateMapSize({ trigger }) {
-  const map = useMap();
-  useEffect(() => {
-    const id = setTimeout(() => map.invalidateSize(), 200);
-    return () => clearTimeout(id);
-  }, [trigger, map]);
-  return null;
-}
-
-/**
- * Extracted as a stable component to prevent MapContainer remounting on parent re-renders.
- * MapContainer does NOT support dynamic center/zoom — it only reads props on first mount.
- */
 const MapContent = memo(function MapContent({ center, markers, workCenters, isFullscreen }) {
-  return (
-    <MapContainer
-      center={center}
-      zoom={14}
-      scrollWheelZoom
-      style={{ height: '100%', width: '100%' }}
-      className="leaflet-dark"
-    >
-      <TileLayer
-        attribution='&copy; CARTO'
-        url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-      />
-      <InvalidateMapSize trigger={isFullscreen} />
+  const mapContainer = useRef(null);
+  const map = useRef(null);
 
-      {workCenters.filter(c => c.latitude && c.longitude).map(c => (
-        <Circle
-          key={`circle-${c.id}`}
-          center={[Number(c.latitude), Number(c.longitude)]}
-          radius={c.radiusMeters || 200}
-          pathOptions={{ color: '#3b82f6', fillColor: '#3b82f6', fillOpacity: 0.1, weight: 1.5 }}
-        >
-          <Popup>
-            <div className="font-bold text-black">{c.name}</div>
-            <div className="text-gray-500 text-xs">Sede autorizada · {c.radiusMeters}m</div>
-          </Popup>
-        </Circle>
-      ))}
+  useEffect(() => {
+    if (!mapboxgl.accessToken) return;
 
-      {workCenters.filter(c => c.latitude && c.longitude).map(c => (
-        <Marker key={`marker-${c.id}`} position={[Number(c.latitude), Number(c.longitude)]}>
-          <Popup>
-            <div className="font-bold text-black">{c.name}</div>
-            <div className="text-gray-500 text-xs">Sede autorizada · {c.radiusMeters}m</div>
-          </Popup>
-        </Marker>
-      ))}
+    if (map.current) return; // initialize map only once
+    map.current = new mapboxgl.Map({
+      container: mapContainer.current,
+      style: 'mapbox://styles/mapbox/dark-v11',
+      center: center || DEFAULT_CENTER,
+      zoom: 13,
+      pitch: 45,
+      bearing: -17.6,
+      antialias: true
+    });
 
-      {markers.map((m) => (
-        <Marker key={m.id} position={[m.pos.lat, m.pos.lng]} icon={m.endTime ? clockOutIcon : clockInIcon}>
-          <Popup>
-            <div className="font-bold text-black">{m.employeeName}</div>
-            <div className="text-gray-600 text-xs">
-              {new Date(m.date).toLocaleDateString('es-ES')} · {formatTime(m.startTime)}{m.endTime ? ` → ${formatTime(m.endTime)}` : ' (activo)'}
-            </div>
-          </Popup>
-        </Marker>
-      ))}
-    </MapContainer>
-  );
+    map.current.on('style.load', () => {
+      // Configurar 3D buildings (Wow effect)
+      map.current.addLayer({
+        'id': '3d-buildings',
+        'source': 'composite',
+        'source-layer': 'building',
+        'filter': ['==', 'extrude', 'true'],
+        'type': 'fill-extrusion',
+        'minzoom': 15,
+        'paint': {
+          'fill-extrusion-color': '#111114',
+          'fill-extrusion-height': ['get', 'height'],
+          'fill-extrusion-base': ['get', 'min_height'],
+          'fill-extrusion-opacity': 0.6
+        }
+      });
+    });
+
+    // Add markers
+    markers.forEach(m => {
+      const el = document.createElement('div');
+      el.className = `w-3 h-3 rounded-full border-2 ${m.endTime ? 'bg-red-500 border-red-900 shadow-[0_0_10px_#ef4444]' : 'bg-emerald-500 border-emerald-900 shadow-[0_0_10px_#10b981]'}`;
+      
+      new mapboxgl.Marker(el)
+        .setLngLat([m.pos.lng, m.pos.lat])
+        .setPopup(new mapboxgl.Popup({ offset: 25 }).setHTML(`
+          <div class="font-bold text-black text-xs">${m.employeeName}</div>
+          <div class="text-gray-500 text-[10px]">${new Date(m.date).toLocaleDateString()} · ${formatTime(m.startTime)}${m.endTime ? ` → ${formatTime(m.endTime)}` : ''}</div>
+        `))
+        .addTo(map.current);
+    });
+
+  }, [center, markers]);
+
+  useEffect(() => {
+    if (map.current) {
+      setTimeout(() => map.current.resize(), 200);
+    }
+  }, [isFullscreen]);
+
+  if (!mapboxgl.accessToken) {
+    return (
+      <div className="h-full flex flex-col items-center justify-center bg-[#0a0a0a] text-center p-6 border border-rose-500/20 rounded-2xl">
+        <div className="w-12 h-12 rounded-full bg-rose-500/10 flex items-center justify-center text-rose-500 mb-4">
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+        </div>
+        <h4 className="text-white font-bold mb-2">Requiere Mapbox Token</h4>
+        <p className="text-sm text-zinc-400">Añade <code className="text-blue-400">VITE_MAPBOX_TOKEN</code> en tu archivo .env para activar el motor 3D de Mapbox.</p>
+      </div>
+    );
+  }
+
+  return <div ref={mapContainer} className="w-full h-full rounded-b-[24px]" />;
 });
+
+import * as Sentry from "@sentry/react";
 
 export default function MapaAuditoria({ fichas = [], workCenters = [], employees = [] }) {
   const [isFullscreen, setIsFullscreen] = useState(false);
+
+  useEffect(() => {
+    // Si hay fichas pero ninguna tiene GPS, avisamos a Sentry de forma silenciosa
+    if (fichas.length > 0 && !fichas.some(f => f.latitude || f.metadata?.location)) {
+      Sentry.captureMessage("Fichajes detectados sin datos de geolocalización", "warning");
+    }
+  }, [fichas]);
 
   useEffect(() => {
     document.body.style.overflow = isFullscreen ? 'hidden' : '';

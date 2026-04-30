@@ -1,179 +1,142 @@
-import React, { useState, useEffect } from 'react';
-import { Clock, Calendar, Save, X, AlertCircle, Info } from 'lucide-react';
+import React, { useState } from 'react';
+import { 
+  ClockCountdown, 
+  CalendarBlank, 
+  Repeat, 
+  Sun, 
+  Moon,
+  FloppyDisk,
+  Timer
+} from '@phosphor-icons/react';
+import Toggle from '@/components/ui/Toggle';
+import { cn } from '@/lib/utils';
 
-export default function ScheduleForm({ initialValues, onSubmit, onCancel, loading }) {
-  const safe = initialValues ?? {};
-  const [formData, setFormData] = useState({
-    name: safe.name || '',
-    startTime: safe.startTime || '09:00',
-    endTime: safe.endTime || '18:00',
-    daysOfWeek: safe.daysOfWeek || [1, 2, 3, 4, 5],
-    gracePeriodMinutes: safe.gracePeriodMinutes || 15
+export default function ScheduleForm({ initialData, onSubmit, onCancel }) {
+  const [formData, setFormData] = useState(initialData ?? {
+    name: '',
+    startTime: '09:00',
+    endTime: '18:00',
+    days: [1, 2, 3, 4, 5],
+    flexible: false,
+    isTemplate: true
   });
 
-  const [error, setError] = useState(null);
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
 
   const toggleDay = (day) => {
     setFormData(prev => ({
       ...prev,
-      daysOfWeek: prev.daysOfWeek.includes(day)
-        ? prev.daysOfWeek.filter(d => d !== day)
-        : [...prev.daysOfWeek, day].sort()
+      days: prev.days.includes(day) 
+        ? prev.days.filter(d => d !== day) 
+        : [...prev.days, day]
     }));
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    setError(null);
-
-    if (!formData.name.trim()) {
-      setError('El nombre de la plantilla es obligatorio.');
-      return;
-    }
-
-    if (formData.daysOfWeek.length === 0) {
-      setError('Debes seleccionar al menos un día de la semana.');
-      return;
-    }
-
     onSubmit(formData);
   };
 
-  const dayLabels = [
-    { id: 1, label: 'L', name: 'Lunes' },
-    { id: 2, label: 'M', name: 'Martes' },
-    { id: 3, label: 'X', name: 'Miércoles' },
-    { id: 4, label: 'J', name: 'Jueves' },
-    { id: 5, label: 'V', name: 'Viernes' },
-    { id: 6, label: 'S', name: 'Sábado' },
-    { id: 7, label: 'D', name: 'Domingo' }
+  const weekDays = [
+    { id: 1, label: 'L' }, { id: 2, label: 'M' }, { id: 3, label: 'X' },
+    { id: 4, label: 'J' }, { id: 5, label: 'V' }, { id: 6, label: 'S' }, { id: 7, label: 'D' }
   ];
 
   return (
-    <form onSubmit={handleSubmit} className="p-6 space-y-6">
-      <div className="flex items-center gap-3 mb-2">
-        <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-500">
-          <Clock className="w-5 h-5" />
-        </div>
-        <div>
-          <h3 className="text-lg font-bold text-white">Plantilla de Horario</h3>
-          <p className="text-[10px] text-zinc-500 uppercase tracking-widest font-black">Reglas de Jornada Laboral</p>
-        </div>
-      </div>
-
-      {error && (
-        <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl flex items-center gap-3 animate-in fade-in slide-in-from-top-1">
-          <AlertCircle className="w-5 h-5 text-red-500" />
-          <p className="text-sm text-red-200 font-medium">{error}</p>
-        </div>
-      )}
-
-      <div className="space-y-4">
-        <div className="space-y-2">
-          <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-1">Identificador del Horario</label>
-          <input
-            type="text"
-            value={formData.name}
-            onChange={e => setFormData({ ...formData, name: e.target.value })}
-            className="w-full bg-white/[0.03] border border-white/5 rounded-2xl px-4 py-3 text-sm outline-none focus:border-blue-500/50 transition-all text-white"
-            placeholder="Ej: Jornada Completa L-V, Turno Nocturno..."
-            required
-          />
-        </div>
+    <form onSubmit={handleSubmit} className="space-y-8">
+      <div className="space-y-6">
+        <FormInput 
+          label="Nombre del Horario" 
+          name="name" 
+          value={formData.name} 
+          onChange={handleChange} 
+          icon={CalendarBlank} 
+          placeholder="Ej. Turno Mañana" 
+        />
 
         <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-1">Hora Entrada</label>
-            <input
-              type="time"
-              value={formData.startTime}
-              onChange={e => setFormData({ ...formData, startTime: e.target.value })}
-              className="w-full bg-white/[0.03] border border-white/5 rounded-2xl px-4 py-3 text-sm outline-none focus:border-blue-500/50 transition-all text-white font-mono"
-              required
-            />
-          </div>
-          <div className="space-y-2">
-            <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-1">Hora Salida</label>
-            <input
-              type="time"
-              value={formData.endTime}
-              onChange={e => setFormData({ ...formData, endTime: e.target.value })}
-              className="w-full bg-white/[0.03] border border-white/5 rounded-2xl px-4 py-3 text-sm outline-none focus:border-blue-500/50 transition-all text-white font-mono"
-              required
-            />
-          </div>
+          <FormInput 
+            label="Hora Entrada" 
+            name="startTime" 
+            value={formData.startTime} 
+            onChange={handleChange} 
+            icon={Sun} 
+            type="time" 
+          />
+          <FormInput 
+            label="Hora Salida" 
+            name="endTime" 
+            value={formData.endTime} 
+            onChange={handleChange} 
+            icon={Moon} 
+            type="time" 
+          />
         </div>
 
         <div className="space-y-3">
-          <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-1">Días Aplicables</label>
+          <label className="text-[10px] font-black text-zinc-600 uppercase tracking-[0.2em] ml-1">Días Laborales</label>
           <div className="flex justify-between gap-2">
-            {dayLabels.map(day => {
-              const isActive = formData.daysOfWeek.includes(day.id);
-              return (
-                <button
-                  key={day.id}
-                  type="button"
-                  onClick={() => toggleDay(day.id)}
-                  title={day.name}
-                  className={`flex-1 h-12 rounded-xl text-xs font-black transition-all border flex items-center justify-center ${
-                    isActive 
-                      ? 'bg-blue-600 border-blue-500 text-white shadow-lg shadow-blue-600/20 active:scale-95' 
-                      : 'bg-white/[0.03] border-white/5 text-zinc-600 hover:text-zinc-400 hover:bg-white/5'
-                  }`}
-                >
-                  {day.label}
-                </button>
-              );
-            })}
+            {weekDays.map(day => (
+              <button
+                key={day.id}
+                type="button"
+                onClick={() => toggleDay(day.id)}
+                className={cn(
+                  "flex-1 h-12 rounded-xl text-xs font-black transition-all border",
+                  formData.days.includes(day.id) 
+                    ? "bg-blue-600 border-blue-500 text-white shadow-lg shadow-blue-600/20" 
+                    : "bg-white/[0.02] border-white/[0.06] text-zinc-600 hover:text-zinc-400"
+                )}
+              >
+                {day.label}
+              </button>
+            ))}
           </div>
         </div>
 
-        <div className="space-y-3 p-4 bg-zinc-500/5 border border-white/5 rounded-2xl">
-          <div className="flex justify-between items-center mb-1">
-            <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest flex items-center gap-1.5">
-              <Info className="w-3.5 h-3.5" />
-              Margen de Cortesía
-            </label>
-            <span className="text-sm font-mono font-black text-zinc-300">{formData.gracePeriodMinutes} min</span>
-          </div>
-          <input
-            type="range"
-            min="0"
-            max="120"
-            step="5"
-            value={formData.gracePeriodMinutes}
-            onChange={e => setFormData({ ...formData, gracePeriodMinutes: parseInt(e.target.value) })}
-            className="w-full accent-blue-600 h-1.5 bg-white/5 rounded-full appearance-none cursor-pointer"
-          />
-          <p className="text-[9px] text-zinc-600 leading-relaxed font-medium">
-            Tiempo de tolerancia permitido después de la hora oficial de entrada sin que se considere retraso.
-          </p>
+        <div className="p-6 rounded-2xl bg-white/[0.02] border border-white/[0.06] flex items-center justify-between">
+           <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-cyan-500/10 flex items-center justify-center text-cyan-500">
+                 <Repeat weight="duotone" className="w-5 h-5" />
+              </div>
+              <div>
+                 <h4 className="text-xs font-black text-white uppercase tracking-widest leading-none">Horario Flexible</h4>
+                 <p className="text-[10px] text-zinc-600 font-medium mt-1">Permitir fichajes fuera de la hora exacta.</p>
+              </div>
+           </div>
+           <Toggle 
+              enabled={formData.flexible} 
+              onChange={(val) => setFormData(p => ({ ...p, flexible: val }))} 
+           />
         </div>
       </div>
 
-      <div className="flex gap-3 pt-4 border-t border-white/5">
-        <button
-          type="button"
-          onClick={onCancel}
-          className="flex-1 px-6 py-4 rounded-2xl bg-[#111114] border border-white/5 text-zinc-400 font-black text-[11px] uppercase tracking-widest hover:text-white transition-all"
-        >
+      <div className="pt-6 border-t border-white/[0.04] flex items-center justify-end gap-4">
+        <button type="button" onClick={onCancel} className="px-6 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest text-zinc-500 hover:text-white transition-all">
           Cancelar
         </button>
-        <button
-          type="submit"
-          disabled={loading}
-          className="flex-1 px-6 py-4 rounded-2xl bg-blue-600 text-white font-black text-[11px] uppercase tracking-widest hover:bg-blue-500 transition-all shadow-xl shadow-blue-600/20 disabled:opacity-50 flex items-center justify-center gap-2"
-        >
-          {loading ? (
-            <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
-          ) : (
-            <>
-              <Save className="w-4 h-4" />
-              {safe.id ? 'Actualizar Plantilla' : 'Crear Plantilla'}
-            </>
-          )}
+        <button type="submit" className="px-8 py-3.5 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white text-[11px] font-black uppercase tracking-[0.15em] transition-all shadow-lg shadow-blue-600/20 active:scale-[0.98]">
+           {initialData?.id ? 'Actualizar Horario' : 'Guardar Plantilla'}
         </button>
       </div>
     </form>
+  );
+}
+
+function FormInput({ label, icon: Icon, ...props }) {
+  return (
+    <div className="space-y-2">
+      <label className="text-[10px] font-black text-zinc-600 uppercase tracking-widest ml-1">{label}</label>
+      <div className="relative group">
+        <Icon className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-600 group-focus-within:text-blue-500 transition-colors" weight="bold" />
+        <input 
+          {...props}
+          className="w-full bg-white/[0.03] border border-white/[0.06] rounded-2xl py-3.5 pl-11 pr-4 text-sm font-semibold text-zinc-300 outline-none focus:border-blue-500/40 transition-all placeholder:text-zinc-700"
+        />
+      </div>
+    </div>
   );
 }

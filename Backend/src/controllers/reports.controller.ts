@@ -1,37 +1,50 @@
-import { Router, Request, Response } from 'express';
-import { firebaseAuthMiddleware } from '../middleware/auth.middleware.js';
-import { asyncHandler } from '../middleware/errorHandler.js';
-import { AppDataSource } from '../database.js';
-import { Ficha } from '../entities/Ficha.js';
-import { User } from '../entities/User.js';
-import { AuditLog } from '../entities/AuditLog.js';
-import { Absence } from '../entities/Absence.js';
-import { TimeEntry, TimeEntryType } from '../entities/TimeEntry.js';
-import { logAction } from '../utils/auditLog.js';
-import { appUserContextMiddleware, getAuthContext } from '../middleware/request-context.middleware.js';
-import { hasPermission } from '../security/authorization.js';
+import { Router, Request, Response } from "express";
+import { firebaseAuthMiddleware } from "../middleware/auth.middleware.js";
+import { asyncHandler } from "../middleware/errorHandler.js";
+import { AppDataSource } from "../database.js";
+import { Ficha } from "../entities/Ficha.js";
+import { User } from "../entities/User.js";
+import { AuditLog } from "../entities/AuditLog.js";
+import { Absence } from "../entities/Absence.js";
+import { TimeEntry, TimeEntryType } from "../entities/TimeEntry.js";
+import { logAction } from "../utils/auditLog.js";
+import {
+  appUserContextMiddleware,
+  getAuthContext,
+} from "../middleware/request-context.middleware.js";
+import { hasPermission } from "../security/authorization.js";
+import { generateInspectionPDF } from "../utils/pdfGenerator.js";
 
 const router = Router();
 
 /** Escape a value for RFC 4180 CSV: wrap in quotes if it contains comma, quote, or newline */
 function csvField(val: string | number | null | undefined): string {
-  const s = String(val ?? '');
-  if (s.includes(',') || s.includes('"') || s.includes('\n') || s.includes('\r')) {
+  const s = String(val ?? "");
+  if (
+    s.includes(",") ||
+    s.includes('"') ||
+    s.includes("\n") ||
+    s.includes("\r")
+  ) {
     return '"' + s.replace(/"/g, '""') + '"';
   }
   return s;
 }
 
 function parseDate(val: unknown): string | undefined {
-  if (typeof val === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(val)) return val;
+  if (typeof val === "string" && /^\d{4}-\d{2}-\d{2}$/.test(val)) return val;
   return undefined;
 }
 
 function fichasToCSV(fichas: Ficha[]): string {
-  const header = 'id,fecha,hora_inicio,hora_fin,horas_trabajadas,descripcion,codigo_proyecto,estado';
+  const header =
+    "id,fecha,hora_inicio,hora_fin,horas_trabajadas,descripcion,codigo_proyecto,estado";
   const rows = fichas.map((f) => {
     const raw = f.date as unknown as string | Date;
-    const date = typeof raw === 'string' ? raw.split('T')[0] : (raw as Date).toISOString().split('T')[0];
+    const date =
+      typeof raw === "string"
+        ? raw.split("T")[0]
+        : (raw as Date).toISOString().split("T")[0];
     return [
       csvField(f.id),
       csvField(date),
@@ -41,49 +54,9 @@ function fichasToCSV(fichas: Ficha[]): string {
       csvField(f.description),
       csvField(f.projectCode),
       csvField(f.status),
-    ].join(',');
+    ].join(",");
   });
-  return [header, ...rows].join('\n');
-}
-
-function fichasToPDF(fichas: (Ficha & { userDisplayName?: string, userEmail?: string })[], totalHours: number, targetUser?: User): string {
-  const now = new Date().toLocaleString('es-ES');
-  const employerName = 'Antonio Lloret Sánchez';
-  const entityName = 'Tempos (Control Horario)';
-  
-  const employeeInfo = targetUser 
-    ? `EMPLEADO: ${targetUser.displayName} (${targetUser.email})`
-    : 'EMPLEADO: TODOS (REPORTE GLOBAL)';
-
-  const lines = [
-    `REGISTRO DE JORNADA LABORAL (Art. 34.9 ET) · ${now}`,
-    '='.repeat(70),
-    `EMPRESA / TITULAR: ${employerName}`,
-    `SOFTWARE: ${entityName}`,
-    employeeInfo,
-    '='.repeat(70),
-    '',
-    `Total registros: ${fichas.length}`,
-    `Total horas confirmadas: ${totalHours.toFixed(2)}h`,
-    '',
-    '-'.repeat(70),
-    'FECHA        INICIO   FIN      HORAS  PROYECTO       ESTADO',
-    '-'.repeat(70),
-    ...fichas.map((f) => {
-      const raw = f.date as unknown as string | Date;
-      const date = typeof raw === 'string' ? raw.split('T')[0] : (raw as Date).toISOString().split('T')[0];
-      const h = String(f.hoursWorked ?? '').padStart(5);
-      const proj = (f.projectCode ?? '').substring(0, 12).padEnd(14);
-      return `${date}  ${f.startTime}  ${(f.endTime ?? '-----').padEnd(5)}  ${h}  ${proj}  ${f.status}`;
-    }),
-    '-'.repeat(70),
-    '',
-    'DECLARACIÓN: Los datos aquí contenidos son un fiel reflejo de la jornada laboral registrada.',
-    'Este informe ha sido generado digitalmente y es íntegro e inalterable en su origen.',
-    '',
-    'Firma del Trabajador/a: ____________________   Firma de la Empresa: ____________________',
-  ];
-  return lines.join('\n');
+  return [header, ...rows].join("\n");
 }
 
 type AuditLogFilters = {
@@ -98,12 +71,14 @@ type AuditLogFilters = {
 function parseAuditLogFilters(req: Request): AuditLogFilters {
   const startDate = parseDate(req.query.startDate);
   const endDate = parseDate(req.query.endDate);
-  const action = typeof req.query.action === 'string' && req.query.action.trim().length > 0
-    ? req.query.action.trim()
-    : undefined;
-  const userId = typeof req.query.userId === 'string' && req.query.userId.trim().length > 0
-    ? req.query.userId.trim()
-    : undefined;
+  const action =
+    typeof req.query.action === "string" && req.query.action.trim().length > 0
+      ? req.query.action.trim()
+      : undefined;
+  const userId =
+    typeof req.query.userId === "string" && req.query.userId.trim().length > 0
+      ? req.query.userId.trim()
+      : undefined;
 
   return {
     startDate,
@@ -115,44 +90,52 @@ function parseAuditLogFilters(req: Request): AuditLogFilters {
   };
 }
 
-function buildAuditLogQuery(auth: ReturnType<typeof getAuthContext>, canViewCompanyLogs: boolean, filters: AuditLogFilters) {
+function buildAuditLogQuery(
+  auth: ReturnType<typeof getAuthContext>,
+  canViewCompanyLogs: boolean,
+  filters: AuditLogFilters,
+) {
   const qb = AppDataSource.getRepository(AuditLog)
-    .createQueryBuilder('audit')
-    .where('audit.companyId = :companyId', { companyId: auth.companyId })
-    .orderBy('audit.createdAt', 'DESC')
+    .createQueryBuilder("audit")
+    .where("audit.companyId = :companyId", { companyId: auth.companyId })
+    .orderBy("audit.createdAt", "DESC")
     .take(filters.limit)
     .skip(filters.offset);
 
   if (!canViewCompanyLogs) {
-    qb.andWhere('audit.userId = :uid', { uid: auth.uid });
+    qb.andWhere("audit.userId = :uid", { uid: auth.uid });
   }
 
   if (filters.userId) {
-    qb.andWhere('audit.userId = :userId', { userId: filters.userId });
+    qb.andWhere("audit.userId = :userId", { userId: filters.userId });
   }
 
   if (filters.action) {
-    qb.andWhere('audit.action = :action', { action: filters.action });
+    qb.andWhere("audit.action = :action", { action: filters.action });
   }
 
   if (filters.startDate && filters.endDate) {
-    qb.andWhere('audit.createdAt BETWEEN :startDate AND :endDate', {
+    qb.andWhere("audit.createdAt BETWEEN :startDate AND :endDate", {
       startDate: `${filters.startDate}T00:00:00.000Z`,
       endDate: `${filters.endDate}T23:59:59.999Z`,
     });
   } else if (filters.startDate) {
-    qb.andWhere('audit.createdAt >= :startDate', { startDate: `${filters.startDate}T00:00:00.000Z` });
+    qb.andWhere("audit.createdAt >= :startDate", {
+      startDate: `${filters.startDate}T00:00:00.000Z`,
+    });
   } else if (filters.endDate) {
-    qb.andWhere('audit.createdAt <= :endDate', { endDate: `${filters.endDate}T23:59:59.999Z` });
+    qb.andWhere("audit.createdAt <= :endDate", {
+      endDate: `${filters.endDate}T23:59:59.999Z`,
+    });
   }
 
   return qb;
 }
 
 function auditLogsToCSV(rows: AuditLog[]): string {
-  const header = 'id,createdAt,userId,companyId,action,ip,userAgent,metadata';
+  const header = "id,createdAt,userId,companyId,action,ip,userAgent,metadata";
   const lines = rows.map((row) => {
-    const metadata = row.metadata ? JSON.stringify(row.metadata) : '';
+    const metadata = row.metadata ? JSON.stringify(row.metadata) : "";
     return [
       csvField(row.id),
       csvField(row.createdAt.toISOString()),
@@ -162,34 +145,34 @@ function auditLogsToCSV(rows: AuditLog[]): string {
       csvField(row.ip),
       csvField(row.userAgent),
       csvField(metadata),
-    ].join(',');
+    ].join(",");
   });
 
-  return [header, ...lines].join('\n');
+  return [header, ...lines].join("\n");
 }
 
 function auditLogsToPDF(rows: AuditLog[]): string {
-  const now = new Date().toLocaleString('es-ES');
+  const now = new Date().toLocaleString("es-ES");
   const lines = [
     `INFORME DE AUDITORIA · ${now}`,
-    '='.repeat(80),
-    '',
+    "=".repeat(80),
+    "",
     `Total eventos: ${rows.length}`,
-    '',
-    '-'.repeat(80),
-    'FECHA/HORA           USUARIO                               ACCION',
-    '-'.repeat(80),
+    "",
+    "-".repeat(80),
+    "FECHA/HORA           USUARIO                               ACCION",
+    "-".repeat(80),
     ...rows.map((row) => {
-      const date = row.createdAt.toISOString().replace('T', ' ').slice(0, 19);
-      const user = (row.userId ?? '-').slice(0, 35).padEnd(35);
+      const date = row.createdAt.toISOString().replace("T", " ").slice(0, 19);
+      const user = (row.userId ?? "-").slice(0, 35).padEnd(35);
       return `${date}  ${user}  ${row.action}`;
     }),
-    '-'.repeat(80),
-    '',
-    'Este informe ha sido generado automáticamente por Tempos.',
+    "-".repeat(80),
+    "",
+    "Este informe ha sido generado automáticamente por Tempos.",
   ];
 
-  return lines.join('\n');
+  return lines.join("\n");
 }
 
 /**
@@ -198,81 +181,116 @@ function auditLogsToPDF(rows: AuditLog[]): string {
  * Query params: format=csv|pdf, startDate=YYYY-MM-DD, endDate=YYYY-MM-DD
  */
 router.get(
-  '/export',
+  "/export",
   firebaseAuthMiddleware,
   appUserContextMiddleware,
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const auth = getAuthContext(req);
-    const format = (req.query.format as string) || 'csv';
+    const format = (req.query.format as string) || "csv";
     const startDate = parseDate(req.query.startDate);
     const endDate = parseDate(req.query.endDate);
-    const targetUserId = typeof req.query.targetUserId === 'string' ? req.query.targetUserId : undefined;
+    const targetUserId =
+      typeof req.query.targetUserId === "string"
+        ? req.query.targetUserId
+        : undefined;
 
     // RBAC: Solo permitir ver otros usuarios si tiene permiso 'view_employees'
     const isViewingSelf = !targetUserId || targetUserId === auth.uid;
-    const canViewOthers = hasPermission(auth, 'view_employees');
+    const canViewOthers = hasPermission(auth, "view_employees");
 
     if (!isViewingSelf && !canViewOthers) {
-      res.status(403).json({ error: 'No tienes permisos para exportar informes de otros empleados.' });
+      res
+        .status(403)
+        .json({
+          error:
+            "No tienes permisos para exportar informes de otros empleados.",
+        });
       return;
     }
 
     const qb = AppDataSource.getRepository(Ficha)
-      .createQueryBuilder('ficha')
-      .innerJoin(User, 'user', 'user.uid = ficha.userId')
-      .where('user.companyId = :companyId', { companyId: auth.companyId })
-      .andWhere('ficha.status = :status', { status: 'confirmed' })
-      .orderBy('ficha.date', 'ASC')
-      .addOrderBy('ficha.startTime', 'ASC');
+      .createQueryBuilder("ficha")
+      .innerJoin(User, "user", "user.uid = ficha.userId")
+      .where("user.companyId = :companyId", { companyId: auth.companyId })
+      .andWhere("ficha.status = :status", { status: "confirmed" })
+      .orderBy("ficha.date", "ASC")
+      .addOrderBy("ficha.startTime", "ASC");
 
     if (targetUserId) {
-      qb.andWhere('ficha.userId = :targetUserId', { targetUserId });
+      qb.andWhere("ficha.userId = :targetUserId", { targetUserId });
     } else if (!canViewOthers) {
       // Si no es admin y no especificó target, forzar al suyo propio
-      qb.andWhere('ficha.userId = :uid', { uid: auth.uid });
+      qb.andWhere("ficha.userId = :uid", { uid: auth.uid });
     }
 
     if (startDate && endDate) {
-      qb.andWhere('ficha.date BETWEEN :startDate AND :endDate', { startDate, endDate });
+      qb.andWhere("ficha.date BETWEEN :startDate AND :endDate", {
+        startDate,
+        endDate,
+      });
     } else if (startDate) {
-      qb.andWhere('ficha.date >= :startDate', { startDate });
+      qb.andWhere("ficha.date >= :startDate", { startDate });
     } else if (endDate) {
-      qb.andWhere('ficha.date <= :endDate', { endDate });
+      qb.andWhere("ficha.date <= :endDate", { endDate });
     }
 
     const fichas = await qb.getMany();
-    
+
     // Obtener info del usuario objetivo para la cabecera del informe
     let targetUserInfo: User | undefined;
     if (targetUserId) {
-      targetUserInfo = await AppDataSource.getRepository(User).findOne({ where: { uid: targetUserId } }) || undefined;
+      targetUserInfo =
+        (await AppDataSource.getRepository(User).findOne({
+          where: { uid: targetUserId },
+        })) || undefined;
     } else if (!targetUserId && !canViewOthers) {
-      targetUserInfo = await AppDataSource.getRepository(User).findOne({ where: { uid: auth.uid } }) || undefined;
+      targetUserInfo =
+        (await AppDataSource.getRepository(User).findOne({
+          where: { uid: auth.uid },
+        })) || undefined;
     }
 
-    const totalHours = fichas.reduce((acc, f) => acc + (Number(f.hoursWorked) || 0), 0);
+    const totalHours = fichas.reduce(
+      (acc, f) => acc + (Number(f.hoursWorked) || 0),
+      0,
+    );
 
     await logAction({
       userId: auth.uid,
       companyId: auth.companyId,
-      action: 'report_export',
-      metadata: { format, startDate, endDate, targetUserId, recordCount: fichas.length },
+      action: "report_export",
+      metadata: {
+        format,
+        startDate,
+        endDate,
+        targetUserId,
+        recordCount: fichas.length,
+      },
       ip: req.ip,
     });
 
-    if (format === 'csv') {
+    if (format === "csv") {
       const csv = fichasToCSV(fichas);
-      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-      res.setHeader('Content-Disposition', 'attachment; filename="informe_tempos.csv"');
-      res.send('\uFEFF' + csv); // BOM for Excel compatibility
+      res.setHeader("Content-Type", "text/csv; charset=utf-8");
+      res.setHeader(
+        "Content-Disposition",
+        'attachment; filename="informe_tempos.csv"',
+      );
+      res.send("\uFEFF" + csv); // BOM for Excel compatibility
     } else {
-      // Plain text report (swap for pdfkit when real PDF generation is needed)
-      const pdf = fichasToPDF(fichas, totalHours, targetUserInfo);
-      res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-      res.setHeader('Content-Disposition', 'attachment; filename="informe_inspeccion.txt"');
-      res.send(Buffer.from(pdf, 'utf-8'));
+      const pdfBuffer = await generateInspectionPDF(
+        fichas,
+        totalHours,
+        targetUserInfo,
+      );
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader(
+        "Content-Disposition",
+        'attachment; filename="informe_inspeccion.pdf"',
+      );
+      res.send(pdfBuffer);
     }
-  })
+  }),
 );
 
 /**
@@ -280,35 +298,41 @@ router.get(
  * JSON summary: total hours, avg per day, absenteeism days
  */
 router.get(
-  '/summary',
+  "/summary",
   firebaseAuthMiddleware,
   appUserContextMiddleware,
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const auth = getAuthContext(req);
 
     const fichas = await AppDataSource.getRepository(Ficha)
-      .createQueryBuilder('ficha')
-      .innerJoin(User, 'user', 'user.uid = ficha.userId')
-      .where('ficha.userId = :uid', { uid: auth.uid })
-      .andWhere('user.companyId = :companyId', { companyId: auth.companyId })
-      .andWhere('ficha.status = :status', { status: 'confirmed' })
+      .createQueryBuilder("ficha")
+      .innerJoin(User, "user", "user.uid = ficha.userId")
+      .where("ficha.userId = :uid", { uid: auth.uid })
+      .andWhere("user.companyId = :companyId", { companyId: auth.companyId })
+      .andWhere("ficha.status = :status", { status: "confirmed" })
       .getMany();
 
-    const totalHours = fichas.reduce((acc, f) => acc + (Number(f.hoursWorked) || 0), 0);
+    const totalHours = fichas.reduce(
+      (acc, f) => acc + (Number(f.hoursWorked) || 0),
+      0,
+    );
     const uniqueDays = new Set(
       fichas.map((f) => {
         const raw = f.date as unknown as string | Date;
-        return typeof raw === 'string' ? raw.split('T')[0] : (raw as Date).toISOString().split('T')[0];
-      })
+        return typeof raw === "string"
+          ? raw.split("T")[0]
+          : (raw as Date).toISOString().split("T")[0];
+      }),
     ).size;
 
     res.json({
       totalEntries: fichas.length,
       totalHours: parseFloat(totalHours.toFixed(2)),
       uniqueDays,
-      avgHoursPerDay: uniqueDays > 0 ? parseFloat((totalHours / uniqueDays).toFixed(2)) : 0,
+      avgHoursPerDay:
+        uniqueDays > 0 ? parseFloat((totalHours / uniqueDays).toFixed(2)) : 0,
     });
-  })
+  }),
 );
 
 /**
@@ -316,17 +340,19 @@ router.get(
  * Historial de cambios y accesos (audit trail)
  */
 router.get(
-  '/audit-log',
+  "/audit-log",
   firebaseAuthMiddleware,
   appUserContextMiddleware,
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const auth = getAuthContext(req);
-    const canViewCompanyLogs = hasPermission(auth, 'view_company_audit_logs');
+    const canViewCompanyLogs = hasPermission(auth, "view_company_audit_logs");
 
     const filters = parseAuditLogFilters(req);
 
     if (filters.userId && !canViewCompanyLogs && filters.userId !== auth.uid) {
-      res.status(403).json({ error: 'No puedes consultar auditoría de otros usuarios.' });
+      res
+        .status(403)
+        .json({ error: "No puedes consultar auditoría de otros usuarios." });
       return;
     }
 
@@ -351,7 +377,7 @@ router.get(
         offset: filters.offset,
       },
     });
-  })
+  }),
 );
 
 /**
@@ -359,30 +385,39 @@ router.get(
  * Exporta el historial de auditoría en CSV o PDF.
  */
 router.get(
-  '/audit-log/export',
+  "/audit-log/export",
   firebaseAuthMiddleware,
   appUserContextMiddleware,
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const auth = getAuthContext(req);
-    const canViewCompanyLogs = hasPermission(auth, 'view_company_audit_logs');
-    const format = (req.query.format as string) || 'csv';
+    const canViewCompanyLogs = hasPermission(auth, "view_company_audit_logs");
+    const format = (req.query.format as string) || "csv";
     const filters = parseAuditLogFilters(req);
 
     // Para exportar, ignoramos paginación de UI y traemos hasta 2000 eventos.
-    filters.limit = Math.min(Math.max(Number(req.query.limit) || 1000, 1), 2000);
+    filters.limit = Math.min(
+      Math.max(Number(req.query.limit) || 1000, 1),
+      2000,
+    );
     filters.offset = Math.max(Number(req.query.offset) || 0, 0);
 
     if (filters.userId && !canViewCompanyLogs && filters.userId !== auth.uid) {
-      res.status(403).json({ error: 'No puedes exportar auditoría de otros usuarios.' });
+      res
+        .status(403)
+        .json({ error: "No puedes exportar auditoría de otros usuarios." });
       return;
     }
 
-    const rows = await buildAuditLogQuery(auth, canViewCompanyLogs, filters).getMany();
+    const rows = await buildAuditLogQuery(
+      auth,
+      canViewCompanyLogs,
+      filters,
+    ).getMany();
 
     await logAction({
       userId: auth.uid,
       companyId: auth.companyId,
-      action: 'report_audit_export',
+      action: "report_audit_export",
       metadata: {
         format,
         actionFilter: filters.action,
@@ -392,39 +427,46 @@ router.get(
         recordCount: rows.length,
       },
       ip: req.ip,
-      userAgent: req.get('user-agent') || undefined,
+      userAgent: req.get("user-agent") || undefined,
     });
 
-    if (format === 'csv') {
+    if (format === "csv") {
       const csv = auditLogsToCSV(rows);
-      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-      res.setHeader('Content-Disposition', 'attachment; filename="auditoria_tempos.csv"');
-      res.send('\uFEFF' + csv);
+      res.setHeader("Content-Type", "text/csv; charset=utf-8");
+      res.setHeader(
+        "Content-Disposition",
+        'attachment; filename="auditoria_tempos.csv"',
+      );
+      res.send("\uFEFF" + csv);
       return;
     }
 
     const pdf = auditLogsToPDF(rows);
-    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-    res.setHeader('Content-Disposition', 'attachment; filename="auditoria_tempos.txt"');
-    res.send(Buffer.from(pdf, 'utf-8'));
-  })
+    res.setHeader("Content-Type", "text/plain; charset=utf-8");
+    res.setHeader(
+      "Content-Disposition",
+      'attachment; filename="auditoria_tempos.txt"',
+    );
+    res.send(Buffer.from(pdf, "utf-8"));
+  }),
 );
-
 
 /**
  * GET /api/v1/reports/dashboard-stats
  * Resumen de indicadores clave para el gerente (Dashboard Inicio)
  */
 router.get(
-  '/dashboard-stats',
+  "/dashboard-stats",
   firebaseAuthMiddleware,
   appUserContextMiddleware,
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const auth = getAuthContext(req);
-    const isAdmin = hasPermission(auth, 'view_employees');
+    const isAdmin = hasPermission(auth, "view_employees");
 
     if (!isAdmin) {
-      res.status(403).json({ error: 'Acceso reservado a administradores/gerentes.' });
+      res
+        .status(403)
+        .json({ error: "Acceso reservado a administradores/gerentes." });
       return;
     }
 
@@ -433,26 +475,28 @@ router.get(
     // 1. Empleados y sus estados hoy
     const userRepo = AppDataSource.getRepository(User);
     const employees = await userRepo.find({
-      where: { companyId: auth.companyId, status: 'active' }
+      where: { companyId: auth.companyId, status: "active" },
     });
     const totalEmployees = employees.length;
 
     const entryRepo = AppDataSource.getRepository(TimeEntry);
-    
+
     // Obtenemos los últimos TimeEntry de hoy para cada empleado de la empresa
     const startOfToday = new Date();
     startOfToday.setHours(0, 0, 0, 0);
 
     const latestEntries = await entryRepo
-      .createQueryBuilder('te')
-      .where('te.userId IN (:...uids)', { uids: employees.length > 0 ? employees.map(e => e.uid) : ['none'] })
-      .andWhere('te.timestampUtc >= :startOfToday', { startOfToday })
-      .orderBy('te.timestampUtc', 'DESC')
+      .createQueryBuilder("te")
+      .where("te.userId IN (:...uids)", {
+        uids: employees.length > 0 ? employees.map((e) => e.uid) : ["none"],
+      })
+      .andWhere("te.timestampUtc >= :startOfToday", { startOfToday })
+      .orderBy("te.timestampUtc", "DESC")
       .getMany();
 
     // Mapear último estado por usuario
     const userStatusMap = new Map<string, TimeEntryType>();
-    latestEntries.forEach(entry => {
+    latestEntries.forEach((entry) => {
       if (!userStatusMap.has(entry.userId)) {
         userStatusMap.set(entry.userId, entry.type);
       }
@@ -460,10 +504,13 @@ router.get(
 
     let workingCount = 0;
     let breakCount = 0;
-    
-    employees.forEach(e => {
+
+    employees.forEach((e) => {
       const status = userStatusMap.get(e.uid);
-      if (status === TimeEntryType.CLOCK_IN || status === TimeEntryType.BREAK_END) {
+      if (
+        status === TimeEntryType.CLOCK_IN ||
+        status === TimeEntryType.BREAK_END
+      ) {
         workingCount++;
       } else if (status === TimeEntryType.BREAK_START) {
         breakCount++;
@@ -475,50 +522,64 @@ router.get(
     // 2. Ausencias hoy y pendientes
     const absenceRepo = AppDataSource.getRepository(Absence);
     await absenceRepo
-      .createQueryBuilder('absence')
-      .innerJoin(User, 'user', 'user.uid = absence.userId')
-      .where('user.companyId = :companyId', { companyId: auth.companyId })
-      .andWhere('absence.status = :status', { status: 'approved' })
-      .andWhere(':today BETWEEN absence.startDate AND absence.endDate', { today: today.toISOString() })
+      .createQueryBuilder("absence")
+      .innerJoin(User, "user", "user.uid = absence.userId")
+      .where("user.companyId = :companyId", { companyId: auth.companyId })
+      .andWhere("absence.status = :status", { status: "approved" })
+      .andWhere(":today BETWEEN absence.startDate AND absence.endDate", {
+        today: today.toISOString(),
+      })
       .getCount();
 
     const pendingAbsences = await absenceRepo
-      .createQueryBuilder('absence')
-      .innerJoin(User, 'user', 'user.uid = absence.userId')
-      .where('user.companyId = :companyId', { companyId: auth.companyId })
-      .andWhere('absence.status = :status', { status: 'pending' })
+      .createQueryBuilder("absence")
+      .innerJoin(User, "user", "user.uid = absence.userId")
+      .where("user.companyId = :companyId", { companyId: auth.companyId })
+      .andWhere("absence.status = :status", { status: "pending" })
       .getCount();
 
     // 3. Actividad reciente (los eventos de fichajes de hoy para el timeline lateral)
     const recentActivity = await AppDataSource.getRepository(AuditLog)
-      .createQueryBuilder('audit')
-      .leftJoin(User, 'user', 'user.uid = audit.userId')
-      .where('audit.companyId = :companyId', { companyId: auth.companyId })
-      .andWhere('audit.action IN (:...actions)', { actions: ['clockin', 'clockout', 'fichaje_entrada', 'fichaje_salida', 'break_start', 'break_end'] })
+      .createQueryBuilder("audit")
+      .leftJoin(User, "user", "user.uid = audit.userId")
+      .where("audit.companyId = :companyId", { companyId: auth.companyId })
+      .andWhere("audit.action IN (:...actions)", {
+        actions: [
+          "clockin",
+          "clockout",
+          "fichaje_entrada",
+          "fichaje_salida",
+          "break_start",
+          "break_end",
+        ],
+      })
       .select([
-        'audit.id',
-        'audit.action',
-        'audit.createdAt',
-        'audit.metadata',
-        'user.displayName',
-        'user.email'
+        "audit.id",
+        "audit.action",
+        "audit.createdAt",
+        "audit.metadata",
+        "user.displayName",
+        "user.email",
       ])
-      .orderBy('audit.createdAt', 'DESC')
+      .orderBy("audit.createdAt", "DESC")
       .take(15)
       .getMany();
 
     // 4. Lista de estados de empleados (para la tabla central)
-    const employeeStatusList = employees.map(e => {
+    const employeeStatusList = employees.map((e) => {
       const lastType = userStatusMap.get(e.uid);
-      let statusLabel = 'Fuera de jornada';
-      let statusColor = 'zinc';
+      let statusLabel = "Fuera de jornada";
+      let statusColor = "zinc";
 
-      if (lastType === TimeEntryType.CLOCK_IN || lastType === TimeEntryType.BREAK_END) {
-        statusLabel = 'Trabajando';
-        statusColor = 'blue';
+      if (
+        lastType === TimeEntryType.CLOCK_IN ||
+        lastType === TimeEntryType.BREAK_END
+      ) {
+        statusLabel = "Trabajando";
+        statusColor = "blue";
       } else if (lastType === TimeEntryType.BREAK_START) {
-        statusLabel = 'En pausa';
-        statusColor = 'orange';
+        statusLabel = "En pausa";
+        statusColor = "orange";
       }
 
       return {
@@ -526,7 +587,7 @@ router.get(
         name: e.displayName || e.email,
         status: statusLabel,
         color: statusColor,
-        lastAction: lastType || 'Ninguna'
+        lastAction: lastType || "Ninguna",
       };
     });
 
@@ -536,12 +597,12 @@ router.get(
         onBreak: breakCount,
         outside: outsideCount,
         registered: totalEmployees,
-        pendingAbsences
+        pendingAbsences,
       },
       recentActivity,
-      employeeStatusList
+      employeeStatusList,
     });
-  })
+  }),
 );
 
 export default router;

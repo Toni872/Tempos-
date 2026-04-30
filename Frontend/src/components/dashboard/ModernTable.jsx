@@ -1,7 +1,9 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
-import { ChevronRight, MoreHorizontal } from 'lucide-react';
+import { CaretRight, DotsThree } from '@phosphor-icons/react';
+import EmptyState from '@/components/ui/EmptyState';
+import { SkeletonTable } from '@/components/ui/Skeleton';
 
 export default function ModernTable({ 
   columns, 
@@ -9,63 +11,60 @@ export default function ModernTable({
   onRowClick, 
   actions,
   isLoading = false,
-  emptyMessage = "No se encontraron registros"
+  emptyMessage = "No se encontraron registros",
+  emptyIcon
 }) {
   if (isLoading) {
-    return (
-      <div className="space-y-4">
-        {[1, 2, 3, 4, 5].map((i) => (
-          <div key={i} className="h-16 w-full bg-white/5 animate-pulse rounded-2xl" />
-        ))}
-      </div>
-    );
+    return <SkeletonTable rows={6} cols={columns.length + (actions ? 1 : 0)} />;
   }
 
   if (!data || data.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 bg-white/5 rounded-[2rem] border border-dashed border-white/10 text-zinc-500">
-        <p className="text-sm font-medium">{emptyMessage}</p>
-      </div>
+      <EmptyState 
+        icon={emptyIcon} 
+        title="Sin registros" 
+        subtitle={emptyMessage} 
+      />
     );
   }
 
   return (
     <div className="overflow-x-auto -mx-6 lg:mx-0">
-      <table className="w-full border-separate border-spacing-y-3">
+      <table className="w-full border-separate border-spacing-y-2.5 px-1">
         <thead>
           <tr className="text-left">
             {columns.map((col, idx) => (
               <th 
                 key={idx} 
                 className={cn(
-                  "px-6 pb-2 text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em]",
+                  "px-6 pb-2 text-[10px] font-extrabold text-zinc-500 uppercase tracking-[0.2em]",
                   col.className
                 )}
               >
                 {col.header}
               </th>
             ))}
-            {actions && <th className="px-6 pb-2 text-[10px] font-bold text-zinc-500 uppercase tracking-widest text-right">Acciones</th>}
+            {actions && <th className="px-6 pb-2 text-[10px] font-extrabold text-zinc-500 uppercase tracking-widest text-right">Acciones</th>}
           </tr>
         </thead>
         <tbody>
           {data.map((row, rowIdx) => (
             <motion.tr
-              initial={{ opacity: 0, x: -10 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: rowIdx * 0.05, duration: 0.3 }}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: Math.min(rowIdx * 0.04, 0.4), duration: 0.3, ease: "easeOut" }}
               key={row.id || rowIdx}
               onClick={() => onRowClick?.(row)}
               className={cn(
-                "group bg-[#111114] hover:bg-[#19191c] border border-white/5 transition-all duration-200 cursor-pointer",
-                "rounded-[1.25rem]"
+                "group bg-[#111114] hover:bg-[#16161a] border border-white/[0.04] hover:border-white/[0.1] transition-all duration-300 cursor-pointer shadow-sm hover:shadow-md",
+                "rounded-2xl"
               )}
             >
               {columns.map((col, colIdx) => (
                 <td 
                   key={colIdx} 
                   className={cn(
-                    "px-6 py-4 text-sm font-medium text-zinc-300 first:rounded-l-[1.25rem] last:rounded-r-[1.25rem] group-hover:text-white transition-colors",
+                    "px-6 py-4 text-sm font-semibold text-zinc-300 first:rounded-l-2xl last:rounded-r-2xl group-hover:text-white transition-colors",
                     colIdx === 0 && "text-white",
                     col.className
                   )}
@@ -74,10 +73,14 @@ export default function ModernTable({
                 </td>
               ))}
               {actions && (
-                <td className="px-6 py-4 text-right rounded-r-[1.25rem]">
-                  <div className="flex items-center justify-end gap-2">
-                    {actions(row)}
-                    <ChevronRight className="w-4 h-4 text-zinc-600 group-hover:text-blue-500 group-hover:translate-x-1 transition-all" />
+                <td className="px-6 py-4 text-right rounded-r-2xl">
+                  <div className="flex items-center justify-end gap-3">
+                    <div className="flex items-center gap-2">
+                      {actions(row)}
+                    </div>
+                    <div className="w-8 h-8 rounded-xl bg-white/[0.02] group-hover:bg-blue-500/10 flex items-center justify-center text-zinc-600 group-hover:text-blue-500 group-hover:translate-x-0.5 transition-all duration-300">
+                      <CaretRight className="w-4 h-4" weight="bold" />
+                    </div>
                   </div>
                 </td>
               )}
