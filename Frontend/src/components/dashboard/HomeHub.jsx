@@ -16,28 +16,25 @@ export default function HomeHub({ profile, setActiveTab, stats = {} }) {
 
   return (
     <div className="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
-      {/* Hero Greeting */}
-      <div className="relative overflow-hidden rounded-[2.5rem] bg-gradient-to-br from-blue-600 to-indigo-700 p-8 md:p-12 text-white shadow-2xl shadow-blue-900/20">
-        <div className="relative z-10 max-w-2xl">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 border border-white/20 text-[10px] font-black uppercase tracking-widest mb-6">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-            Acceso Autorizado • {profile?.role === 'admin' ? 'Administrador' : 'Empleado'}
+      {/* Hero Greeting - Minimalist & Professional */}
+      <div className="relative p-2 md:p-4">
+        <div className="relative z-10 py-10 px-2">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.03] border border-white/10 text-[9px] font-black uppercase tracking-[0.2em] mb-6 text-zinc-500">
+            <span className="w-1 h-1 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]" />
+            Estatus de Operaciones • {profile?.role === 'admin' ? 'Administrador' : 'Empleado'}
           </div>
-          <h1 className="text-4xl md:text-5xl font-black tracking-tight mb-4 leading-tight">
-            Hola, {profile?.displayName?.split(' ')[0] || 'Usuario'}. <br/>
-            <span className="text-blue-200">Bienvenido a tu centro de control.</span>
+          <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight mb-6 leading-[1.1] text-white">
+            Buenos días, <span className="text-zinc-500 font-medium">{profile?.displayName?.split(' ')[0] || 'Usuario'}</span>. <br/>
+            <span className="bg-gradient-to-r from-white to-white/40 bg-clip-text text-transparent italic serif">Resumen de jornada.</span>
           </h1>
-          <p className="text-blue-100/80 text-lg font-medium max-w-lg leading-relaxed">
-            Gestiona la jornada, revisa el cumplimiento legal y organiza a tu equipo desde un único panel inteligente.
+          <p className="text-zinc-500 text-base md:text-lg font-medium max-w-xl leading-relaxed">
+            La plataforma de gestión inteligente de capital humano <br className="hidden md:block" />
+            está optimizada y lista para procesar tus registros legales.
           </p>
         </div>
         
-        {/* Abstract Background Shapes */}
-        <div className="absolute top-0 right-0 w-1/2 h-full opacity-10 pointer-events-none">
-           <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" className="w-full h-full transform translate-x-1/4 -translate-y-1/4 rotate-12">
-             <path fill="#FFFFFF" d="M44.7,-76.4C58.3,-69.2,70.1,-58.5,79.1,-45.5C88.1,-32.5,94.3,-17.2,93.5,-2.2C92.7,12.8,84.9,27.5,75,40.1C65.1,52.7,53,63.2,39.3,71.2C25.6,79.2,10.3,84.7,-4.8,89.5C-19.9,94.3,-34.8,98.4,-47.9,94.3C-61,90.2,-72.3,77.9,-79.8,64C-87.3,50.1,-91,34.6,-92.3,19.3C-93.6,4,-92.5,-11.1,-87.3,-24.8C-82.1,-38.5,-72.8,-50.8,-60.8,-58.9C-48.8,-67,-34.1,-70.9,-19.9,-75.4C-5.7,-79.9,8,-83.6,44.7,-76.4Z" />
-           </svg>
-        </div>
+        {/* Subtle Background Accent */}
+        <div className="absolute -top-24 -right-24 w-96 h-96 bg-blue-600/10 blur-[120px] rounded-full pointer-events-none" />
       </div>
 
       {/* Main Hub Actions */}
