@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { bootstrapLocalSession, getClientSession, registerMe, getMe, setClientSession } from '@/lib/api';
 import { signInAndGetIdToken, signInWithGoogleAndGetIdToken } from '@/lib/firebaseClient';
+import Logo from '@/components/ui/Logo';
 
 const MIN_PASSWORD_LENGTH = 8;
 const AUTH_FIELD_IDS = {
@@ -267,22 +268,7 @@ export default function AuthPage({ mode }) {
 
           <div style={{ margin: 'auto 0', width: '100%', paddingTop: 40, paddingBottom: 40 }}>
             <div style={{ marginBottom: 40 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-                <svg width="28" height="28" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0 }}>
-                  <circle cx="50" cy="50" r="45" fill="none" stroke="var(--mg)" strokeWidth="2.5" opacity="0.2"/>
-                  <circle cx="50" cy="50" r="40" fill="none" stroke="var(--mg)" strokeWidth="2.8"/>
-                  <circle cx="50" cy="12" r="2.2" fill="var(--mg)"/>
-                  <circle cx="88" cy="50" r="2.2" fill="var(--mg)"/>
-                  <circle cx="50" cy="88" r="2.2" fill="var(--mg)"/>
-                  <circle cx="12" cy="50" r="2.2" fill="var(--mg)"/>
-                  <line x1="50" y1="50" x2="50" y2="28" stroke="var(--mg)" strokeWidth="2.5" strokeLinecap="round" opacity="0.85"/>
-                  <line x1="50" y1="50" x2="68" y2="44" stroke="var(--mg)" strokeWidth="2" strokeLinecap="round" opacity="0.6"/>
-                  <circle cx="50" cy="50" r="3.5" fill="var(--mg)"/>
-                </svg>
-                <div style={{ fontFamily: 'var(--ff-head)', fontSize: 24, fontWeight: 700, letterSpacing: 1.5 }}>
-                  Tem<span style={{ color: 'var(--mg)' }}>pos</span>
-                </div>
-              </div>
+              <Logo size="md" className="mb-6" />
               <h1 style={{ fontFamily: 'var(--ff-head)', fontSize: 36, fontWeight: 600, letterSpacing: -0.5, marginBottom: 12, color: 'var(--t0)' }}>
                 {isLogin ? 'Bienvenido de nuevo' : 'Crea tu cuenta gratis'}
               </h1>
