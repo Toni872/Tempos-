@@ -10,6 +10,7 @@ const TrialPage = lazy(() => import('@/pages/TrialPage'))
 const MarketingPage = lazy(() => import('@/pages/MarketingPage'))
 const PrivacyPolicy = lazy(() => import('@/pages/PrivacyPolicy'))
 const TermsOfService = lazy(() => import('@/pages/TermsOfService'))
+import FloatingDownloadBtn from '@/components/ui/FloatingDownloadBtn'
 
 function App() {
   const [installPrompt, setInstallPrompt] = useState(null)
@@ -81,6 +82,7 @@ function App() {
           </Routes>
         </AnimatePresence>
       </Suspense>
+      <FloatingDownloadBtn />
     </>
   )
 }
