@@ -1,5 +1,5 @@
-import { AppDataSource } from '../database.js';
-import { AuditLog } from '../entities/AuditLog.js';
+import { AppDataSource } from "../database.js";
+import { AuditLog } from "../entities/AuditLog.js";
 
 interface LogActionParams {
   userId?: string;

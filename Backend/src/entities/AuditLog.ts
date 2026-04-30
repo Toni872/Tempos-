@@ -1,31 +1,37 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, Index } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  Index,
+} from "typeorm";
 
-@Entity('audit_logs')
-@Index(['userId', 'createdAt'])
-@Index(['action'])
-@Index(['companyId', 'createdAt'])
+@Entity("audit_logs")
+@Index(["userId", "createdAt"])
+@Index(["action"])
+@Index(["companyId", "createdAt"])
 export class AuditLog {
-  @PrimaryGeneratedColumn('uuid')
+  @PrimaryGeneratedColumn("uuid")
   id!: string;
 
-  @Column({ type: 'varchar', length: 128, nullable: true })
+  @Column({ type: "varchar", length: 128, nullable: true })
   userId?: string;
 
-  @Column({ type: 'varchar', nullable: true })
+  @Column({ type: "varchar", nullable: true })
   companyId?: string;
 
   // e.g. 'clock_in', 'clock_out', 'absence_create', 'absence_approve', 'document_sign'
-  @Column({ type: 'varchar' })
+  @Column({ type: "varchar" })
   action!: string;
 
   // Flexible JSON payload: fichaId, absenceId, duration, location, device, etc.
-  @Column({ type: 'json', nullable: true })
+  @Column({ type: "json", nullable: true })
   metadata?: Record<string, unknown>;
 
-  @Column({ type: 'varchar', nullable: true })
+  @Column({ type: "varchar", nullable: true })
   ip?: string;
 
-  @Column({ type: 'varchar', nullable: true })
+  @Column({ type: "varchar", nullable: true })
   userAgent?: string;
 
   @CreateDateColumn()

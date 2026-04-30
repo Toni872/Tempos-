@@ -1,128 +1,90 @@
-import React, { useMemo } from 'react';
-import { BarChart3, TrendingUp, Users, Clock, Map } from 'lucide-react';
-import MapaAuditoria from './MapaAuditoria';
+import React from 'react';
+import { 
+  ChartLineUp, 
+  TrendUp, 
+  TrendDown, 
+  Clock, 
+  Calendar, 
+  UsersThree,
+  ArrowRight,
+  DownloadSimple,
+  ChartPieSlice
+} from '@phosphor-icons/react';
+import SectionHeader from '@/components/ui/SectionHeader';
+import StatCard from '@/components/ui/StatCard';
+import Card, { CardBody, CardHeader } from '@/components/ui/Card';
+import Badge from '@/components/ui/Badge';
+import { cn } from '@/lib/utils';
 
-export default function AnalisisTab({ registros = [], workCenters = [], employees = [] }) {
-  
-  // Fake data for the chart based on realistic HR metrics
-  const weeklyData = [
-    { day: 'Lun', hours: 42, overtime: 2 },
-    { day: 'Mar', hours: 38, overtime: 1 },
-    { day: 'Mié', hours: 45, overtime: 5 },
-    { day: 'Jue', hours: 40, overtime: 0 },
-    { day: 'Vie', hours: 35, overtime: 0 },
-  ];
-
-  const maxHours = Math.max(...weeklyData.map(d => d.hours + d.overtime));
-
+export default function AnalisisTab() {
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-[#111114] border border-white/5 p-6 rounded-[2rem] shadow-2xl">
-        <div className="flex items-center gap-4">
-          <div className="w-14 h-14 rounded-2xl bg-indigo-500/10 flex items-center justify-center text-indigo-500 shadow-[0_0_15px_rgba(99,102,241,0.15)]">
-            <BarChart3 className="w-7 h-7" />
-          </div>
-          <div>
-            <h2 className="text-2xl font-black text-white tracking-tight">Análisis Estratégico</h2>
-            <p className="text-zinc-500 text-sm font-medium">Insights operativos y cumplimiento de horarios</p>
-          </div>
-        </div>
+    <div className="space-y-8">
+      <SectionHeader 
+        icon={ChartLineUp}
+        title="Panel Analítico"
+        subtitle="Visualización de KPIs, tendencias de asistencia y costes de personal."
+        actionLabel="Generar Reporte"
+        actionIcon={DownloadSimple}
+        onAction={() => {}}
+      />
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCard label="Tasa de Asistencia" value="98.2%" icon={TrendUp} color="emerald" trend={2.4} />
+        <StatCard label="Horas Promedio" value="38.5h" icon={Clock} color="blue" trend={-0.8} />
+        <StatCard label="Nuevas Altas" value="12" icon={UsersThree} color="indigo" trend={15} />
+        <StatCard label="Incidencias" value="4" icon={TrendDown} color="rose" trend={-12} />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
-        {/* Gráfico SVG Nativo */}
-        <div className="lg:col-span-2 bg-[#111114] border border-white/5 rounded-[2rem] p-8 shadow-xl flex flex-col">
-          <div className="flex justify-between items-center mb-8">
-            <div>
-              <h3 className="text-sm font-black text-zinc-500 uppercase tracking-widest">Horas Trabajadas vs Extra</h3>
-              <p className="text-xs text-zinc-600 mt-1">Evolución de la semana actual</p>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <Card className="min-h-[380px]">
+          <CardHeader className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+               <ChartLineUp className="w-5 h-5 text-blue-500" weight="duotone" />
+               <span className="text-[11px] font-black text-zinc-500 uppercase tracking-widest">Asistencia Semanal</span>
             </div>
-            <div className="flex gap-4 text-[10px] font-bold uppercase tracking-widest">
-              <span className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-blue-500" /> Ordinarias</span>
-              <span className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-orange-500" /> Extra</span>
+            <Badge color="blue">Tiempo Real</Badge>
+          </CardHeader>
+          <CardBody className="flex items-center justify-center h-full">
+            <div className="text-center space-y-4 opacity-30">
+               <ChartLineUp className="w-16 h-16 mx-auto text-zinc-700" weight="duotone" />
+               <p className="text-xs font-black uppercase tracking-[0.2em] text-zinc-500">Renderizando Gráficos...</p>
             </div>
-          </div>
-          
-          <div className="flex-1 flex items-end justify-between gap-2 md:gap-6 mt-4 h-48 px-2 pb-6 border-b border-white/5 relative">
-            {/* SVG Grid Lines Background */}
-            <div className="absolute inset-0 flex flex-col justify-between pointer-events-none opacity-20">
-              <div className="w-full border-t border-dashed border-zinc-600" />
-              <div className="w-full border-t border-dashed border-zinc-600" />
-              <div className="w-full border-t border-dashed border-zinc-600" />
-              <div className="w-full border-t border-dashed border-zinc-600" />
+          </CardBody>
+        </Card>
+
+        <Card className="min-h-[380px]">
+          <CardHeader className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+               <ChartPieSlice className="w-5 h-5 text-emerald-500" weight="duotone" />
+               <span className="text-[11px] font-black text-zinc-500 uppercase tracking-widest">Distribución por Sedes</span>
             </div>
-
-            {weeklyData.map((d, i) => (
-              <div key={i} className="flex-1 flex flex-col items-center gap-2 relative z-10 group">
-                {/* Tooltip on hover */}
-                <div className="absolute -top-12 opacity-0 group-hover:opacity-100 transition-opacity bg-zinc-800 text-white text-[10px] font-bold px-3 py-1.5 rounded-lg whitespace-nowrap shadow-xl">
-                  {d.hours}h + {d.overtime}h extra
-                </div>
-                
-                <div className="w-full max-w-[48px] flex flex-col justify-end gap-1 h-full">
-                  {d.overtime > 0 && (
-                    <div 
-                      style={{ height: `${(d.overtime / maxHours) * 100}%` }} 
-                      className="w-full bg-gradient-to-t from-orange-600 to-orange-400 rounded-t-sm transition-all duration-1000 animate-in slide-in-from-bottom-2"
-                    />
-                  )}
-                  <div 
-                    style={{ height: `${(d.hours / maxHours) * 100}%` }} 
-                    className={`w-full bg-gradient-to-t from-blue-700 to-blue-500 transition-all duration-1000 animate-in slide-in-from-bottom-4 ${d.overtime > 0 ? 'rounded-b-sm' : 'rounded-sm'}`}
-                  />
-                </div>
-                <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mt-2">{d.day}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Tarjetas de Insights */}
-        <div className="space-y-6">
-          <div className="bg-gradient-to-br from-indigo-900/50 to-[#111114] border border-indigo-500/20 rounded-[2rem] p-6 shadow-xl relative overflow-hidden">
-            <TrendingUp className="absolute -right-4 -bottom-4 w-24 h-24 text-indigo-500/10 pointer-events-none" />
-            <h3 className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-2">Puntualidad Global</h3>
-            <p className="text-4xl font-black text-white">92<span className="text-xl text-zinc-500">%</span></p>
-            <p className="text-xs text-indigo-300 font-medium mt-2 flex items-center gap-1">
-              <TrendingUp className="w-3 h-3" /> +2% vs mes anterior
-            </p>
-          </div>
-
-          <div className="bg-[#111114] border border-white/5 rounded-[2rem] p-6 shadow-xl relative overflow-hidden">
-             <Users className="absolute -right-4 -bottom-4 w-24 h-24 text-white/5 pointer-events-none" />
-             <h3 className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-2">Presencialidad</h3>
-             <div className="flex gap-4 mt-4">
-               <div>
-                 <p className="text-2xl font-black text-emerald-400">75%</p>
-                 <p className="text-[10px] text-zinc-500 uppercase font-bold tracking-widest">En Sede</p>
-               </div>
-               <div>
-                 <p className="text-2xl font-black text-blue-400">25%</p>
-                 <p className="text-[10px] text-zinc-500 uppercase font-bold tracking-widest">Remoto</p>
-               </div>
-             </div>
-          </div>
-        </div>
+            <button className="text-[10px] font-black text-blue-400 hover:text-blue-300 transition-colors uppercase tracking-widest flex items-center gap-1.5">
+              Detalles <ArrowRight weight="bold" />
+            </button>
+          </CardHeader>
+          <CardBody className="flex items-center justify-center h-full">
+            <div className="text-center space-y-4 opacity-30">
+               <ChartPieSlice className="w-16 h-16 mx-auto text-zinc-700" weight="duotone" />
+               <p className="text-xs font-black uppercase tracking-[0.2em] text-zinc-500">Calculando Proporciones...</p>
+            </div>
+          </CardBody>
+        </Card>
       </div>
-
-      {/* Mapa de Auditoría (Geofichaje) */}
-      <div className="bg-[#111114] border border-white/5 rounded-[2rem] p-8 shadow-xl">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h3 className="text-lg font-bold text-white">Mapa de Geofichaje</h3>
-            <p className="text-sm text-zinc-500">Visualización en tiempo real de entradas y salidas fuera de la geocerca permitida.</p>
+      
+      <Card>
+        <CardBody className="p-8 flex flex-col md:flex-row items-center gap-8 bg-gradient-to-br from-blue-600/5 to-transparent">
+          <div className="w-16 h-16 rounded-3xl bg-blue-600 flex items-center justify-center text-white shadow-xl shadow-blue-600/20 shrink-0">
+             <Calendar className="w-8 h-8" weight="duotone" />
           </div>
-          <div className="w-10 h-10 bg-white/5 rounded-xl flex items-center justify-center">
-            <Map className="w-5 h-5 text-zinc-400" />
+          <div className="flex-1 text-center md:text-left">
+            <h4 className="text-lg font-black text-white mb-1">Planificación Inteligente</h4>
+            <p className="text-sm text-zinc-500 font-medium leading-relaxed">Analiza los picos de trabajo y optimiza tus plantillas de horarios para reducir horas extra no deseadas.</p>
           </div>
-        </div>
-        <div className="rounded-xl overflow-hidden border border-white/10">
-          <MapaAuditoria fichas={registros} workCenters={workCenters} employees={employees} />
-        </div>
-      </div>
-
+          <button className="px-8 py-3.5 bg-white text-black font-black text-[11px] uppercase tracking-widest rounded-2xl hover:bg-zinc-200 transition-all active:scale-95 shadow-xl shadow-white/5">
+            Explorar IA
+          </button>
+        </CardBody>
+      </Card>
     </div>
   );
 }

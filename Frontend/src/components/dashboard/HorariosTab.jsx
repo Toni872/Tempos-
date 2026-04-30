@@ -1,166 +1,210 @@
-import React from 'react';
-import { Clock, Calendar, LayoutGrid, Plus, Users, Settings2, Trash2, Edit3 } from 'lucide-react';
-import SchedulingGrid from './SchedulingGrid';
+import React, { useMemo, useState } from 'react';
+import { 
+  ClockCountdown, 
+  Plus, 
+  CalendarBlank, 
+  Repeat, 
+  Timer,
+  TrashSimple,
+  PencilSimple,
+  Sun,
+  Moon,
+  List,
+  Calendar as CalendarIcon
+} from '@phosphor-icons/react';
+import ModernTable from './ModernTable';
+import SectionHeader from '@/components/ui/SectionHeader';
+import Card, { CardBody } from '@/components/ui/Card';
+import Badge from '@/components/ui/Badge';
+import { cn } from '@/lib/utils';
+import FullCalendar from '@fullcalendar/react';
+import dayGridPlugin from '@fullcalendar/daygrid';
+import timeGridPlugin from '@fullcalendar/timegrid';
+import interactionPlugin from '@fullcalendar/interaction';
 
-export default function HorariosTab({ employees, schedules, assignments, onAssign, onAddTemplate, onEditTemplate, onDeleteTemplate, isAdmin, profile }) {
-  return (
-    <div className="space-y-10 animate-in fade-in slide-in-from-bottom-6 duration-700">
-      {/* Header Section */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-[#111114]/50 border border-white/5 p-8 rounded-[2.5rem] backdrop-blur-xl">
-        <div>
-          <div className="flex items-center gap-3 mb-2">
-            <div className="p-2 bg-blue-600/10 rounded-lg">
-              <Calendar className="w-5 h-5 text-blue-500" />
-            </div>
-            <h2 className="text-3xl font-black text-white tracking-tight">Gestión de Horarios</h2>
+export default function HorariosTab({ schedules = [], onAdd, onEdit, onDelete }) {
+  const [viewMode, setViewMode] = useState('calendar'); // 'calendar' o 'list'
+
+  const columns = [
+    { 
+      header: 'Nombre del Horario', 
+      cell: (row) => (
+        <div className="flex items-center gap-4">
+          <div className="w-11 h-11 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-500">
+             <CalendarBlank weight="duotone" className="w-5 h-5" />
           </div>
-          <p className="text-zinc-500 font-medium max-w-md">
-            Planifica turnos, asigna jornadas y define patrones de trabajo para tu equipo.
-          </p>
+          <div>
+            <div className="font-bold text-zinc-100 group-hover:text-white transition-colors">{row.name}</div>
+            <div className="text-[10px] text-zinc-600 font-extrabold uppercase tracking-widest">{row.isTemplate ? 'Plantilla Global' : 'Horario Personal'}</div>
+          </div>
         </div>
-        
-        {isAdmin && (
-          <button 
-            onClick={onAddTemplate}
-            className="bg-blue-600 hover:bg-blue-500 text-white font-black text-[11px] uppercase tracking-[0.2em] px-8 py-4 rounded-[1.5rem] transition-all shadow-xl shadow-blue-600/20 active:scale-95 flex items-center justify-center gap-3"
-          >
-            <Plus className="w-4 h-4" />
-            Nueva Plantilla de Horario
-          </button>
-        )}
-      </div>
-
-      {/* Main Content Areas */}
-      <div className="space-y-12">
-        {/* Scheduling Grid Section */}
-        <section>
-          <div className="flex items-center gap-3 mb-6">
-            <Users className="w-5 h-5 text-zinc-600" />
-            <h3 className="text-xl font-bold text-white">Planificación de Turnos</h3>
+      )
+    },
+    { 
+      header: 'Franja Horaria', 
+      cell: (row) => {
+        const isNight = parseInt(row.startTime?.split(':')[0]) > 20 || parseInt(row.startTime?.split(':')[0]) < 6;
+        return (
+          <div className="flex items-center gap-3">
+            <div className={cn(
+              "px-3 py-1.5 rounded-xl border flex items-center gap-2",
+              isNight ? "bg-indigo-500/5 border-indigo-500/20 text-indigo-400" : "bg-orange-500/5 border-orange-500/20 text-orange-400"
+            )}>
+              {isNight ? <Moon className="w-3.5 h-3.5" weight="fill" /> : <Sun className="w-3.5 h-3.5" weight="fill" />}
+              <span className="text-sm font-black tabular-nums">{row.startTime} — {row.endTime}</span>
+            </div>
           </div>
-          
-          {isAdmin ? (
-            <div className="bg-[#0d0d0f] border border-white/5 rounded-[3rem] p-2 shadow-2xl relative group">
-              <div className="absolute -inset-1 bg-blue-600/5 rounded-[3rem] blur opacity-25" />
-              <SchedulingGrid 
-                employees={employees}
-                schedules={schedules}
-                assignments={assignments}
-                onAssign={onAssign}
-              />
-            </div>
-          ) : (
-            <div className="max-w-xl mx-auto space-y-6">
-              <div className="bg-[#111114] border border-white/5 p-10 rounded-[2.5rem] text-center">
-                <div className="w-16 h-16 bg-blue-500/10 rounded-2xl flex items-center justify-center text-blue-500 mx-auto mb-6">
-                  <Clock className="w-8 h-8" />
-                </div>
-                <h3 className="text-2xl font-black text-white mb-2">Tu Horario Asignado</h3>
-                <p className="text-zinc-500 text-sm mb-8">Consulta tus turnos y patrones de jornada para esta semana.</p>
-                
-                <div className="space-y-3 text-left">
-                  {assignments.filter(a => a.userId === profile?.uid || a.userId === profile?.id).length > 0 ? (
-                    assignments.filter(a => a.userId === profile?.uid || a.userId === profile?.id).map(a => (
-                      <div key={a.id} className="p-5 bg-white/[0.03] border border-white/5 rounded-2xl hover:bg-white/[0.05] transition-all">
-                        <div className="flex justify-between items-center mb-2">
-                          <span className="font-bold text-blue-400">{a.schedule?.name}</span>
-                          <span className="px-2 py-0.5 bg-emerald-500/10 text-emerald-500 text-[9px] font-black uppercase tracking-widest rounded-full">Activo</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-zinc-400 text-xs font-mono">
-                          <Clock className="w-3 h-3" />
-                          {a.schedule?.startTime} - {a.schedule?.endTime}
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="p-8 border border-dashed border-white/10 rounded-2xl text-zinc-600 text-center italic">
-                      No tienes turnos asignados por el momento.
-                    </div>
-                  )}
-                </div>
+        );
+      }
+    },
+    { 
+      header: 'Días Aplicables', 
+      cell: (row) => (
+        <div className="flex gap-1">
+          {['L', 'M', 'X', 'J', 'V', 'S', 'D'].map((dia, idx) => {
+            const isSelected = row.days?.includes(idx + 1);
+            return (
+              <div 
+                key={dia} 
+                className={cn(
+                  "w-7 h-7 rounded-lg flex items-center justify-center text-[10px] font-black transition-all",
+                  isSelected ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20" : "bg-white/[0.03] text-zinc-700"
+                )}
+              >
+                {dia}
               </div>
-            </div>
-          )}
-        </section>
+            );
+          })}
+        </div>
+      )
+    },
+    { 
+      header: 'Recurrencia', 
+      cell: (row) => (
+        <Badge color={row.flexible ? 'cyan' : 'blue'}>
+          <Repeat className="w-3.5 h-3.5" weight="bold" />
+          {row.flexible ? 'Flexible' : 'Fijo'}
+        </Badge>
+      )
+    }
+  ];
 
-        {/* Templates Section - Admin Only */}
-        {isAdmin && (
-          <section className="animate-in fade-in duration-1000">
-            <div className="flex items-center justify-between mb-8">
-              <div className="flex items-center gap-3">
-                <Settings2 className="w-5 h-5 text-zinc-600" />
-                <h3 className="text-xl font-bold text-white">Plantillas Disponibles</h3>
-              </div>
-            </div>
+  // Convertir las plantillas de base de datos al formato de recurrencia de FullCalendar
+  const calendarEvents = useMemo(() => {
+    return schedules.map(s => {
+      // FullCalendar usa 0=Domingo, 1=Lunes. Nuestra BD usa 1=Lunes, 7=Domingo.
+      const mappedDays = (s.days || []).map(d => d === 7 ? 0 : d);
+      return {
+        id: s.id,
+        title: s.name,
+        startTime: s.startTime,
+        endTime: s.endTime,
+        daysOfWeek: mappedDays,
+        backgroundColor: s.isTemplate ? 'rgba(59, 130, 246, 0.1)' : 'rgba(245, 158, 11, 0.1)',
+        borderColor: s.isTemplate ? 'rgba(59, 130, 246, 0.5)' : 'rgba(245, 158, 11, 0.5)',
+        textColor: s.isTemplate ? '#60a5fa' : '#fbbf24',
+        extendedProps: { originalData: s }
+      };
+    });
+  }, [schedules]);
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {schedules.map(sch => (
-                <div 
-                  key={sch.id} 
-                  className="group bg-[#111114] border border-white/5 p-6 rounded-[2.5rem] hover:border-blue-500/30 transition-all duration-300 relative overflow-hidden shadow-xl"
-                >
-                  <div className="absolute top-0 right-0 p-4 opacity-0 group-hover:opacity-100 transition-opacity flex gap-2">
-                    <button 
-                      onClick={() => onEditTemplate(sch)}
-                      className="p-2 rounded-xl bg-white/5 text-zinc-400 hover:text-white transition-colors"
-                    >
-                      <Edit3 className="w-3.5 h-3.5" />
-                    </button>
-                    <button 
-                      onClick={() => onDeleteTemplate(sch)}
-                      className="p-2 rounded-xl bg-red-500/10 text-red-500/50 hover:text-red-500 transition-colors"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
+  return (
+    <div className="space-y-6">
+      <div className="flex items-start justify-between">
+        <SectionHeader 
+          icon={ClockCountdown}
+          title="Planificación y Turnos"
+          subtitle="Diseña y organiza los horarios de forma visual en el calendario."
+          actionLabel="Crear Plantilla"
+          actionIcon={Plus}
+          onAction={onAdd}
+        />
+        
+        <div className="flex bg-[#111114] p-1 rounded-xl border border-white/[0.06] shadow-inner ml-4">
+          <button 
+            onClick={() => setViewMode('calendar')}
+            className={cn("px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2", viewMode === 'calendar' ? "bg-white/10 text-white shadow-sm" : "text-zinc-500 hover:text-zinc-300")}
+          >
+            <CalendarIcon className="w-4 h-4" />
+            Calendario
+          </button>
+          <button 
+            onClick={() => setViewMode('list')}
+            className={cn("px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2", viewMode === 'list' ? "bg-white/10 text-white shadow-sm" : "text-zinc-500 hover:text-zinc-300")}
+          >
+            <List className="w-4 h-4" />
+            Plantillas
+          </button>
+        </div>
+      </div>
 
-                  <div className="flex items-center gap-4 mb-6">
-                    <div className="w-12 h-12 rounded-2xl bg-blue-500/10 flex items-center justify-center text-blue-500 group-hover:bg-blue-600 group-hover:text-white transition-all duration-300">
-                      <Clock className="w-6 h-6" />
-                    </div>
-                    <div>
-                      <h4 className="font-bold text-white text-lg">{sch.name}</h4>
-                      <p className="text-[10px] text-zinc-500 font-black uppercase tracking-widest">Jornada Estándar</p>
-                    </div>
-                  </div>
-
-                  <div className="bg-white/5 rounded-2xl p-4 mb-6 border border-white/5">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Horario</span>
-                      <span className="text-sm font-mono font-black text-blue-400">{sch.startTime} - {sch.endTime}</span>
-                    </div>
-                  </div>
-                  
-                  <div className="flex gap-1.5 flex-wrap">
-                    {['L', 'M', 'X', 'J', 'V', 'S', 'D'].map((day, idx) => {
-                      const isActive = sch.daysOfWeek.includes(idx + 1);
-                      return (
-                        <div 
-                          key={idx} 
-                          className={`w-8 h-8 rounded-xl flex items-center justify-center text-[10px] font-black transition-all ${
-                            isActive 
-                              ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' 
-                              : 'bg-white/5 text-zinc-600'
-                          }`}
-                        >
-                          {day}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              ))}
-              
-              {schedules.length === 0 && (
-                <div className="col-span-full py-20 bg-white/[0.02] border border-dashed border-white/10 rounded-[3rem] text-center flex flex-col items-center justify-center">
-                   <Clock className="w-8 h-8 text-zinc-700 mb-4" />
-                   <p className="text-zinc-500 font-medium">No se han definido plantillas de horarios aún.</p>
-                </div>
-              )}
-            </div>
-          </section>
+      <div className="bg-[#0d0d0f] rounded-[24px] overflow-hidden border border-white/[0.04]">
+        {viewMode === 'list' ? (
+          <ModernTable 
+            columns={columns} 
+            data={schedules} 
+            emptyIcon={ClockCountdown}
+            emptyMessage="No hay horarios definidos. Crea plantillas para automatizar los turnos."
+            actions={(row) => (
+              <>
+                <button onClick={(e) => { e.stopPropagation(); onEdit(row); }} className="p-2.5 rounded-xl bg-white/[0.03] text-zinc-500 hover:text-white transition-all border border-transparent hover:border-white/10">
+                  <PencilSimple className="w-4 h-4" weight="duotone" />
+                </button>
+                <button onClick={(e) => { e.stopPropagation(); onDelete(row); }} className="p-2.5 rounded-xl bg-rose-500/5 text-rose-500/40 hover:text-rose-500 transition-all border border-transparent hover:border-rose-500/20">
+                  <TrashSimple className="w-4 h-4" weight="duotone" />
+                </button>
+              </>
+            )}
+          />
+        ) : (
+          <div className="p-6 h-[700px] fc-theme-dark">
+            <FullCalendar
+              plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
+              initialView="timeGridWeek"
+              headerToolbar={{
+                left: 'prev,next today',
+                center: 'title',
+                right: 'dayGridMonth,timeGridWeek,timeGridDay'
+              }}
+              events={calendarEvents}
+              locale="es"
+              firstDay={1}
+              allDaySlot={false}
+              slotMinTime="06:00:00"
+              slotMaxTime="24:00:00"
+              expandRows={true}
+              height="100%"
+              eventClick={(info) => {
+                onEdit(info.event.extendedProps.originalData);
+              }}
+              eventClassNames="rounded-md border shadow-sm cursor-pointer hover:brightness-125 transition-all font-semibold p-1"
+            />
+          </div>
         )}
       </div>
+
+      <style>{`
+        .fc-theme-dark {
+          --fc-page-bg-color: transparent;
+          --fc-neutral-bg-color: #111114;
+          --fc-neutral-text-color: #a1a1aa;
+          --fc-border-color: rgba(255, 255, 255, 0.06);
+          --fc-button-text-color: #a1a1aa;
+          --fc-button-bg-color: #18181b;
+          --fc-button-border-color: rgba(255, 255, 255, 0.1);
+          --fc-button-hover-bg-color: rgba(255, 255, 255, 0.05);
+          --fc-button-hover-border-color: rgba(255, 255, 255, 0.2);
+          --fc-button-active-bg-color: #3b82f6;
+          --fc-button-active-border-color: #2563eb;
+          --fc-button-active-text-color: #ffffff;
+          --fc-today-bg-color: rgba(59, 130, 246, 0.05);
+        }
+        .fc .fc-toolbar-title { font-size: 1.25rem; font-weight: 800; color: #fff; text-transform: capitalize; }
+        .fc .fc-col-header-cell-cushion { padding: 12px 8px; color: #e4e4e7; font-weight: 800; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.1em; }
+        .fc .fc-timegrid-slot-label-cushion { color: #71717a; font-size: 0.75rem; font-weight: 600; }
+        .fc .fc-timegrid-now-indicator-line { border-color: #ef4444; }
+        .fc .fc-timegrid-now-indicator-arrow { border-color: #ef4444; }
+      `}</style>
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { MigrationInterface, QueryRunner } from 'typeorm';
+import { MigrationInterface, QueryRunner } from "typeorm";
 
 export class CreateTimeEntryTables1712500000000 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
@@ -119,12 +119,18 @@ export class CreateTimeEntryTables1712500000000 implements MigrationInterface {
 
   public async down(queryRunner: QueryRunner): Promise<void> {
     // Drop tablas en orden inverso (por FKs)
-    await queryRunner.query(`DROP TABLE IF EXISTS time_entry_change_logs CASCADE;`);
+    await queryRunner.query(
+      `DROP TABLE IF EXISTS time_entry_change_logs CASCADE;`,
+    );
     await queryRunner.query(`DROP TABLE IF EXISTS time_entries CASCADE;`);
 
     // Drop enums
     await queryRunner.query(`DROP TYPE IF EXISTS change_action_enum CASCADE;`);
-    await queryRunner.query(`DROP TYPE IF EXISTS time_entry_source_enum CASCADE;`);
-    await queryRunner.query(`DROP TYPE IF EXISTS time_entry_type_enum CASCADE;`);
+    await queryRunner.query(
+      `DROP TYPE IF EXISTS time_entry_source_enum CASCADE;`,
+    );
+    await queryRunner.query(
+      `DROP TYPE IF EXISTS time_entry_type_enum CASCADE;`,
+    );
   }
 }
