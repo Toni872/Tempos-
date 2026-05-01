@@ -50,8 +50,6 @@ const allowedOrigins = [
   "http://127.0.0.1:5173",
   "http://127.0.0.1:5174",
   "http://localhost:5175",
-  "https://tempos-project-f1e77.web.app",
-  "https://tempos-project-f1e77.firebaseapp.com",
   "https://discerning-emotion-production-4044.up.railway.app",
   "https://tempos-production.up.railway.app"
 ];
