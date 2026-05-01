@@ -134,7 +134,7 @@ app.use("/api/v1/push", pushRoutes);
 app.use("/api/v1/webauthn", webauthnRoutes);
 
 // Health check for Railway/CloudRun
-app.get("/health", (req, res) => {
+app.get("/health", (_req, res) => {
   res.status(200).json({ status: "ok", timestamp: new Date().toISOString(), version: "1.0.1-pro" });
 });
 
