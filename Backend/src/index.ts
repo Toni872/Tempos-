@@ -51,6 +51,8 @@ const allowedOrigins = [
   "http://localhost:5175",
   "https://tempos-project-f1e77.web.app",
   "https://tempos-project-f1e77.firebaseapp.com",
+  "https://discerning-emotion-production-4044.up.railway.app",
+  "https://tempos-production.up.railway.app"
 ];
 
 if (process.env.FRONTEND_URL) {
@@ -130,6 +132,11 @@ app.use("/api/v1/work-centers", workCenterRoutes);
 app.use("/api/v1/schedules", scheduleController);
 app.use("/api/v1/push", pushRoutes);
 app.use("/api/v1/webauthn", webauthnRoutes);
+
+// Health check for Railway/CloudRun
+app.get("/health", (_req, res) => {
+  res.status(200).json({ status: "ok", timestamp: new Date().toISOString(), version: "1.0.1-pro" });
+});
 
 // GDPR Routes (RGPD compliance)
 app.get(
