@@ -12,6 +12,13 @@
         "destination": "/index.html"
       }
     ],
+    "redirects": [
+      {
+        "source": "**",
+        "destination": "https://tempos-production.up.railway.app",
+        "type": 301
+      }
+    ],
     "headers": [
       {
         "source": "/sw.js",
