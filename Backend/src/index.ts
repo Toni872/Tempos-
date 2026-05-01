@@ -33,6 +33,7 @@ const PORT = process.env.PORT || 8080;
 
 app.use(helmet());
 app.use(hpp());
+app.set("trust proxy", 1); // Confía en el proxy de Railway/CloudRun para rate limiting
 app.disable("x-powered-by");
 
 app.use((req, _res, next) => {
