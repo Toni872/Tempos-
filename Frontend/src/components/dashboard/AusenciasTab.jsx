@@ -9,41 +9,52 @@ import {
   Clock,
   TrashSimple,
   PencilSimple,
-  Suitcase
+  Suitcase,
+  User,
+  Warning,
+  ArrowRight,
+  XCircle
 } from '@phosphor-icons/react';
-import ModernTable from './ModernTable';
 import SectionHeader from '@/components/ui/SectionHeader';
+import Badge from '@/components/ui/Badge';
 import { 
   flexRender, 
   getCoreRowModel, 
   useReactTable, 
   getPaginationRowModel 
 } from '@tanstack/react-table';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
+import { cn } from '@/lib/utils';
 
-export default function AusenciasTab({ absences = [], onAdd, onEdit, onDelete, profile = {} }) {
+export default function AusenciasTab({ absences = [], onAdd, onEdit, onDelete, onActOnAbsence, profile = {} }) {
   const pendingCount = absences.filter(a => a.status?.toLowerCase() === 'pending').length;
   const approvedCount = absences.filter(a => a.status?.toLowerCase() === 'approved').length;
   const rejectedCount = absences.filter(a => a.status?.toLowerCase() === 'rejected').length;
+
   const columns = React.useMemo(() => [
     { 
       accessorKey: 'employee',
-      header: 'Empleado Solicitante', 
+      header: 'Solicitante', 
       cell: ({ row }) => {
         const data = row.original;
+        const name = data.userName || data.user?.displayName || 'Personal';
+        const initial = name.charAt(0).toUpperCase();
         return (
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-[10px] font-black text-indigo-400 uppercase">
-               {data.userName?.charAt(0) || 'U'}
+          <div className="flex items-center gap-4 py-1">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center text-white font-black text-lg shadow-lg shadow-blue-600/5">
+               {initial}
             </div>
-            <span className="font-bold text-zinc-200">{data.userName || data.user?.displayName || 'Empleado'}</span>
+            <div className="min-w-0">
+               <div className="font-black text-white text-xs tracking-tight uppercase truncate italic">{name}</div>
+               <div className="text-[9px] text-white/20 font-bold uppercase tracking-widest truncate">ID: {data.userId?.slice(-8)}</div>
+            </div>
           </div>
         )
       }
     },
     { 
       accessorKey: 'type',
-      header: 'Tipo de Ausencia', 
+      header: 'Categoría', 
       cell: ({ row }) => {
         const data = row.original;
         const type = data.type?.toLowerCase();
@@ -56,143 +67,214 @@ export default function AusenciasTab({ absences = [], onAdd, onEdit, onDelete, p
         
         return (
           <Badge color={color}>
-            <Icon className="w-3.5 h-3.5" weight="duotone" />
-            {data.type}
+            <div className="flex items-center gap-2">
+              <Icon size={14} weight="fill" />
+              <span className="font-black tracking-widest">{data.type?.toUpperCase()}</span>
+            </div>
           </Badge>
         );
       }
     },
     {
       accessorKey: 'date',
-      header: 'Periodo', 
+      header: 'Ventana Temporal', 
       cell: ({ row }) => {
         const data = row.original;
+        const days = Math.ceil((new Date(data.endDate) - new Date(data.startDate)) / (1000 * 60 * 60 * 24)) + 1;
         return (
-          <div className="flex flex-col gap-0.5">
-            <div className="flex items-center gap-2 text-[13px] font-semibold text-zinc-300">
-              {new Date(data.startDate).toLocaleDateString()} — {new Date(data.endDate).toLocaleDateString()}
+          <div className="flex items-center gap-4">
+            <div className="flex flex-col">
+              <div className="flex items-center gap-2 font-mono text-xs font-black text-white uppercase italic">
+                <span>{new Date(data.startDate).toLocaleDateString()}</span>
+                <ArrowRight size={10} className="text-white/20" />
+                <span>{new Date(data.endDate).toLocaleDateString()}</span>
+              </div>
+              <span className="text-[9px] text-white/20 font-bold uppercase tracking-[0.2em] mt-1">{days} días naturales</span>
             </div>
-            <span className="text-[10px] text-zinc-600 font-extrabold uppercase tracking-tighter">
-              {Math.ceil((new Date(data.endDate) - new Date(data.startDate)) / (1000 * 60 * 60 * 24)) + 1} días naturales
-            </span>
           </div>
         )
       }
     },
     {
       accessorKey: 'status',
-      header: 'Estado de Aprobación', 
+      header: 'Resolución', 
       cell: ({ row }) => {
         const data = row.original;
         const status = data.status?.toLowerCase() || 'pending';
         const isApproved = status === 'approved' || status === 'aprobado';
         const isPending = status === 'pending' || status === 'pendiente';
+        const isRejected = status === 'rejected' || status === 'rechazado';
         
         return (
-          <div className="flex items-center gap-3">
-            <Badge color={isApproved ? 'emerald' : isPending ? 'amber' : 'rose'} className="animate-in fade-in zoom-in">
-              {isApproved ? <CheckCircle className="w-3.5 h-3.5" weight="fill" /> : isPending ? <Clock className="w-3.5 h-3.5 animate-pulse" weight="fill" /> : <WarningCircle className="w-3.5 h-3.5" weight="fill" />}
-              {status.toUpperCase()}
+          <div className="flex items-center gap-4">
+            <Badge color={isApproved ? 'emerald' : isPending ? 'orange' : 'rose'}>
+              <div className="flex items-center gap-2">
+                {isApproved ? <CheckCircle size={14} weight="fill" /> : isPending ? <Clock size={14} weight="fill" className="animate-pulse" /> : <XCircle size={14} weight="fill" />}
+                <span className="font-black tracking-[0.1em]">{status.toUpperCase()}</span>
+              </div>
             </Badge>
+
             {isPending && profile?.role === 'admin' && (
-              <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                <button onClick={(e) => { e.stopPropagation(); onEdit({...data, status: 'approved'}); }} className="p-1 rounded bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500 hover:text-white transition-colors" title="Aprobar"><CheckCircle className="w-3 h-3" weight="bold"/></button>
-                <button onClick={(e) => { e.stopPropagation(); onEdit({...data, status: 'rejected'}); }} className="p-1 rounded bg-rose-500/10 text-rose-500 hover:bg-rose-500 hover:text-white transition-colors" title="Rechazar"><WarningCircle className="w-3 h-3" weight="bold"/></button>
+              <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-all">
+                <button 
+                  onClick={(e) => { e.stopPropagation(); onActOnAbsence?.(data.id, 'approve'); }} 
+                  className="p-2 rounded-xl bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500 hover:text-white transition-all shadow-lg shadow-emerald-500/10 border border-emerald-500/20"
+                >
+                  <CheckCircle size={14} weight="bold"/>
+                </button>
+                <button 
+                  onClick={(e) => { e.stopPropagation(); onActOnAbsence?.(data.id, 'reject'); }} 
+                  className="p-2 rounded-xl bg-rose-500/10 text-rose-500 hover:bg-rose-500 hover:text-white transition-all shadow-lg shadow-rose-500/10 border border-rose-500/20"
+                >
+                  <XCircle size={14} weight="bold"/>
+                </button>
               </div>
             )}
           </div>
         );
       }
     }
-  ], [profile]);
+  ], [profile, onActOnAbsence]);
 
   const table = useReactTable({
     data: absences,
     columns,
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
-    initialState: { pagination: { pageSize: 8 } }
+    initialState: { pagination: { pageSize: 10 } }
   });
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-10 animate-in fade-in duration-700">
       <SectionHeader 
         icon={CalendarX}
-        title="Control de Ausencias"
-        subtitle="Gestiona vacaciones, bajas médicas y permisos especiales."
-        actionLabel="Registrar Ausencia"
+        title="Gestión de Disponibilidad"
+        subtitle="Auditoría de licencias, vacaciones y ausencias del escuadrón operativo."
+        actionLabel="Nueva Solicitud"
         actionIcon={Plus}
         onAction={onAdd}
       />
 
-      {/* Métricas Superiores */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-[#111114] border border-amber-500/20 rounded-[20px] p-5 flex items-center justify-between shadow-[0_0_20px_rgba(245,158,11,0.05)]">
-           <div><p className="text-[10px] text-amber-500 font-extrabold uppercase tracking-widest">Pendientes</p><p className="text-3xl font-black text-white mt-1">{pendingCount}</p></div>
-           <div className="w-12 h-12 rounded-full bg-amber-500/10 flex items-center justify-center"><Clock className="w-6 h-6 text-amber-500" weight="duotone"/></div>
-        </div>
-        <div className="bg-[#111114] border border-emerald-500/20 rounded-[20px] p-5 flex items-center justify-between shadow-[0_0_20px_rgba(16,185,129,0.05)]">
-           <div><p className="text-[10px] text-emerald-500 font-extrabold uppercase tracking-widest">Aprobadas</p><p className="text-3xl font-black text-white mt-1">{approvedCount}</p></div>
-           <div className="w-12 h-12 rounded-full bg-emerald-500/10 flex items-center justify-center"><CheckCircle className="w-6 h-6 text-emerald-500" weight="duotone"/></div>
-        </div>
-        <div className="bg-[#111114] border border-rose-500/20 rounded-[20px] p-5 flex items-center justify-between shadow-[0_0_20px_rgba(244,63,94,0.05)]">
-           <div><p className="text-[10px] text-rose-500 font-extrabold uppercase tracking-widest">Rechazadas</p><p className="text-3xl font-black text-white mt-1">{rejectedCount}</p></div>
-           <div className="w-12 h-12 rounded-full bg-rose-500/10 flex items-center justify-center"><WarningCircle className="w-6 h-6 text-rose-500" weight="duotone"/></div>
-        </div>
+      {/* Métricas Superiores Premium */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+        <MetricCard label="Pendientes" value={pendingCount} icon={Clock} color="orange" />
+        <MetricCard label="Aprobadas" value={approvedCount} icon={CheckCircle} color="emerald" />
+        <MetricCard label="Rechazadas" value={rejectedCount} icon={XCircle} color="rose" />
       </div>
 
-      <div className="bg-[#0d0d0f] rounded-[24px] overflow-hidden border border-white/[0.04]">
-        <div className="overflow-x-auto min-h-[300px]">
+      <div className="bg-white/[0.01] rounded-[3rem] overflow-hidden border border-white/5 shadow-2xl">
+        <div className="overflow-x-auto min-h-[400px]">
           <table className="w-full text-left">
-            <thead className="bg-[#111114]">
-              {table.getHeaderGroups().map(headerGroup => (
-                <tr key={headerGroup.id} className="border-b border-white/[0.06]">
-                  {headerGroup.headers.map(header => (
-                    <th key={header.id} className="px-6 py-4 text-[10px] font-extrabold text-zinc-500 uppercase tracking-widest">
-                      {flexRender(header.column.columnDef.header, header.getContext())}
-                    </th>
-                  ))}
-                  <th className="px-6 py-4 text-[10px] font-extrabold text-zinc-500 uppercase tracking-widest text-right">Acciones</th>
-                </tr>
-              ))}
+            <thead>
+              <tr className="bg-white/[0.03] border-b border-white/5">
+                {table.getHeaderGroups()[0].headers.map(header => (
+                  <th key={header.id} className="px-8 py-6 text-[10px] font-black text-white/20 uppercase tracking-[0.3em]">
+                    {flexRender(header.column.columnDef.header, header.getContext())}
+                  </th>
+                ))}
+                <th className="px-8 py-6 text-[10px] font-black text-white/20 uppercase tracking-[0.3em] text-right">Gestión</th>
+              </tr>
             </thead>
-            <tbody className="divide-y divide-white/[0.04]">
-              {table.getRowModel().rows.length ? table.getRowModel().rows.map((row, idx) => (
-                <motion.tr 
-                  initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: idx * 0.05 }}
-                  key={row.id} 
-                  className="hover:bg-white/[0.02] cursor-default group transition-colors"
-                >
-                  {row.getVisibleCells().map(cell => (
-                    <td key={cell.id} className="px-6 py-4">
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+            <tbody className="divide-y divide-white/5">
+              <AnimatePresence mode="popLayout">
+                {table.getRowModel().rows.length ? table.getRowModel().rows.map((row, idx) => (
+                  <motion.tr 
+                    initial={{ opacity: 0, x: -10 }} 
+                    animate={{ opacity: 1, x: 0 }} 
+                    transition={{ delay: idx * 0.03 }}
+                    key={row.id} 
+                    className="hover:bg-white/[0.03] transition-all group"
+                  >
+                    {row.getVisibleCells().map(cell => (
+                      <td key={cell.id} className="px-8 py-5">
+                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      </td>
+                    ))}
+                    <td className="px-8 py-5 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <ActionBtn onClick={() => onEdit(row.original)} icon={PencilSimple} color="zinc" />
+                        <ActionBtn onClick={() => onDelete(row.original)} icon={TrashSimple} color="rose" />
+                      </div>
                     </td>
-                  ))}
-                  <td className="px-6 py-4 text-right">
-                    <div className="flex items-center justify-end gap-2 opacity-50 group-hover:opacity-100 transition-opacity">
-                      <button onClick={(e) => { e.stopPropagation(); onEdit(row.original); }} className="p-2 rounded-xl bg-white/[0.03] text-zinc-500 hover:text-white transition-all"><PencilSimple className="w-4 h-4" /></button>
-                      <button onClick={(e) => { e.stopPropagation(); onDelete(row.original); }} className="p-2 rounded-xl bg-rose-500/5 text-rose-500/40 hover:text-rose-500 transition-all"><TrashSimple className="w-4 h-4" /></button>
-                    </div>
-                  </td>
-                </motion.tr>
-              )) : (
-                <tr><td colSpan={columns.length + 1} className="py-12 text-center text-zinc-500 text-sm">No hay solicitudes de ausencia registradas.</td></tr>
-              )}
+                  </motion.tr>
+                )) : (
+                  <tr>
+                    <td colSpan={table.getHeaderGroups()[0].headers.length + 1} className="py-32 text-center">
+                      <div className="flex flex-col items-center gap-4 opacity-10">
+                        <Warning size={64} weight="duotone" />
+                        <p className="text-xs font-black uppercase tracking-[0.4em]">Sin solicitudes registradas</p>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </AnimatePresence>
             </tbody>
           </table>
         </div>
         
-        {/* Paginación */}
-        <div className="px-6 py-4 border-t border-white/[0.04] bg-[#111114] flex items-center justify-between">
-          <span className="text-xs text-zinc-500 font-semibold">
-            Página {table.getState().pagination.pageIndex + 1} de {table.getPageCount() || 1}
+        <div className="px-10 py-6 border-t border-white/5 bg-white/[0.02] flex items-center justify-between">
+          <span className="text-[10px] text-white/20 font-black uppercase tracking-widest">
+            Hoja {table.getState().pagination.pageIndex + 1} de {table.getPageCount() || 1}
           </span>
           <div className="flex gap-2">
-            <button onClick={() => table.previousPage()} disabled={!table.getCanPreviousPage()} className="px-4 py-2 rounded-xl bg-white/[0.03] disabled:opacity-30 text-xs font-bold text-zinc-400 hover:text-white">Anterior</button>
-            <button onClick={() => table.nextPage()} disabled={!table.getCanNextPage()} className="px-4 py-2 rounded-xl bg-white/[0.03] disabled:opacity-30 text-xs font-bold text-zinc-400 hover:text-white">Siguiente</button>
+             <button 
+              onClick={() => table.previousPage()} 
+              disabled={!table.getCanPreviousPage()} 
+              className="px-6 py-3 rounded-xl bg-white/5 disabled:opacity-10 text-[10px] font-black uppercase tracking-widest text-white/40 hover:text-white transition-all border border-transparent hover:border-white/10"
+            >
+              Anterior
+            </button>
+            <button 
+              onClick={() => table.nextPage()} 
+              disabled={!table.getCanNextPage()} 
+              className="px-6 py-3 rounded-xl bg-white/5 disabled:opacity-10 text-[10px] font-black uppercase tracking-widest text-white/40 hover:text-white transition-all border border-transparent hover:border-white/10"
+            >
+              Siguiente
+            </button>
           </div>
         </div>
       </div>
     </div>
+  );
+}
+
+function MetricCard({ label, value, icon: Icon, color }) {
+  const themes = {
+    orange: "border-orange-500/20 bg-orange-500/5 text-orange-500 shadow-orange-500/5",
+    emerald: "border-emerald-500/20 bg-emerald-500/5 text-emerald-500 shadow-emerald-500/5",
+    rose: "border-rose-500/20 bg-rose-500/5 text-rose-500 shadow-rose-500/5"
+  };
+
+  return (
+    <div className={cn(
+      "border rounded-[2.5rem] p-8 flex items-center justify-between shadow-2xl transition-all hover:scale-[1.02]",
+      themes[color]
+    )}>
+       <div>
+         <p className="text-[10px] font-black uppercase tracking-[0.3em] opacity-40">{label}</p>
+         <p className="text-4xl font-black text-white mt-2 italic tracking-tighter">{value}</p>
+       </div>
+       <div className={cn("w-14 h-14 rounded-2xl flex items-center justify-center bg-white/5 border border-white/5 shadow-inner")}>
+          <Icon size={28} weight="duotone"/>
+       </div>
+    </div>
+  );
+}
+
+function ActionBtn({ onClick, icon: Icon, color }) {
+  const colors = {
+    rose: "text-rose-500 hover:bg-rose-500/10 hover:border-rose-500/30",
+    zinc: "text-white/20 hover:bg-white/10 hover:border-white/20 hover:text-white"
+  };
+  return (
+    <button 
+      onClick={onClick} 
+      className={cn(
+        "p-3 rounded-2xl bg-white/[0.03] border border-transparent transition-all",
+        colors[color]
+      )}
+    >
+      <Icon size={18} weight="bold" />
+    </button>
   );
 }

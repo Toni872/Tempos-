@@ -385,7 +385,8 @@ export default function DashboardPage() {
       closeModal();
       showFeedback('success', 'Empleado guardado.');
     } catch (err) {
-      showFeedback('error', 'Error al guardar empleado.');
+      const msg = err.response?.data?.error || err.message || 'Error al guardar empleado.';
+      showFeedback('error', msg);
     }
   };
 
@@ -655,7 +656,8 @@ export default function DashboardPage() {
               stats={{
                 working: dashboardStats?.metrics?.working || 0,
                 totalEmployees: employees.length,
-                todayRegistros: registros.filter(r => r.startTime?.includes(new Date().toISOString().split('T')[0])).length
+                todayRegistros: registros.filter(r => r.startTime?.includes(new Date().toISOString().split('T')[0])).length,
+                pendingAbsences: stats.pendingAbsences || 0
               }}
             />
           )}
