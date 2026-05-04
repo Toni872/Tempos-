@@ -109,11 +109,26 @@ export default function DashboardShell({
       <div className={cn("border-t border-white/[0.04]", isMobile ? "p-6" : "p-4")}>
         <button 
           onClick={onLogout}
-          className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-[13px] font-semibold text-zinc-600 hover:text-rose-400 hover:bg-rose-500/[0.06] transition-all duration-200"
+          className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-[13px] font-semibold text-zinc-600 hover:text-rose-400 hover:bg-rose-500/[0.06] transition-all duration-200 mb-6"
         >
           <SignOut className="w-[18px] h-[18px]" weight="regular" />
           Cerrar Sesión
         </button>
+
+        {/* Firma de Autoría Script-9 */}
+        <div className="px-4 py-4 bg-gradient-to-br from-white/[0.02] to-transparent rounded-[20px] border border-white/5">
+          <p className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.3em] mb-1.5">POWERED BY</p>
+          <a 
+            href="https://www.script-9.com" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="flex items-center gap-2 group"
+          >
+            <span className="text-[13px] font-bold text-zinc-400 group-hover:text-blue-400 transition-colors tracking-tight">Script-9</span>
+            <div className="w-1 h-1 rounded-full bg-blue-500 animate-pulse" />
+            <NavigationArrow size={10} weight="fill" className="text-zinc-600 group-hover:text-blue-400 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all" />
+          </a>
+        </div>
       </div>
     </>
   );

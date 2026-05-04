@@ -115,11 +115,12 @@ export default function EmpleadoForm({ initialValues, onSubmit, onCancel, isSubm
                   name="workCenterId" 
                   value={formData.workCenterId} 
                   onChange={handleChange}
-                  className="w-full bg-white/[0.03] border border-white/[0.06] rounded-2xl py-3.5 pl-11 pr-4 text-sm font-semibold text-zinc-300 focus:outline-none focus:border-blue-500/40 transition-all appearance-none"
+                  className="w-full bg-[#111114] border border-white/[0.06] rounded-2xl py-3.5 pl-11 pr-4 text-sm font-semibold text-zinc-300 focus:outline-none focus:border-blue-500/40 transition-all appearance-none"
+                  style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' fill=\'none\' viewBox=\'0 0 24 24\' stroke=\'rgba(255,255,255,0.3)\'%3E%3Cpath stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'2\' d=\'M19 9l-7 7-7-7\'%3E%3C/path%3E%3C/svg%3E")', backgroundRepeat: 'no-repeat', backgroundPosition: 'right 1rem center', backgroundSize: '1.2em' }}
                 >
-                  <option value="">Seleccionar sede...</option>
-                  <option value="main">Sede Principal</option>
-                  <option value="madrid">Delegación Madrid</option>
+                  <option value="" style={{ background: '#111114', color: '#71717a' }}>Seleccionar sede...</option>
+                  <option value="main" style={{ background: '#111114', color: '#f4f4f5' }}>Sede Principal</option>
+                  <option value="madrid" style={{ background: '#111114', color: '#f4f4f5' }}>Delegación Madrid</option>
                 </select>
               </div>
             </div>
@@ -206,6 +207,16 @@ export default function EmpleadoForm({ initialValues, onSubmit, onCancel, isSubm
                     Desvincular
                   </button>
                 </div>
+              )}
+              
+              {!formData.authorizedDeviceId && (
+                <button 
+                  type="button"
+                  onClick={() => alert('Se enviará un enlace de emparejamiento único al dispositivo del empleado tras guardar el perfil.')}
+                  className="w-full py-4 rounded-xl bg-white/[0.02] border border-dashed border-white/20 text-[10px] font-black uppercase tracking-widest text-zinc-400 hover:text-white hover:border-white/40 transition-all hover:bg-white/[0.05]"
+                >
+                  + Generar Código de Emparejamiento
+                </button>
               )}
             </div>
           </div>

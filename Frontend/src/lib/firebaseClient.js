@@ -57,13 +57,38 @@ export async function signInWithGoogleAndGetIdToken() {
     throw new Error('Firebase no está disponible');
   }
 
-  const { GoogleAuthProvider, signInWithPopup } = await import('firebase/auth');
+  const { GoogleAuthProvider, signInWithPopup, browserPopupRedirectResolver } = await import('firebase/auth');
   const provider = new GoogleAuthProvider();
-  const userCredential = await signInWithPopup(_auth, provider);
-  if (!userCredential) {
-    throw new Error('No se pudo autenticar con Google');
+  
+  try {
+    console.log('🚀 [AUTH] Iniciando flujo Google con Popup...');
+    const userCredential = await signInWithPopup(_auth, provider, browserPopupRedirectResolver);
+    
+    if (!userCredential) {
+      throw new Error('No se pudo autenticar con Google (sin credenciales)');
+    }
+    
+    console.log('✅ [AUTH] Autenticación exitosa');
+    return userCredential.user.getIdToken();
+  } catch (err) {
+    console.error('❌ [AUTH] Error en Google SignIn:', err);
+    
+    // Mapeo de errores específicos para ayudar al usuario
+    if (err.code === 'auth/popup-blocked') {
+      throw new Error('El navegador ha bloqueado la ventana emergente. Por favor, permite los popups para este sitio.');
+    }
+    if (err.code === 'auth/internal-error') {
+      throw new Error('Error interno de Firebase. Comprueba que el dominio localhost:5173 esté autorizado en la consola de Firebase.');
+    }
+    if (err.code === 'auth/network-request-failed') {
+      throw new Error('Error de red. Comprueba tu conexión o si Chrome está bloqueando las peticiones a Google.');
+    }
+    if (err.code === 'auth/cancelled-popup-request' || err.code === 'auth/popup-closed-by-user') {
+      return null; // El usuario cerró la ventana, no es un error crítico
+    }
+
+    throw err;
   }
-  return userCredential.user.getIdToken();
 }
 
 export function initFirebase() {

@@ -71,6 +71,14 @@ export default defineConfig({
   },
   server: {
     port: 5173,
+    headers: {
+      'X-Content-Type-Options': 'nosniff',
+      'X-XSS-Protection': '1; mode=block',
+      'Referrer-Policy': 'no-referrer-when-downgrade',
+      'Cross-Origin-Opener-Policy': 'unsafe-none',
+      // Eliminamos X-Frame-Options para permitir el handshake de Firebase en Chrome local
+      'Content-Security-Policy': "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://*.google.com https://*.googleapis.com https://*.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' http://localhost:8080 http://localhost:5173 http://localhost:5174 https:; worker-src 'self' blob:; frame-src 'self' https://*.firebaseapp.com https://*.google.com https:;"
+    },
     proxy: {
       '/api': {
         target: 'http://localhost:8080',

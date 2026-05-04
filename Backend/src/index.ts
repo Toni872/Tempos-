@@ -49,7 +49,6 @@ const allowedOrigins = [
   "http://localhost:5174",
   "http://127.0.0.1:5173",
   "http://127.0.0.1:5174",
-  "http://localhost:5175",
   "https://discerning-emotion-production-4044.up.railway.app",
   "https://tempos-production.up.railway.app"
 ];
@@ -68,8 +67,12 @@ app.use(
     origin: (origin, callback) => {
       // Permitir peticiones sin origen (como apps móviles o curl)
       if (!origin) return callback(null, true);
+      
+      const isLocalhost = origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:');
+
       if (
         allowedOrigins.indexOf(origin) !== -1 ||
+        (isLocalhost && process.env.NODE_ENV !== "production") ||
         process.env.NODE_ENV !== "production"
       ) {
         callback(null, true);
@@ -85,6 +88,7 @@ app.use(
       "X-Requested-With",
       "Accept",
       "Origin",
+      "X-CSRF-Token",
     ],
     exposedHeaders: ["Content-Range", "X-Content-Range"],
     optionsSuccessStatus: 204,

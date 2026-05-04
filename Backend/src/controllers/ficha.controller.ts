@@ -1085,37 +1085,46 @@ router.post(
           message:
             "Estás intentando fichar desde un dispositivo distinto al habitual. Contacta con tu administrador para desvincular el anterior.",
         });
-        return;
+        // ----------------------------
+    const { offlineTimestamp } = parseBody.data;
+    
+    let now = new Date();
+    if (offlineTimestamp) {
+      const offlineDate = new Date(offlineTimestamp);
+      const diffMs = now.getTime() - offlineDate.getTime();
+      if (!isNaN(offlineDate.getTime()) && diffMs >= 0 && diffMs <= 48 * 60 * 60 * 1000) {
+        now = offlineDate;
       }
     }
-    // ----------------------------
+
+    const { timeHHMM, dateIso: localDate } = getMadridDateTimeParts(now);
 
     const ficha = fichaRepository.create({
       userId: auth.uid,
-      date: todayDate,
-      startTime,
+      date: toUtcMidnightDate(now),
+      startTime: timeHHMM,
       description,
       projectCode,
       status: "draft",
       clockInMethod: authMethod || "password",
-      metadata: location
-        ? { location: `${location.lat},${location.lng}` }
-        : undefined,
+      metadata: {
+        ...(location ? { location: `${location.lat},${location.lng}` } : {}),
+        isOffline: !!offlineTimestamp,
+        originalSyncAt: offlineTimestamp ? new Date().toISOString() : undefined
+      },
     });
 
     await fichaRepository.save(ficha);
 
     // Registrar evento atómico CLOCK_IN
     const timeEntryService = getTimeEntryService();
-    const now = new Date();
-    const { dateIso: localDate } = getMadridDateTimeParts(now);
 
     try {
       await timeEntryService.recordClockEvent({
         userId: auth.uid,
         fichaId: ficha.id,
         type: TimeEntryType.CLOCK_IN,
-        source: TimeEntrySource.WEB,
+        source: offlineTimestamp ? TimeEntrySource.API : TimeEntrySource.WEB,
         timestampUtc: now,
         localDateTime: `${localDate}T${timeHHMM}${getMadridUtcOffset(now)}`,
         ip: req.ip,
@@ -1123,6 +1132,7 @@ router.post(
         latitude: location?.lat,
         longitude: location?.lng,
         deviceId: deviceId,
+      });viceId: deviceId,
       });
     } catch (eventError) {
       console.error("Error registrando TimeEntry CLOCK_IN:", eventError);
@@ -1154,7 +1164,18 @@ router.post(
   appUserContextMiddleware,
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const auth = getAuthContext(req);
-    const { timeHHMM } = getMadridDateTimeParts(new Date());
+    const { offlineTimestamp } = req.body || {};
+    
+    let now = new Date();
+    if (offlineTimestamp) {
+      const offlineDate = new Date(offlineTimestamp);
+      const diffMs = now.getTime() - offlineDate.getTime();
+      if (!isNaN(offlineDate.getTime()) && diffMs >= 0 && diffMs <= 48 * 60 * 60 * 1000) {
+        now = offlineDate;
+      }
+    }
+
+    const { timeHHMM, dateIso: localDate } = getMadridDateTimeParts(now);
     const endTime = timeHHMM;
 
     const fichaRepository = AppDataSource.getRepository(Ficha);
@@ -1279,7 +1300,7 @@ router.post(
         userId: auth.uid,
         fichaId: openFicha.id,
         type: TimeEntryType.CLOCK_OUT,
-        source: TimeEntrySource.WEB,
+        source: offlineTimestamp ? TimeEntrySource.API : TimeEntrySource.WEB,
         timestampUtc: now,
         localDateTime: `${localDate}T${timeHHMM}${getMadridUtcOffset(now)}`,
         ip: req.ip,
@@ -1324,8 +1345,14 @@ router.post(
   appUserContextMiddleware,
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const auth = getAuthContext(req);
-    const { timeHHMM } = getMadridDateTimeParts(new Date());
-    const { deviceId } = req.body || {};
+    const { deviceId, offlineTimestamp } = req.body || {};
+    
+    let now = new Date();
+    if (offlineTimestamp) {
+      const offlineDate = new Date(offlineTimestamp);
+      if (!isNaN(offlineDate.getTime())) now = offlineDate;
+    }
+    const { timeHHMM, dateIso: localDate } = getMadridDateTimeParts(now);
 
     const user = await AppDataSource.getRepository(User).findOneBy({
       uid: auth.uid,
@@ -1371,7 +1398,7 @@ router.post(
         userId: auth.uid,
         fichaId: openFicha.id,
         type: TimeEntryType.BREAK_START,
-        source: TimeEntrySource.WEB,
+        source: offlineTimestamp ? TimeEntrySource.API : TimeEntrySource.WEB,
         timestampUtc: now,
         localDateTime: `${localDate}T${timeHHMM}${getMadridUtcOffset(now)}`,
         ip: req.ip,
@@ -1398,8 +1425,14 @@ router.post(
   appUserContextMiddleware,
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const auth = getAuthContext(req);
-    const { timeHHMM } = getMadridDateTimeParts(new Date());
-    const { deviceId } = req.body || {};
+    const { deviceId, offlineTimestamp } = req.body || {};
+
+    let now = new Date();
+    if (offlineTimestamp) {
+      const offlineDate = new Date(offlineTimestamp);
+      if (!isNaN(offlineDate.getTime())) now = offlineDate;
+    }
+    const { timeHHMM, dateIso: localDate } = getMadridDateTimeParts(now);
 
     const user = await AppDataSource.getRepository(User).findOneBy({
       uid: auth.uid,
@@ -1442,7 +1475,7 @@ router.post(
         userId: auth.uid,
         fichaId: openFicha.id,
         type: TimeEntryType.BREAK_END,
-        source: TimeEntrySource.WEB,
+        source: offlineTimestamp ? TimeEntrySource.API : TimeEntrySource.WEB,
         timestampUtc: now,
         localDateTime: `${localDate}T${timeHHMM}${getMadridUtcOffset(now)}`,
         ip: req.ip,

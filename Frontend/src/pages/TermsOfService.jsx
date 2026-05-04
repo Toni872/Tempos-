@@ -9,7 +9,7 @@ const TermsOfService = () => {
         <section style={{ marginBottom: '2.5rem' }}>
           <h2 style={{ fontSize: '1.5rem', marginBottom: '1rem', color: 'var(--t0)' }}>1. Aceptación de los Términos</h2>
           <p style={{ color: 'var(--t1)', lineHeight: '1.6' }}>
-            El presente documento establece las Condiciones Generales de Uso del software <strong>Tempos</strong> (en adelante, "el Software" o "el Servicio"), desarrollado y operado por <strong>Antonio Lloret Sánchez</strong> (en adelante, "el Proveedor").
+            El presente documento establece las Condiciones Generales de Uso del software <strong>Tempos</strong> (en adelante, "el Software" o "el Servicio"), una solución de alta ingeniería desarrollada y operada por la marca comercial <strong>Script 9</strong>, de la cual es titular <strong>Antonio Lloret Sánchez</strong> (en adelante, "el Proveedor").
             <br /><br />
             Al registrarse, acceder o utilizar el Servicio, el usuario persona física o jurídica (en adelante, "el Cliente" o "la Empresa") acepta quedar expresamente vinculado por los presentes Términos de Servicio.
           </p>
@@ -39,9 +39,9 @@ const TermsOfService = () => {
         <section style={{ marginBottom: '2.5rem' }}>
           <h2 style={{ fontSize: '1.5rem', marginBottom: '1rem', color: 'var(--t0)' }}>4. Acuerdo de Encargo de Tratamiento (DPA)</h2>
           <p style={{ color: 'var(--t1)', lineHeight: '1.6' }}>
-            A los efectos de la normativa de Protección de Datos (RGPD y LOPDGDD), el Cliente ostenta la condición de <strong>Responsable del Tratamiento</strong> de los datos de sus empleados alojados en Tempos. Antonio Lloret Sánchez actuará exclusivamente como <strong>Encargado del Tratamiento</strong>.
+            A los efectos de la normativa de Protección de Datos (RGPD y LOPDGDD), el Cliente ostenta la condición de <strong>Responsable del Tratamiento</strong> de los datos de sus empleados alojados en Tempos. <strong>Script 9</strong> actuará exclusivamente como <strong>Encargado del Tratamiento</strong>.
             <br /><br />
-            El Proveedor se compromete a tratar los datos siguiendo única y exclusivamente las instrucciones documentadas del Cliente, aplicando todas las medidas de seguridad exigibles, y obligándose a no utilizar dichos datos para ningún fin distinto a la prestación del Servicio. Al aceptar estos términos, se da por suscrito el Acuerdo de Encargo de Tratamiento entre las partes.
+            Script 9 se compromete a tratar los datos siguiendo única y exclusivamente las instrucciones documentadas del Cliente, aplicando protocolos de cifrado y seguridad de grado industrial, y obligándose a no utilizar dichos datos para ningún fin distinto a la prestación del Servicio. Al aceptar estos términos, se formaliza el Acuerdo de Encargo de Tratamiento entre las partes según el Art. 28 del RGPD.
           </p>
         </section>
 
@@ -55,13 +55,13 @@ const TermsOfService = () => {
         <section style={{ marginBottom: '2.5rem' }}>
           <h2 style={{ fontSize: '1.5rem', marginBottom: '1rem', color: 'var(--t0)' }}>6. Limitación de Responsabilidad</h2>
           <p style={{ color: 'var(--t1)', lineHeight: '1.6' }}>
-            El Software se proporciona "tal cual". Antonio Lloret Sánchez <strong>declina expresamente cualquier responsabilidad</strong> frente a sanciones, multas administrativas, demandas laborales o indemnizaciones de cualquier tipo impuestas al Cliente por parte de la Inspección de Trabajo, Seguridad Social u órganos judiciales, que se deriven de:
+            El Software se proporciona como una herramienta de apoyo al cumplimiento legal. <strong>Script 9</strong> declina expresamente cualquier responsabilidad frente a sanciones, multas administrativas o demandas laborales impuestas al Cliente que se deriven de una mala praxis en el uso de la herramienta, tales como:
             <ul style={{ marginLeft: '1.5rem', marginTop: '0.5rem' }}>
-              <li>Falta de fichaje u omisiones por parte de los empleados.</li>
-              <li>Modificaciones indebidas de los apuntes horarios realizadas por el administrador del Cliente.</li>
-              <li>Cálculos incorrectos debido a la mala configuración de perfiles o turnos por parte del Cliente.</li>
+              <li>Omisión de registros por parte del personal del Cliente.</li>
+              <li>Manipulación indebida de los datos por el Administrador.</li>
+              <li>Configuraciones de horarios que contravengan convenios colectivos específicos.</li>
             </ul>
-            En todo caso, la responsabilidad máxima económica del Proveedor por reclamaciones directamente relacionadas con el Servicio quedará limitada a la cuantía abonada por el Cliente en los doce (12) meses previos al incidente.
+            La garantía de Script 9 se limita a la integridad y disponibilidad técnica de los registros capturados por el sistema. En todo caso, la responsabilidad máxima económica del Proveedor por reclamaciones directamente relacionadas con el Servicio quedará limitada a la cuantía abonada por el Cliente en los doce (12) meses previos al incidente.
           </p>
         </section>
 

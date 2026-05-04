@@ -10,7 +10,10 @@ import {
   PencilSimple,
   Crosshair,
   User,
-  MapTrifold
+  MapTrifold,
+  Warning,
+  Buildings,
+  Pulse
 } from '@phosphor-icons/react';
 import SectionHeader from '@/components/ui/SectionHeader';
 import Badge from '@/components/ui/Badge';
@@ -27,7 +30,7 @@ export default function SedesTab({ workCenters = [], onAdd, onEdit, onDelete }) 
       mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN || '';
     }
     
-    if (!mapboxgl.accessToken || map.current) return;
+    if (!mapboxgl.accessToken || !mapContainer.current || map.current) return;
     
     const centerLat = workCenters[0]?.latitude || 40.4168;
     const centerLng = workCenters[0]?.longitude || -3.7038;
@@ -36,25 +39,28 @@ export default function SedesTab({ workCenters = [], onAdd, onEdit, onDelete }) 
       container: mapContainer.current,
       style: 'mapbox://styles/mapbox/dark-v11',
       center: [centerLng, centerLat],
-      zoom: 14,
+      zoom: 13,
       pitch: 45,
+      antialias: true
     });
 
     map.current.on('load', () => {
-      // Dibujar los radios (Geofencing)
       workCenters.forEach(wc => {
         if (!wc.latitude || !wc.longitude) return;
         
-        // Marker
         const el = document.createElement('div');
-        el.className = 'w-6 h-6 rounded-full bg-indigo-500 border-[4px] border-[#111114] shadow-[0_0_15px_#6366f1] flex items-center justify-center';
-        el.innerHTML = '<div class="w-2 h-2 bg-white rounded-full"></div>';
+        el.className = 'group relative flex items-center justify-center';
+        el.innerHTML = `
+          <div class="absolute w-10 h-10 bg-blue-500/20 rounded-full animate-ping"></div>
+          <div class="relative w-6 h-6 bg-blue-600 rounded-full border-[3px] border-white shadow-[0_0_15px_rgba(59,130,246,0.5)] flex items-center justify-center">
+            <div class="w-1.5 h-1.5 bg-white rounded-full"></div>
+          </div>
+        `;
         
         new mapboxgl.Marker(el)
           .setLngLat([wc.longitude, wc.latitude])
           .addTo(map.current);
 
-        // Geocerca (Círculo estático simplificado para visualización)
         if (wc.geofencingEnabled && wc.radiusMeters) {
            map.current.addSource(`geofence-${wc.id}`, {
              type: 'geojson',
@@ -64,18 +70,24 @@ export default function SedesTab({ workCenters = [], onAdd, onEdit, onDelete }) 
              id: `geofence-fill-${wc.id}`,
              type: 'fill',
              source: `geofence-${wc.id}`,
-             paint: { 'fill-color': '#6366f1', 'fill-opacity': 0.1 }
+             paint: { 'fill-color': '#3b82f6', 'fill-opacity': 0.05 }
            });
            map.current.addLayer({
              id: `geofence-line-${wc.id}`,
              type: 'line',
              source: `geofence-${wc.id}`,
-             paint: { 'line-color': '#6366f1', 'line-width': 2, 'line-dasharray': [2, 2] }
+             paint: { 'line-color': '#3b82f6', 'line-width': 1, 'line-dasharray': [4, 4] }
            });
         }
       });
     });
 
+    return () => {
+      if (map.current) {
+        map.current.remove();
+        map.current = null;
+      }
+    };
   }, [workCenters]);
 
   useEffect(() => {
@@ -84,83 +96,107 @@ export default function SedesTab({ workCenters = [], onAdd, onEdit, onDelete }) 
         center: [activeSede.longitude, activeSede.latitude],
         zoom: 16,
         essential: true,
-        duration: 2000
+        duration: 2000,
+        pitch: 60
       });
     }
   }, [activeSede]);
 
   return (
-    <div className="space-y-6 h-full flex flex-col">
+    <div className="space-y-8 h-full flex flex-col animate-in fade-in duration-700">
       <SectionHeader 
-        icon={NavigationArrow}
-        title="Sedes y Logística"
-        subtitle="Gestiona los centros de trabajo y los perímetros de geofencing."
-        actionLabel="Registrar Nueva Sede"
+        icon={Buildings}
+        title="Infraestructura y Sedes"
+        subtitle="Auditoría geográfica de centros operativos y perímetros de seguridad."
+        actionLabel="Nueva Sede"
         actionIcon={Plus}
         onAction={onAdd}
       />
 
-      <div className="flex-1 grid grid-cols-1 xl:grid-cols-3 gap-6 h-[700px]">
+      <div className="flex-1 grid grid-cols-1 xl:grid-cols-3 gap-8 min-h-[650px]">
         {/* Panel Izquierdo: Lista */}
-        <div className="bg-[#111114] border border-white/[0.06] rounded-[24px] flex flex-col overflow-hidden">
-          <div className="p-5 border-b border-white/[0.04] bg-white/[0.01]">
-            <h3 className="text-sm font-extrabold text-white flex items-center gap-2">
-              <MapTrifold className="w-5 h-5 text-indigo-400" weight="duotone" />
-              Directorio de Sedes
+        <div className="bg-white/[0.01] border border-white/5 rounded-[3rem] flex flex-col overflow-hidden shadow-2xl">
+          <div className="p-8 border-b border-white/5 bg-white/[0.02]">
+            <h3 className="text-[10px] font-black text-white/40 uppercase tracking-[0.3em] flex items-center gap-3">
+              <MapTrifold size={20} weight="fill" className="text-blue-500" />
+              Activos Registrados
             </h3>
           </div>
-          <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
+          <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar">
             {workCenters.length > 0 ? workCenters.map((wc) => (
               <div 
                 key={wc.id}
                 onClick={() => setActiveSede(wc)}
                 className={cn(
-                  "p-4 rounded-2xl border cursor-pointer transition-all flex flex-col gap-3 group relative overflow-hidden",
-                  activeSede?.id === wc.id ? "bg-indigo-500/10 border-indigo-500/30 shadow-[0_0_30px_rgba(99,102,241,0.1)]" : "bg-white/[0.02] border-white/[0.04] hover:bg-white/[0.04]"
+                  "p-6 rounded-[2rem] border cursor-pointer transition-all flex flex-col gap-4 group relative overflow-hidden",
+                  activeSede?.id === wc.id 
+                    ? "bg-blue-600 border-blue-500 shadow-xl shadow-blue-600/20" 
+                    : "bg-white/[0.03] border-white/5 hover:bg-white/10"
                 )}
               >
-                {activeSede?.id === wc.id && <div className="absolute left-0 top-0 bottom-0 w-1 bg-indigo-500" />}
                 <div className="flex justify-between items-start">
-                  <div>
-                    <h4 className="font-extrabold text-white text-sm group-hover:text-indigo-300 transition-colors">{wc.name}</h4>
-                    <p className="text-[10px] text-zinc-500 font-mono mt-1 uppercase tracking-wider">{wc.address || 'Sin dirección definida'}</p>
+                  <div className="min-w-0">
+                    <h4 className={cn(
+                      "font-black text-sm tracking-tight uppercase italic truncate",
+                      activeSede?.id === wc.id ? "text-white" : "text-white/60 group-hover:text-white"
+                    )}>{wc.name}</h4>
+                    <p className={cn(
+                      "text-[9px] font-bold mt-1 uppercase tracking-widest truncate",
+                      activeSede?.id === wc.id ? "text-white/60" : "text-white/20"
+                    )}>{wc.address || 'Sin coordenadas fijadas'}</p>
                   </div>
-                  <Badge color={wc.geofencingEnabled ? 'emerald' : 'zinc'}>
-                    <Crosshair className="w-3 h-3" />
-                    {wc.geofencingEnabled ? `${wc.radiusMeters}m` : 'Off'}
-                  </Badge>
+                  <div className={cn(
+                    "px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border flex items-center gap-1.5",
+                    wc.geofencingEnabled 
+                      ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400" 
+                      : "bg-white/5 border-white/5 text-white/20"
+                  )}>
+                    <Crosshair size={10} weight="bold" />
+                    {wc.geofencingEnabled ? `${wc.radiusMeters}M` : 'OFF'}
+                  </div>
                 </div>
                 
-                <div className="flex items-center justify-between mt-2 pt-3 border-t border-white/[0.04]">
-                  <span className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest flex items-center gap-1.5">
-                    <Users className="w-3.5 h-3.5 text-zinc-500" />
-                    Plantilla Asignada
-                  </span>
-                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button onClick={(e) => { e.stopPropagation(); onEdit(wc); }} className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white"><PencilSimple className="w-3 h-3" /></button>
-                    <button onClick={(e) => { e.stopPropagation(); onDelete(wc); }} className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-500"><TrashSimple className="w-3 h-3" /></button>
+                <div className={cn(
+                  "flex items-center justify-between pt-4 border-t",
+                  activeSede?.id === wc.id ? "border-white/10" : "border-white/5"
+                )}>
+                  <div className="flex items-center gap-2">
+                    <Users size={14} className={activeSede?.id === wc.id ? "text-white/60" : "text-white/20"} />
+                    <span className={cn(
+                      "text-[9px] font-black uppercase tracking-widest",
+                      activeSede?.id === wc.id ? "text-white" : "text-white/40"
+                    )}>Terminal Activa</span>
+                  </div>
+                  <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-all translate-x-2 group-hover:translate-x-0">
+                    <button onClick={(e) => { e.stopPropagation(); onEdit(wc); }} className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-colors"><PencilSimple size={14} weight="bold" /></button>
+                    <button onClick={(e) => { e.stopPropagation(); onDelete(wc); }} className="p-2 rounded-xl bg-rose-500/20 hover:bg-rose-500/40 text-rose-500 transition-colors"><TrashSimple size={14} weight="bold" /></button>
                   </div>
                 </div>
               </div>
             )) : (
-              <div className="text-center p-8 text-zinc-500 text-sm">No hay sedes registradas.</div>
+              <div className="flex flex-col items-center justify-center py-20 gap-4 opacity-10">
+                <Warning size={48} weight="duotone" />
+                <p className="text-[10px] font-black uppercase tracking-[0.4em]">Sin sedes operativas</p>
+              </div>
             )}
           </div>
         </div>
 
         {/* Panel Derecho: Mapa interactivo */}
-        <div className="xl:col-span-2 bg-[#111114] border border-white/[0.06] rounded-[24px] overflow-hidden relative">
+        <div className="xl:col-span-2 bg-white/[0.01] border border-white/5 rounded-[3rem] overflow-hidden relative shadow-2xl">
           {!import.meta.env.VITE_MAPBOX_TOKEN ? (
-            <div className="h-full flex items-center justify-center bg-[#0a0a0a] flex-col p-8 text-center">
-               <div className="w-16 h-16 bg-blue-500/10 rounded-full flex items-center justify-center mb-4"><Globe className="w-8 h-8 text-blue-500" /></div>
-               <h3 className="text-white font-bold text-lg">Geolocalización Inactiva</h3>
-               <p className="text-zinc-500 max-w-sm mt-2 text-sm">Configura VITE_MAPBOX_TOKEN para activar el motor de mapas y trazar los radios de fichaje (Geofencing).</p>
+            <div className="h-full flex items-center justify-center bg-[#0a0a0a] flex-col p-12 text-center">
+               <div className="w-20 h-20 bg-blue-500/10 rounded-full flex items-center justify-center mb-6 border border-blue-500/20 shadow-2xl animate-pulse">
+                  <Globe size={40} weight="duotone" className="text-blue-500" />
+               </div>
+               <h3 className="text-white font-black text-xl uppercase italic tracking-tight">Geolocalización Inactiva</h3>
+               <p className="text-white/20 max-w-sm mt-4 text-[10px] font-bold uppercase tracking-[0.2em] leading-relaxed">Configura VITE_MAPBOX_TOKEN para activar el motor de mapas y trazar los perímetros de seguridad (Geofencing).</p>
             </div>
           ) : (
             <>
-              <div className="absolute top-4 left-4 z-10 bg-[#111114]/90 backdrop-blur border border-white/10 px-4 py-2 rounded-xl flex items-center gap-2">
-                <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_8px_#10b981]" />
-                <span className="text-[10px] font-extrabold text-white uppercase tracking-widest">Motor WebGL Activo</span>
+              <div className="absolute top-6 left-6 z-10 bg-white/5 backdrop-blur-xl border border-white/10 px-5 py-3 rounded-2xl flex items-center gap-3 shadow-2xl">
+                <Pulse size={16} className="text-blue-500 animate-pulse" weight="bold" />
+                <span className="text-[10px] font-black text-white uppercase tracking-[0.2em]">Motor WebGL 2.0 Operativo</span>
               </div>
               <div ref={mapContainer} className="w-full h-full" />
             </>
@@ -171,7 +207,6 @@ export default function SedesTab({ workCenters = [], onAdd, onEdit, onDelete }) 
   );
 }
 
-// Función auxiliar para dibujar un círculo en GeoJSON
 function createGeoJSONCircle(center, radiusInKm, points = 64) {
   const coords = { latitude: center[1], longitude: center[0] };
   const km = radiusInKm;
@@ -188,3 +223,4 @@ function createGeoJSONCircle(center, radiusInKm, points = 64) {
   ret.push(ret[0]);
   return { type: 'FeatureCollection', features: [{ type: 'Feature', geometry: { type: 'Polygon', coordinates: [ret] } }] };
 }
+

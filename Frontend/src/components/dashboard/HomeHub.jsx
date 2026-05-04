@@ -12,7 +12,17 @@ import {
 import { cn } from '@/lib/utils';
 
 export default function HomeHub({ profile, setActiveTab, stats = {} }) {
-  const isAdmin = profile?.role === 'admin';
+  const isAdmin = profile?.role === 'admin' || profile?.role === 'manager';
+
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Buenos días';
+    if (hour < 20) return 'Buenas tardes';
+    return 'Buenas noches';
+  };
+
+  // Lógica simple de cumplimiento: si hay ausencias pendientes o empleados sin contrato, avisar.
+  const isCompliant = (stats.pendingAbsences || 0) === 0;
 
   return (
     <div className="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
@@ -21,10 +31,10 @@ export default function HomeHub({ profile, setActiveTab, stats = {} }) {
         <div className="relative z-10 py-10 px-2">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.03] border border-white/10 text-[9px] font-black uppercase tracking-[0.2em] mb-6 text-zinc-500">
             <span className="w-1 h-1 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]" />
-            Estatus de Operaciones • {profile?.role === 'admin' ? 'Administrador' : 'Empleado'}
+            Estatus de Operaciones • {profile?.role === 'admin' ? 'Administrador' : profile?.role === 'manager' ? 'Mánager' : 'Personal'}
           </div>
           <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight mb-6 leading-[1.1] text-white">
-            Buenos días, <span className="text-zinc-500 font-medium">{profile?.displayName?.split(' ')[0] || 'Usuario'}</span>. <br/>
+            {getGreeting()}, <span className="text-zinc-500 font-medium">{profile?.displayName?.split(' ')[0] || 'Usuario'}</span>. <br/>
             <span className="bg-gradient-to-r from-white to-white/40 bg-clip-text text-transparent italic serif">Resumen de jornada.</span>
           </h1>
           <p className="text-zinc-500 text-base md:text-lg font-medium max-w-xl leading-relaxed">
@@ -47,18 +57,18 @@ export default function HomeHub({ profile, setActiveTab, stats = {} }) {
           onClick={() => setActiveTab('Registros')}
         />
         <HubCard 
-          icon={Gear}
-          title="Configuración"
-          description="Ajusta las políticas de la empresa, centros de trabajo y reglas de fichaje."
+          icon={isAdmin ? Gear : User}
+          title={isAdmin ? "Configuración" : "Mi Perfil"}
+          description={isAdmin ? "Ajusta las políticas de la empresa, centros de trabajo y reglas de fichaje." : "Consulta tus datos personales, histórico de horas y gestión de privacidad."}
           color="zinc"
-          onClick={() => setActiveTab('Mi Empresa')}
+          onClick={() => setActiveTab(isAdmin ? 'Mi Empresa' : 'Mi Perfil')}
         />
         <HubCard 
-          icon={User}
-          title="Mi Perfil"
-          description="Consulta tus datos personales, histórico de horas y gestión de privacidad."
+          icon={isAdmin ? Users : Clock}
+          title={isAdmin ? "Gestión de Equipo" : "Mis Registros"}
+          description={isAdmin ? "Administra altas, bajas y expedientes laborales de tu plantilla." : "Revisa tus entradas, salidas y solicita correcciones de jornada."}
           color="emerald"
-          onClick={() => setActiveTab('Mi Perfil')}
+          onClick={() => setActiveTab(isAdmin ? 'Equipo' : 'Registros')}
         />
       </div>
 
@@ -94,16 +104,31 @@ export default function HomeHub({ profile, setActiveTab, stats = {} }) {
         </div>
 
         <div className="bg-[#111114] border border-white/5 rounded-[2rem] p-8 flex flex-col justify-center items-center text-center space-y-4">
-           <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 flex items-center justify-center text-emerald-500 mb-2">
-             <CheckCircle className="w-8 h-8" weight="fill" />
+           <div className={cn(
+             "w-16 h-16 rounded-2xl flex items-center justify-center mb-2 transition-all duration-500",
+             isCompliant ? "bg-emerald-500/10 text-emerald-500" : "bg-amber-500/10 text-amber-500"
+           )}>
+             <CheckCircle className="w-8 h-8" weight={isCompliant ? "fill" : "duotone"} />
            </div>
-           <h3 className="text-xl font-bold text-white">Cumplimiento Legal OK</h3>
+           <h3 className="text-xl font-bold text-white">
+             {isCompliant ? 'Cumplimiento Legal OK' : 'Acción Requerida'}
+           </h3>
            <p className="text-zinc-500 text-sm max-w-[280px]">
-             Tu empresa cumple con la normativa vigente de registro de jornada en España.
+             {isCompliant 
+               ? 'Tu empresa cumple con la normativa vigente de registro de jornada en España.'
+               : `Tienes ${stats.pendingAbsences} solicitudes de ausencia pendientes de revisión legal.`}
            </p>
            <div className="pt-4 flex gap-2">
              <div className="px-3 py-1 rounded-full bg-white/5 text-[10px] font-bold text-zinc-400">RGPD 2026</div>
              <div className="px-3 py-1 rounded-full bg-white/5 text-[10px] font-bold text-zinc-400">Ley 8/2019</div>
+             {!isCompliant && (
+               <button 
+                 onClick={() => setActiveTab('Ausencias')}
+                 className="px-3 py-1 rounded-full bg-amber-500/20 text-[10px] font-black text-amber-500 uppercase tracking-tighter"
+               >
+                 Resolver
+               </button>
+             )}
            </div>
         </div>
       </div>

@@ -13,7 +13,7 @@ import {
   getAuthContext,
 } from "../middleware/request-context.middleware.js";
 import { hasPermission } from "../security/authorization.js";
-import { generateInspectionPDF } from "../utils/pdfGenerator.js";
+import { generateInspectionPDF, generateAuditPDF } from "../utils/pdfGenerator.js";
 
 const router = Router();
 
@@ -602,6 +602,53 @@ router.get(
       recentActivity,
       employeeStatusList,
     });
+  }),
+);
+
+/**
+ * GET /api/v1/reports/audit-pdf
+ * Export GPS Audit as PDF
+ */
+router.get(
+  "/audit-pdf",
+  firebaseAuthMiddleware,
+  appUserContextMiddleware,
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const auth = getAuthContext(req);
+    const isAdmin = hasPermission(auth, "view_employees");
+
+    if (!isAdmin) {
+      res.status(403).json({ error: "Acceso reservado a administradores para auditoría GPS." });
+      return;
+    }
+
+    // Obtener fichas de hoy (o del rango si se desea) que tengan GPS
+    const qb = AppDataSource.getRepository(Ficha)
+      .createQueryBuilder("ficha")
+      .innerJoin(User, "user", "user.uid = ficha.userId")
+      .where("user.companyId = :companyId", { companyId: auth.companyId })
+      .orderBy("ficha.date", "DESC")
+      .addOrderBy("ficha.startTime", "DESC");
+
+    const fichas = await qb.getMany();
+
+    // Log de auditoría de la descarga
+    await logAction({
+      userId: auth.uid,
+      companyId: auth.companyId,
+      action: "gps_audit_export",
+      metadata: { recordCount: fichas.length },
+      ip: req.ip,
+    });
+
+    const pdfBuffer = await generateAuditPDF(fichas, undefined, "Sede Central Tempos");
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader(
+      "Content-Disposition",
+      'attachment; filename="auditoria_gps_tempos.pdf"',
+    );
+    res.send(pdfBuffer);
   }),
 );
 

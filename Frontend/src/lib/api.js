@@ -1,7 +1,12 @@
 // En desarrollo, usamos rutas relativas para que el proxy de Vite las reenvíe al backend.
 // En producción, VITE_API_URL apuntará al dominio real del backend.
+import { apiRateLimiter, authRateLimiter, generateCSRFToken } from './security';
+
 const DEFAULT_LOCAL_API = '';
 const SESSION_STORAGE_KEY = 'tempos.session';
+const OFFLINE_QUEUE_KEY = 'tempos.offline_queue';
+
+let currentCsrfToken = generateCSRFToken(); // Generate once per session for the frontend
 
 function getApiBaseUrl() {
   const fromEnv = import.meta.env.VITE_API_URL;
@@ -34,40 +39,128 @@ function toQueryString(params = {}) {
   return qs.toString();
 }
 
+// --- OFFLINE SUPPORT LOGIC ---
+const getOfflineQueue = () => {
+  try {
+    return JSON.parse(localStorage.getItem(OFFLINE_QUEUE_KEY) || '[]');
+  } catch {
+    return [];
+  }
+};
+
+const addToOfflineQueue = (path, options) => {
+  const queue = getOfflineQueue();
+  // Solo encolamos acciones críticas de fichaje que no pueden perderse
+  if (path.includes('/fichas/clock') || path.includes('/fichas/break')) {
+    queue.push({
+      id: crypto.randomUUID(),
+      path,
+      options: {
+        ...options,
+        body: options.body ? JSON.parse(options.body) : null
+      },
+      timestamp: new Date().toISOString(),
+      retryCount: 0
+    });
+    localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(queue));
+    console.log('📡 [OFFLINE] Fichaje guardado en cola local.');
+    return true;
+  }
+  return false;
+};
+
+export async function syncOfflineQueue(token) {
+  const queue = getOfflineQueue();
+  if (queue.length === 0) return;
+
+  console.log(`🔄 [SYNC] Sincronizando ${queue.length} eventos pendientes...`);
+  const remaining = [];
+
+  for (const item of queue) {
+    try {
+      await request(item.path, {
+        ...item.options,
+        token: token || item.options.token,
+        body: JSON.stringify({
+          ...item.options.body,
+          offlineTimestamp: item.timestamp,
+          isOfflineSync: true
+        })
+      });
+    } catch (err) {
+      console.error('❌ [SYNC] Error sincronizando item:', err);
+      if (item.retryCount < 5) {
+        remaining.push({ ...item, retryCount: item.retryCount + 1 });
+      }
+    }
+  }
+
+  localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(remaining));
+}
+
+// Auto-sync listener
+if (typeof window !== 'undefined') {
+  window.addEventListener('online', () => {
+    const session = getClientSession();
+    if (session?.token) {
+      syncOfflineQueue(session.token);
+    }
+  });
+}
+
 async function request(path, options = {}) {
+	if (!apiRateLimiter.canMakeRequest()) {
+		throw new Error("Tasa de peticiones excedida. Por favor, espera un momento por seguridad.");
+	}
+
 	const { token, headers, ...rest } = options;
 
-	const response = await fetch(buildUrl(path), {
-		...rest,
-		headers: {
-			'Content-Type': 'application/json',
-			...(token ? { Authorization: `Bearer ${token}` } : {}),
-			...(headers || {}),
-		},
-	});
+  try {
+    const response = await fetch(buildUrl(path), {
+      ...rest,
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRF-Token': currentCsrfToken, // Anti-CSRF measure
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(headers || {}),
+      },
+    });
 
-	let payload = null;
-	try {
-		payload = await response.json();
-	} catch {
-		payload = null;
-	}
+    let payload = null;
+    try {
+      payload = await response.json();
+    } catch {
+      payload = null;
+    }
 
-	if (!response.ok) {
-		const message = payload?.error || payload?.message || `Error HTTP ${response.status}`;
-		const error = new Error(message);
-		error.status = response.status;
-		throw error;
-	}
+    if (!response.ok) {
+      const message = payload?.error || payload?.message || `Error HTTP ${response.status}`;
+      const error = new Error(message);
+      error.status = response.status;
+      throw error;
+    }
 
-	return payload;
+    return payload;
+  } catch (error) {
+    // Si es un error de conexión, intentamos encolar
+    if (!navigator.onLine || error.message === 'Failed to fetch') {
+      if (addToOfflineQueue(path, options)) {
+        return { offline: true, message: 'Fichaje guardado localmente (sin conexión)' };
+      }
+    }
+    throw error;
+  }
 }
 
 async function requestBlob(path, options = {}) {
+	if (!apiRateLimiter.canMakeRequest()) {
+		throw new Error("Tasa de peticiones excedida.");
+	}
 	const { token, headers, ...rest } = options;
 	const res = await fetch(buildUrl(path), {
 		...rest,
 		headers: {
+			'X-CSRF-Token': currentCsrfToken,
 			...(token ? { Authorization: `Bearer ${token}` } : {}),
 			...(headers || {}),
 		},
@@ -116,6 +209,7 @@ export function getDeviceId() {
 }
 
 export async function registerMe(token, data = {}) {
+  if (!authRateLimiter.canMakeRequest()) throw new Error("Tasa de auth excedida. Por favor, espera.");
   return request('/api/v1/auth/register', {
     method: 'POST',
     token,
@@ -311,6 +405,10 @@ export async function exportReport(token, params = {}) {
   return requestBlob(path, { method: 'GET', token });
 }
 
+export async function exportAuditPDF(token) {
+  return requestBlob('/api/v1/reports/audit-pdf', { method: 'GET', token });
+}
+
 // Clock in/out
 export async function clockIn(token, payload = {}) {
   const deviceId = getDeviceId();
@@ -328,6 +426,10 @@ export async function breakStart(token, payload = {}) {
   const deviceId = getDeviceId();
   const body = { ...payload, deviceId };
   return request('/api/v1/fichas/break-start', { method: 'POST', token, body: JSON.stringify(body) });
+}
+
+export async function breakStartInternal(token, payload = {}) {
+  return request('/api/v1/fichas/break-start', { method: 'POST', token, body: JSON.stringify(payload) });
 }
 
 export async function breakEnd(token, payload = {}) {

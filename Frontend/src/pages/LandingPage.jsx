@@ -1106,27 +1106,104 @@ export default function LandingPage() {
 
       </main>
 
-      {/* ── Footer ── */}
+      {/* ── Footer Estratégico de Marca ── */}
       <footer role="contentinfo" style={{
         borderTop: '1px solid var(--border)',
-        padding: '60px 48px',
-        display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
-        flexWrap: 'wrap', gap: 40, position: 'relative', zIndex: 1,
-        background: 'rgba(255,255,255,0.008)',
+        padding: '80px 48px 60px',
+        background: 'radial-gradient(circle at top, rgba(37,99,235,0.02) 0%, transparent 70%)',
+        position: 'relative', zIndex: 1,
       }}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 300 }}>
-            <Logo />
-            <p style={{ fontSize: 13, color: 'var(--t2)', lineHeight: 1.6 }}>
-              Liderando la transformación digital de RRHH en España. Cumplimiento legal y eficiencia para empresas que miran al futuro.
+        {/* Importación de fuentes */}
+        <style>{`
+          @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@800&display=swap');
+          .tp-s9-footer-logo {
+            font-family: 'Space Grotesk', sans-serif;
+            font-weight: 800;
+            font-size: 18px;
+            letter-spacing: -0.8px;
+            display: flex;
+            align-items: center;
+            gap: 0;
+            line-height: 1;
+          }
+          .tp-foot-link {
+            font-size: 12px;
+            color: var(--t3);
+            text-decoration: none;
+            transition: all 0.2s;
+            font-weight: 500;
+          }
+          .tp-foot-link:hover {
+            color: var(--t0);
+          }
+        `}</style>
+
+        <div style={{ maxWidth: 1200, margin: '0 auto' }}>
+          
+          {/* Fila Superior: Tempos (Producto Hero) */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', marginBottom: 60 }}>
+            <div style={{ marginBottom: 16 }}>
+              <Logo size="lg" />
+            </div>
+            <p style={{ fontSize: 14.5, color: 'var(--t1)', maxWidth: 500, lineHeight: 1.6, fontWeight: 300 }}>
+              La plataforma definitiva para el control de jornada, gestión de ausencias y cumplimiento legal. Diseñada para empresas que valoran el tiempo de su equipo.
             </p>
-            <p style={{ fontSize: 11.5, color: 'var(--t3)', marginTop: 8 }}>© 2026 Antonio Lloret Sánchez. <br/>Todos los derechos reservados.</p>
-        </div>
-        <div style={{ display: 'flex', gap: 30 }}>
-          <Link to="/legal/terminos" style={{ fontSize: 13, color: 'var(--t3)', textDecoration: 'none', transition: 'color 0.2s' }} onMouseEnter={e => e.target.style.color = 'var(--t0)'} onMouseLeave={e => e.target.style.color = 'var(--t3)'}>Términos de Servicio</Link>
-          <Link to="/legal/privacidad" style={{ fontSize: 13, color: 'var(--t3)', textDecoration: 'none', transition: 'color 0.2s' }} onMouseEnter={e => e.target.style.color = 'var(--t0)'} onMouseLeave={e => e.target.style.color = 'var(--t3)'}>Privacidad</Link>
-          <Link to="/contacto" style={{ fontSize: 13, color: 'var(--t3)', textDecoration: 'none', transition: 'color 0.2s' }} onMouseEnter={e => e.target.style.color = 'var(--t0)'} onMouseLeave={e => e.target.style.color = 'var(--t3)'}>Contacto</Link>
+          </div>
+
+          {/* Fila Inferior: Links y Firma Script 9 */}
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'flex-end',
+            flexWrap: 'wrap',
+            gap: 40,
+            borderTop: '1px solid var(--border)',
+            paddingTop: 40
+          }}>
+            
+            {/* Izquierda: Legal y Copyright */}
+            <div style={{ flex: 1, minWidth: 280 }}>
+              <div style={{ display: 'flex', gap: 24, marginBottom: 16 }}>
+                <Link to="/legal/terminos" className="tp-foot-link">Términos</Link>
+                <Link to="/legal/privacidad" className="tp-foot-link">Privacidad</Link>
+                <Link to="/contacto" className="tp-foot-link">Contacto</Link>
+              </div>
+              <p style={{ fontSize: 11, color: 'var(--t3)', fontWeight: 500 }}>
+                © 2026 Tempos · Todos los derechos reservados.
+              </p>
+            </div>
+
+            {/* Derecha: Firma Script 9 (Esquina) */}
+            <div style={{ 
+              display: 'flex', 
+              flexDirection: 'column', 
+              alignItems: 'flex-end', 
+              textAlign: 'right',
+              maxWidth: 320 
+            }}>
+              <p style={{ fontSize: 9, fontWeight: 800, color: 'var(--t3)', letterSpacing: 1.5, marginBottom: 8, textTransform: 'uppercase' }}>
+                Desarrollado con excelencia por
+              </p>
+              <a 
+                href="https://www.script-9.com" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="group"
+                style={{ textDecoration: 'none' }}
+              >
+                <div className="tp-s9-footer-logo" style={{ marginBottom: 6 }}>
+                  <span style={{ color: 'var(--t0)' }}>Script</span>
+                  <span style={{ color: '#10B981' }}>9</span>
+                </div>
+              </a>
+              <p style={{ fontSize: 11, color: 'var(--t3)', lineHeight: 1.4, opacity: 0.8 }}>
+                La factoría de software detrás de las soluciones más disruptivas. Ingeniería de vanguardia aplicada al crecimiento empresarial.
+              </p>
+            </div>
+          </div>
         </div>
       </footer>
+
     </div>
   );
 }
