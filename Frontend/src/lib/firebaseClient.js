@@ -43,18 +43,26 @@ export const signInWithGoogleAndGetIdToken = async (mode = 'popup') => {
   });
 
   try {
-    console.log('⚡ [AUTH] Limpiando memoria local e intentando login...');
-    localStorage.clear();
-    sessionStorage.clear();
+    console.log('⚡ [AUTH] Iniciando proceso de Google...');
 
     if (mode === 'redirect') {
       await signInWithRedirect(auth, provider);
       return null;
     }
     const result = await signInWithPopup(auth, provider);
+    console.log('✅ [AUTH] Login exitoso!');
     return await result.user.getIdToken();
   } catch (error) {
-    console.warn('⚠️ [AUTH] Error detectado, saltando a modo seguro (Redirect)...', error.code);
+    console.error('❌ [AUTH] Error detallado:', {
+      code: error.code,
+      message: error.message,
+      customData: error.customData
+    });
+    
+    if (error.code === 'auth/popup-closed-by-user') {
+      console.warn('⚠️ [AUTH] El popup se cerró solo o fue bloqueado. Saltando a Redirect...');
+    }
+    
     await signInWithRedirect(auth, provider);
     return null;
   }
