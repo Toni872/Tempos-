@@ -46,7 +46,7 @@ function drawTemposLogo(doc: PDFKit.PDFDocument, x: number, y: number, size: num
  */
 export async function generateInspectionPDF(
   fichas: Ficha[],
-  totalHours: number,
+  _totalHours: number,
   targetUser?: User,
   employerName: string = "Antonio Lloret Sánchez",
 ): Promise<Buffer> {

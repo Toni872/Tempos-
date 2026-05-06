@@ -5,12 +5,14 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   OneToMany,
+  Index,
 } from "typeorm";
 
 
 export type UserRole = "admin" | "manager" | "employee" | "auditor";
 
 @Entity("users")
+@Index(["companyId"])
 export class User {
   @PrimaryColumn("varchar", { length: 128 })
   uid!: string; // Firebase UID
@@ -20,6 +22,9 @@ export class User {
 
   @Column({ type: "varchar", nullable: true })
   displayName?: string;
+
+  @Column({ type: "varchar", nullable: true })
+  photoURL?: string;
 
   @Column({ type: "boolean", default: false })
   emailVerified!: boolean;

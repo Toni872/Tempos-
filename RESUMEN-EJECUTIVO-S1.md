@@ -89,14 +89,14 @@ npm run migration:run -- -d dist/database.js
 npm run dev
 
 # 5. Test clockin
-curl -X POST http://localhost:8080/api/v1/fichas/clockin \
+curl -X POST http://localhost:8081/api/v1/fichas/clockin \
   -H "Authorization: Bearer test-token"
 
 # 6. Verificar TimeEntry
 psql $DATABASE_URL -c "SELECT * FROM time_entries LIMIT 1"
 
 # 7. Ver audit trail
-curl http://localhost:8080/api/v1/fichas/{ficha-id}/audit-trail \
+curl http://localhost:8081/api/v1/fichas/{ficha-id}/audit-trail \
   -H "Authorization: Bearer test-token"
 ```
 

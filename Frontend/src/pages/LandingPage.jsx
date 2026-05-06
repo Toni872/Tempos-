@@ -1,45 +1,19 @@
 import { useState, useEffect, useRef } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { Link, useNavigate } from 'react-router-dom';
 import { prefetchRoute } from '@/lib/routePrefetch';
 import Logo from '@/components/ui/Logo';
 import '../styles/landing.css';
 
-// ─── HOOKS ────────────────────────────────────────────────────────────────────
+// ─── STATIC DATA ─────────────────────────────────────────────────────────────
 
-function useReveal(threshold = 0.12) {
-  const ref = useRef(null);
-  const [visible, setVisible] = useState(false);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const obs = new IntersectionObserver(([e]) => {
-      if (e.isIntersecting) { setVisible(true); obs.disconnect(); }
-    }, { threshold });
-    obs.observe(el);
-    return () => obs.disconnect();
-  }, [threshold]);
-  return [ref, visible];
-}
-
-function useCounter(target, duration = 2200, active = false) {
-  const [val, setVal] = useState(0);
-  useEffect(() => {
-    if (!active) return;
-    let start = null;
-    const tick = (ts) => {
-      if (!start) start = ts;
-      const p = Math.min((ts - start) / duration, 1);
-      const eased = 1 - Math.pow(1 - p, 4);
-      setVal(Math.round(eased * target));
-      if (p < 1) requestAnimationFrame(tick);
-    };
-    requestAnimationFrame(tick);
-  }, [target, duration, active]);
-  return val;
-}
-
-// ─── ICONS ───────────────────────────────────────────────────────────────────
+const navItems = [
+  { id: 'inicio', label: 'Inicio' },
+  { id: 'producto', label: 'Producto' },
+  { id: 'proceso', label: 'Proceso' },
+  { id: 'precios', label: 'Precios' },
+  { id: 'faqs', label: 'FAQs' },
+];
 
 const Icon = {
   Clock: () => (
@@ -130,6 +104,138 @@ const Icon = {
     </svg>
   ),
 };
+
+const benefits = [
+  { Ic: Icon.Shield, title: 'Blindaje Legal Integral', desc: 'Cumplimiento estricto del RDL 8/2019 en España. Generamos registros inalterables con firma digital, listos para cualquier inspección de trabajo.' },
+  { Ic: Icon.Clock,  title: 'Gestión Inteligente de Jornada',  desc: 'Controla horas ordinarias, extraordinarias y complementarias. Automatiza el cálculo de descansos y evita errores en el pago de nóminas.' },
+  { Ic: Icon.Mobile, title: 'Movilidad Sin Fricciones', desc: 'App nativa para empleados: fichaje por geolocalización, QR o PIN. El equipo gestiona sus ausencias y vacaciones desde su bolsillo.' },
+  { Ic: Icon.Chart,  title: 'Analítica Estratégica',   desc: 'No solo datos, sino información. Visualiza picos de actividad, absentismo y rentabilidad por proyecto o sede en tiempo real.' },
+];
+
+const modules = [
+  {
+    title: 'Intranet de empresa',
+    desc: 'Alta de empleados, configuración de horarios, validación de registros y control de incidencias desde un panel único.',
+    cta: 'Ideal para responsables de RRHH y gerencia.',
+  },
+  {
+    title: 'App para empleados',
+    desc: 'Fichaje inmediato, consulta de jornada, solicitud de vacaciones y comunicación de ausencias desde el móvil.',
+    cta: 'Menos fricción para el equipo, más datos fiables para la empresa.',
+  },
+  {
+    title: 'Punto de fichaje en oficina',
+    desc: 'Activa un punto fijo en tablet o móvil para equipos presenciales. Registro rápido, visual y sin complejidad técnica.',
+    cta: 'Perfecto para centros con entrada común o turnos rotativos.',
+  },
+];
+
+const targetProfiles = [
+  {
+    title: 'Autónomos',
+    desc: 'Registra tu jornada sin papeleo y mantén toda la documentación preparada para cualquier requerimiento legal.',
+  },
+  {
+    title: 'Pymes',
+    desc: 'Coordina equipos con distintos turnos, vacaciones y ausencias desde una única plataforma fácil de mantener.',
+  },
+  {
+    title: 'Equipos en movilidad',
+    desc: 'Valida fichajes fuera de oficina con geolocalización y reglas por ubicación para mantener trazabilidad.',
+  },
+];
+
+const showcase = [
+  {
+    img: '/landing_workstation.jpg',
+    label: 'Panel de gestión',
+    title: 'Control de jornada desde el panel de empresa',
+    desc: 'El responsable de RRHH o gerencia tiene visión completa de fichajes, ausencias e incidencias desde un único panel web, sin necesidad de exportar datos manualmente.',
+    alt: 'Responsable de equipo gestionando jornadas con Tempos en su ordenador',
+  },
+  {
+    img: '/landing_analytics.jpg',
+    label: 'Informes y analítica',
+    title: 'Datos de jornada listos para gestoría e inspección',
+    desc: 'Genera informes detallados de horas, extras y ausencias exportables en PDF y Excel. Documentación preparada en segundos para auditorías o requerimientos de Inspección de Trabajo.',
+    alt: 'Vista de informes y analítica de control horario en Tempos',
+  },
+  {
+    img: '/landing_team_collab.jpg',
+    label: 'Coordinación de equipo',
+    title: 'Organiza turnos, vacaciones y permisos sin fricciones',
+    desc: 'Los empleados solicitan vacaciones o permisos desde la app y el responsable aprueba o gestiona la incidencia al instante. Menos correos, menos errores, más control.',
+    alt: 'Equipo colaborando con gestión de turnos y vacaciones en Tempos',
+  },
+  {
+    img: '/landing_legal_desk.jpg',
+    label: 'Cumplimiento legal',
+    title: 'Documenta la jornada con trazabilidad real',
+    desc: 'Cada fichaje queda registrado con sello de tiempo y contexto verificable. Historial auditable para cumplir la obligación legal de registro horario en España.',
+    alt: 'Documentación de cumplimiento legal de control horario para inspección',
+  },
+];
+
+const faqs = [
+  {
+    q: '¿Tempos cumple la normativa de registro horario en España?',
+    a: 'Sí. Tempos está diseñado para registrar jornada diaria, conservar histórico y facilitar documentación verificable para auditorías e inspecciones.',
+  },
+  {
+    q: '¿Cómo fichan los empleados?',
+    a: 'Pueden fichar desde app móvil, navegador, código QR o punto fijo en oficina. La empresa decide qué método habilitar por perfil o sede.',
+  },
+  {
+    q: '¿Se pueden gestionar vacaciones, permisos y bajas?',
+    a: 'Sí. El equipo puede enviar solicitudes y RRHH validarlas desde la intranet, manteniendo trazabilidad y calendario actualizado.',
+  },
+  {
+    q: '¿Qué pasa si un empleado olvida fichar?',
+    a: 'El sistema permite gestionar incidencias y correcciones con control de cambios, evitando pérdidas de información y mejorando la calidad del dato.',
+  },
+  {
+    q: '¿Puedo descargar informes para gestoría o inspección?',
+    a: 'Sí. Puedes exportar informes en PDF y Excel con el detalle de jornada, ausencias y horas para compartir con gestoría o auditoría.',
+  },
+  {
+    q: '¿Tiene permanencia o costes de alta?',
+    a: 'No. Puedes empezar con prueba y cancelar cuando quieras, sin compromisos de permanencia ni costes de implantación complejos.',
+  },
+];
+
+const proofItems = [
+  { value: '14 días', label: 'de prueba para validar la operativa antes de implantarla' },
+  { value: '0€', label: 'de cuota de alta para empezar sin costes iniciales' },
+  { value: '1 panel', label: 'para controlar jornada, ausencias e incidencias del equipo' },
+];
+
+const useCases = [
+  {
+    name: 'Empresas con personal administrativo y operativo',
+    quote: 'Centraliza fichajes, ausencias e incidencias en un único entorno y reduce la revisión manual de registros.',
+  },
+  {
+    name: 'Pymes con turnos o varios centros',
+    quote: 'Combina fichaje en oficina, móvil o punto fijo según cada equipo, con control unificado desde la intranet.',
+  },
+  {
+    name: 'Asesorías y responsables de RRHH',
+    quote: 'Accede a información ordenada y exportable para revisar jornada, horas extra y documentación ante inspecciones.',
+  },
+];
+
+const compareRows = [
+  ['Registro en papel o Excel', 'Procesos manuales, errores frecuentes y poca trazabilidad'],
+  ['Tempos', 'Registro digital centralizado, histórico ordenado y control inmediato del equipo'],
+];
+
+const steps = [
+  { n: '01', title: 'Registro y Configuración', desc: 'Crea tu cuenta en 30 segundos. Define la razón social de tu empresa y configura tus sedes de trabajo para tener un control geográfico preciso.' },
+  { n: '02', title: 'Diseño de Horarios', desc: 'Crea plantillas de horarios fijos, turnos rotativos o jornadas flexibles. Asigna estas plantillas a tus empleados para automatizar el control.' },
+  { n: '03', title: 'Alta de Equipo', desc: 'Invita a tus empleados por email. Cada uno recibirá sus credenciales únicas para acceder a la App móvil o al panel web de fichaje.' },
+  { n: '04', title: 'Registro y Ausencias', desc: 'Tus empleados fichan su jornada y gestionan sus vacaciones o bajas desde la App. Tú validas las solicitudes en tiempo real desde el panel.' },
+  { n: '05', title: 'Informes e Inspección', desc: 'Exporta en un clic informes PDF certificados con validez legal ante la Inspección de Trabajo. Datos trazables, seguros e inalterables.' },
+];
 
 // ─── HERO SLIDER COMPONENT ───────────────────────────────────────────────────
 
@@ -229,17 +335,10 @@ export default function LandingPage() {
   const navigate = useNavigate();
   const [navOpen, setNavOpen] = useState(false);
   const [activeSection, setActiveSection] = useState('inicio');
+  const [hoveredSection, setHoveredSection] = useState(null);
   const [scrollProgress, setScrollProgress] = useState(0);
   const [isScrolled, setIsScrolled] = useState(false);
   const [ctaVariant, setCtaVariant] = useState('A');
-
-  const navItems = [
-    { id: 'inicio', label: 'Inicio' },
-    { id: 'producto', label: 'Producto' },
-    { id: 'proceso', label: 'Proceso' },
-    { id: 'precios', label: 'Precios' },
-    { id: 'faqs', label: 'FAQs' },
-  ];
 
   const withViewTransition = (action) => {
     if (typeof document !== 'undefined' && 'startViewTransition' in document) {
@@ -355,145 +454,6 @@ export default function LandingPage() {
       finalPrimary: 'Empezar ahora',
     };
 
-  // Reveal refs
-  const [heroRef, heroVis]         = useReveal(0.05);
-  const [benefitsRef, benefitsVis] = useReveal(0.1);
-  const [showcaseRef, showcaseVis] = useReveal(0.08);
-  const [stepsRef, stepsVis]       = useReveal(0.1);
-  const [pricingRef, pricingVis]   = useReveal(0.08);
-
-  const benefits = [
-    { Icon: Icon.Shield, title: 'Blindaje Legal Integral', desc: 'Cumplimiento estricto del RDL 8/2019 en España. Generamos registros inalterables con firma digital, listos para cualquier inspección de trabajo.' },
-    { Icon: Icon.Clock,  title: 'Gestión Inteligente de Jornada',  desc: 'Controla horas ordinarias, extraordinarias y complementarias. Automatiza el cálculo de descansos y evita errores en el pago de nóminas.' },
-    { Icon: Icon.Mobile, title: 'Movilidad Sin Fricciones', desc: 'App nativa para empleados: fichaje por geolocalización, QR o PIN. El equipo gestiona sus ausencias y vacaciones desde su bolsillo.' },
-    { Icon: Icon.Chart,  title: 'Analítica Estratégica',   desc: 'No solo datos, sino información. Visualiza picos de actividad, absentismo y rentabilidad por proyecto o sede en tiempo real.' },
-  ];
-
-  const modules = [
-    {
-      title: 'Intranet de empresa',
-      desc: 'Alta de empleados, configuración de horarios, validación de registros y control de incidencias desde un panel único.',
-      cta: 'Ideal para responsables de RRHH y gerencia.',
-    },
-    {
-      title: 'App para empleados',
-      desc: 'Fichaje inmediato, consulta de jornada, solicitud de vacaciones y comunicación de ausencias desde el móvil.',
-      cta: 'Menos fricción para el equipo, más datos fiables para la empresa.',
-    },
-    {
-      title: 'Punto de fichaje en oficina',
-      desc: 'Activa un punto fijo en tablet o móvil para equipos presenciales. Registro rápido, visual y sin complejidad técnica.',
-      cta: 'Perfecto para centros con entrada común o turnos rotativos.',
-    },
-  ];
-
-  const targetProfiles = [
-    {
-      title: 'Autónomos',
-      desc: 'Registra tu jornada sin papeleo y mantén toda la documentación preparada para cualquier requerimiento legal.',
-    },
-    {
-      title: 'Pymes',
-      desc: 'Coordina equipos con distintos turnos, vacaciones y ausencias desde una única plataforma fácil de mantener.',
-    },
-    {
-      title: 'Equipos en movilidad',
-      desc: 'Valida fichajes fuera de oficina con geolocalización y reglas por ubicación para mantener trazabilidad.',
-    },
-  ];
-
-  const showcase = [
-    {
-      img: '/landing_workstation.jpg',
-      label: 'Panel de gestión',
-      title: 'Control de jornada desde el panel de empresa',
-      desc: 'El responsable de RRHH o gerencia tiene visión completa de fichajes, ausencias e incidencias desde un único panel web, sin necesidad de exportar datos manualmente.',
-      alt: 'Responsable de equipo gestionando jornadas con Tempos en su ordenador',
-    },
-    {
-      img: '/landing_analytics.jpg',
-      label: 'Informes y analítica',
-      title: 'Datos de jornada listos para gestoría e inspección',
-      desc: 'Genera informes detallados de horas, extras y ausencias exportables en PDF y Excel. Documentación preparada en segundos para auditorías o requerimientos de Inspección de Trabajo.',
-      alt: 'Vista de informes y analítica de control horario en Tempos',
-    },
-    {
-      img: '/landing_team_collab.jpg',
-      label: 'Coordinación de equipo',
-      title: 'Organiza turnos, vacaciones y permisos sin fricciones',
-      desc: 'Los empleados solicitan vacaciones o permisos desde la app y el responsable aprueba o gestiona la incidencia al instante. Menos correos, menos errores, más control.',
-      alt: 'Equipo colaborando con gestión de turnos y vacaciones en Tempos',
-    },
-    {
-      img: '/landing_legal_desk.jpg',
-      label: 'Cumplimiento legal',
-      title: 'Documenta la jornada con trazabilidad real',
-      desc: 'Cada fichaje queda registrado con sello de tiempo y contexto verificable. Historial auditable para cumplir la obligación legal de registro horario en España.',
-      alt: 'Documentación de cumplimiento legal de control horario para inspección',
-    },
-  ];
-
-  const faqs = [
-    {
-      q: '¿Tempos cumple la normativa de registro horario en España?',
-      a: 'Sí. Tempos está diseñado para registrar jornada diaria, conservar histórico y facilitar documentación verificable para auditorías e inspecciones.',
-    },
-    {
-      q: '¿Cómo fichan los empleados?',
-      a: 'Pueden fichar desde app móvil, navegador, código QR o punto fijo en oficina. La empresa decide qué método habilitar por perfil o sede.',
-    },
-    {
-      q: '¿Se pueden gestionar vacaciones, permisos y bajas?',
-      a: 'Sí. El equipo puede enviar solicitudes y RRHH validarlas desde la intranet, manteniendo trazabilidad y calendario actualizado.',
-    },
-    {
-      q: '¿Qué pasa si un empleado olvida fichar?',
-      a: 'El sistema permite gestionar incidencias y correcciones con control de cambios, evitando pérdidas de información y mejorando la calidad del dato.',
-    },
-    {
-      q: '¿Puedo descargar informes para gestoría o inspección?',
-      a: 'Sí. Puedes exportar informes en PDF y Excel con el detalle de jornada, ausencias y horas para compartir con gestoría o auditoría.',
-    },
-    {
-      q: '¿Tiene permanencia o costes de alta?',
-      a: 'No. Puedes empezar con prueba y cancelar cuando quieras, sin compromisos de permanencia ni costes de implantación complejos.',
-    },
-  ];
-
-  const proofItems = [
-    { value: '14 días', label: 'de prueba para validar la operativa antes de implantarla' },
-    { value: '0€', label: 'de cuota de alta para empezar sin costes iniciales' },
-    { value: '1 panel', label: 'para controlar jornada, ausencias e incidencias del equipo' },
-  ];
-
-  const useCases = [
-    {
-      name: 'Empresas con personal administrativo y operativo',
-      quote: 'Centraliza fichajes, ausencias e incidencias en un único entorno y reduce la revisión manual de registros.',
-    },
-    {
-      name: 'Pymes con turnos o varios centros',
-      quote: 'Combina fichaje en oficina, móvil o punto fijo según cada equipo, con control unificado desde la intranet.',
-    },
-    {
-      name: 'Asesorías y responsables de RRHH',
-      quote: 'Accede a información ordenada y exportable para revisar jornada, horas extra y documentación ante inspecciones.',
-    },
-  ];
-
-  const compareRows = [
-    ['Registro en papel o Excel', 'Procesos manuales, errores frecuentes y poca trazabilidad'],
-    ['Tempos', 'Registro digital centralizado, histórico ordenado y control inmediato del equipo'],
-  ];
-
-  const steps = [
-    { n: '01', title: 'Registro y Configuración', desc: 'Crea tu cuenta en 30 segundos. Define la razón social de tu empresa y configura tus sedes de trabajo para tener un control geográfico preciso.' },
-    { n: '02', title: 'Diseño de Horarios', desc: 'Crea plantillas de horarios fijos, turnos rotativos o jornadas flexibles. Asigna estas plantillas a tus empleados para automatizar el control.' },
-    { n: '03', title: 'Alta de Equipo', desc: 'Invita a tus empleados por email. Cada uno recibirá sus credenciales únicas para acceder a la App móvil o al panel web de fichaje.' },
-    { n: '04', title: 'Registro y Ausencias', desc: 'Tus empleados fichan su jornada y gestionan sus vacaciones o bajas desde la App. Tú validas las solicitudes en tiempo real desde el panel.' },
-    { n: '05', title: 'Informes e Inspección', desc: 'Exporta en un clic informes PDF certificados con validez legal ante la Inspección de Trabajo. Datos trazables, seguros e inalterables.' },
-  ];
-
   return (
     <div className="tp-root">
 
@@ -510,14 +470,43 @@ export default function LandingPage() {
           <span className="tp-brand-proof">Cumplimiento laboral verificado</span>
         </div>
 
-        <nav className="tp-nav-links" aria-label="Secciones">
+        <nav className="tp-nav-links" aria-label="Secciones" onMouseLeave={() => setHoveredSection(null)}>
           {navItems.map((item) => (
             <button
               key={item.id}
               className={`tp-nav-link ${activeSection === item.id ? 'tp-active' : ''}`}
               onClick={() => scrollToSection(item.id)}
+              onMouseEnter={() => setHoveredSection(item.id)}
+              style={{ position: 'relative' }}
             >
-              {item.label}
+              <span style={{ position: 'relative', zIndex: 2 }}>{item.label}</span>
+              <AnimatePresence>
+                {(hoveredSection === item.id || (activeSection === item.id && !hoveredSection)) && (
+                  <motion.div
+                    layoutId="nav-underline"
+                    className="tp-nav-underline"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{
+                      type: "spring",
+                      stiffness: 400,
+                      damping: 30
+                    }}
+                    style={{
+                      position: 'absolute',
+                      bottom: '2px',
+                      left: 0,
+                      right: 0,
+                      height: '2px',
+                      background: 'linear-gradient(90deg, var(--mg), var(--mg2))',
+                      borderRadius: '2px',
+                      boxShadow: '0 0 12px rgba(96,165,250,0.5)',
+                      zIndex: 1
+                    }}
+                  />
+                )}
+              </AnimatePresence>
             </button>
           ))}
         </nav>
@@ -567,24 +556,20 @@ export default function LandingPage() {
       <main id="contenido-principal">
 
       {/* ── Hero ── */}
-      <section ref={heroRef} id="inicio" aria-label="Software de control horario legal para empresas y autónomos en España" style={{
+      <section id="inicio" aria-label="Software de control horario legal para empresas y autónomos en España" style={{
         minHeight: '100vh',
         display: 'flex', alignItems: 'center',
         paddingTop: 84, position: 'relative', overflow: 'hidden',
       }}>
-        {/* Ambient orbs */}
         <div className="tp-orb" style={{ width: 700, height: 700, top: '-15%', left: '-18%', background: 'radial-gradient(circle, rgba(37,99,235,0.11) 0%, transparent 70%)' }}/>
         <div className="tp-orb" style={{ width: 500, height: 500, bottom: '-10%', right: '-12%', background: 'radial-gradient(circle, rgba(37,99,235,0.07) 0%, transparent 70%)' }}/>
 
         <div style={{ maxWidth: 1180, margin: '0 auto', padding: 'clamp(32px,4vw,60px) clamp(18px,4vw,48px)', width: '100%', position: 'relative', zIndex: 1 }}>
           <div className="tp-hero-wrap">
-
-            {/* Left copy */}
             <motion.div 
               initial={{ opacity: 0, x: -30 }}
               whileInView={{ opacity: 1, x: 0 }}
               viewport={{ once: true }}
-              className="tp-reveal-l tp-visible" 
               style={{ flex: 1, maxWidth: 560 }}
             >
               <div style={{ display: 'inline-flex', alignItems: 'center', gap: 9, borderRadius: 100, border: '1px solid var(--border-mg)', background: 'rgba(37,99,235,0.06)', padding: '5px 16px', marginBottom: 36 }}>
@@ -623,16 +608,12 @@ export default function LandingPage() {
               </div>
             </motion.div>
 
-            {/* Right — Slider */}
-            <div className={`tp-reveal-r tp-hero-right ${heroVis ? 'tp-visible' : ''}`} style={{ flexShrink: 0 }}>
+            <div className="tp-hero-right" style={{ flexShrink: 0 }}>
               <HeroImageSlider />
             </div>
-
           </div>
         </div>
       </section>
-
-      {/* (Stats strip removed for MVP) */}
 
       {/* ── Feature Grid ── */}
       <section className="tp-section-surface" aria-label="Características principales de Tempos" style={{ padding: '40px 48px 100px', borderBottom: '1px solid var(--border)' }}>
@@ -640,14 +621,14 @@ export default function LandingPage() {
           <h2 className="tp-visually-hidden">Características principales de Tempos</h2>
           <div className="tp-grid-5">
             {[
-              { ic: Icon.Zap, t: 'Automatización', d: 'Configura horarios y avisos para reducir olvidos y tareas repetitivas.' },
-              { ic: Icon.MapPin, t: 'Geolocalización', d: 'Valida fichajes remotos o en movilidad con contexto de ubicación.' },
-              { ic: Icon.Edit, t: 'Gestión de incidencias', d: 'Corrige olvidos y revisa cambios con trazabilidad.' },
-              { ic: Icon.Bell, t: 'Comunicación', d: 'Gestiona ausencias, solicitudes y avisos desde un único canal.' },
-              { ic: Icon.Report, t: 'Informes', d: 'Exporta información clara para dirección, gestoría o inspección.' },
+              { Ic: Icon.Zap, t: 'Automatización', d: 'Configura horarios y avisos para reducir olvidos y tareas repetitivas.' },
+              { Ic: Icon.MapPin, t: 'Geolocalización', d: 'Valida fichajes remotos o en movilidad con contexto de ubicación.' },
+              { Ic: Icon.Edit, t: 'Gestión de incidencias', d: 'Corrige olvidos y revisa cambios con trazabilidad.' },
+              { Ic: Icon.Bell, t: 'Comunicación', d: 'Gestiona ausencias, solicitudes y avisos desde un único canal.' },
+              { Ic: Icon.Report, t: 'Informes', d: 'Exporta información clara para dirección, gestoría o inspección.' },
             ].map(f => (
               <div key={f.t} className="tp-card" style={{ padding: 24, borderRadius: 20, textAlign: 'center' }}>
-                <div style={{ color: 'var(--mg)', marginBottom: 16, display: 'flex', justifyContent: 'center' }}><f.ic /></div>
+                <div style={{ color: 'var(--mg)', marginBottom: 16, display: 'flex', justifyContent: 'center' }}><f.Ic /></div>
                 <h3 style={{ fontSize: 15, fontWeight: 700, color: 'var(--t0)', marginBottom: 8 }}>{f.t}</h3>
                 <div style={{ fontSize: 12.5, color: 'var(--t2)', lineHeight: 1.5 }}>{f.d}</div>
               </div>
@@ -657,9 +638,15 @@ export default function LandingPage() {
       </section>
 
       {/* ── Benefits ── */}
-      <section className="tp-section-surface" id="producto" ref={benefitsRef} aria-label="Beneficios del software de control horario Tempos" style={{ padding: 'clamp(60px,8vw,110px) clamp(18px,4vw,48px)', position: 'relative', zIndex: 1 }}>
+      <section className="tp-section-surface" id="producto" aria-label="Beneficios del software de control horario Tempos" style={{ padding: 'clamp(60px,8vw,110px) clamp(18px,4vw,48px)', position: 'relative', zIndex: 1 }}>
         <div style={{ maxWidth: 1180, margin: '0 auto' }}>
-          <div className={`tp-reveal ${benefitsVis ? 'tp-visible' : ''}`} style={{ textAlign: 'center', marginBottom: 64 }}>
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-100px" }}
+            transition={{ duration: 0.6 }}
+            style={{ textAlign: 'center', marginBottom: 64 }}
+          >
             <span className="tp-label">Control y cumplimiento</span>
             <h2 style={{ fontFamily: 'var(--ff-head)', fontSize: 48, fontWeight: 600, letterSpacing: 0.5, color: 'var(--t0)', marginBottom: 14 }}>
               Un sistema de registro horario<br/>útil para la gestión diaria.
@@ -667,13 +654,29 @@ export default function LandingPage() {
             <p style={{ fontSize: 15.5, color: 'var(--t1)', maxWidth: 500, margin: '0 auto', lineHeight: 1.65, fontWeight: 300 }}>
               Tempos cubre el registro de jornada laboral exigido por ley y ayuda a ordenar la operativa diaria de equipos, turnos y ausencias.
             </p>
-          </div>
+          </motion.div>
 
-          <div className="tp-grid-4">
-            {benefits.map(({ Icon: Ic, title, desc }, i) => (
-              <div
+          <motion.div 
+            className="tp-grid-4"
+            initial="hidden"
+            whileInView="show"
+            viewport={{ once: true, margin: "-50px" }}
+            variants={{
+              hidden: { opacity: 0 },
+              show: {
+                opacity: 1,
+                transition: { staggerChildren: 0.12 }
+              }
+            }}
+          >
+            {benefits.map(({ Ic, title, desc }) => (
+              <motion.div
                 key={title}
-                className={`tp-card tp-reveal ${benefitsVis ? 'tp-visible' : ''} tp-d${i}`}
+                variants={{
+                  hidden: { opacity: 0, y: 20 },
+                  show: { opacity: 1, y: 0 }
+                }}
+                className="tp-card"
                 style={{ borderRadius: 20, padding: '32px 28px' }}
               >
                 <div style={{
@@ -688,16 +691,21 @@ export default function LandingPage() {
                 </div>
                 <h3 style={{ fontFamily: 'var(--ff-head)', fontSize: 15.5, fontWeight: 700, color: 'var(--t0)', marginBottom: 10, letterSpacing: -0.3, lineHeight: 1.3 }}>{title}</h3>
                 <p style={{ fontSize: 13, color: 'var(--t1)', lineHeight: 1.65, fontWeight: 300 }}>{desc}</p>
-              </div>
+              </motion.div>
             ))}
-          </div>
+          </motion.div>
         </div>
       </section>
 
       {/* ── Feature Showcase ── */}
-      <section className="tp-section-surface" ref={showcaseRef} aria-label="Imágenes del software de control horario Tempos en uso" style={{ padding: '0 clamp(18px,4vw,48px) clamp(56px,7vw,96px)', position: 'relative', zIndex: 1, borderTop: '1px solid var(--border)' }}>
+      <section className="tp-section-surface" id="proceso" aria-label="Imágenes del software de control horario Tempos en uso" style={{ padding: '0 clamp(18px,4vw,48px) clamp(56px,7vw,96px)', position: 'relative', zIndex: 1, borderTop: '1px solid var(--border)' }}>
         <div style={{ maxWidth: 1180, margin: '0 auto' }}>
-          <div style={{ textAlign: 'center', marginBottom: 72 }}>
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            whileInView={{ opacity: 1, scale: 1 }}
+            viewport={{ once: true }}
+            style={{ textAlign: 'center', marginBottom: 72, marginTop: 100 }}
+          >
             <span className="tp-label">Software en acción</span>
             <h2 style={{ fontFamily: 'var(--ff-head)', fontSize: 44, fontWeight: 600, color: 'var(--t0)', marginBottom: 14, lineHeight: 1.12 }}>
               Diseñado para el trabajo real
@@ -705,13 +713,16 @@ export default function LandingPage() {
             <p style={{ fontSize: 15.5, color: 'var(--t1)', maxWidth: 520, margin: '0 auto', lineHeight: 1.65, fontWeight: 300 }}>
               Desde el fichaje diario hasta los informes de fin de mes: Tempos cubre cada punto del ciclo de gestión horaria.
             </p>
-          </div>
+          </motion.div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'clamp(52px,7vw,88px)' }}>
             {showcase.map((item, i) => (
-              <div
+              <motion.div
                 key={item.title}
-                className={`tp-reveal ${showcaseVis ? 'tp-visible' : ''} tp-d${i}`}
+                initial={{ opacity: 0, x: i % 2 === 0 ? -40 : 40 }}
+                whileInView={{ opacity: 1, x: 0 }}
+                viewport={{ once: true, margin: "-100px" }}
+                transition={{ duration: 0.8, ease: "easeOut" }}
                 style={{
                   display: 'grid',
                   gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
@@ -719,7 +730,6 @@ export default function LandingPage() {
                   alignItems: 'center',
                 }}
               >
-                {/* Image side */}
                 <div
                   style={{
                     order: i % 2 === 0 ? 0 : 1,
@@ -736,13 +746,12 @@ export default function LandingPage() {
                   />
                   <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(10,10,10,0.32) 0%, transparent 55%)' }} aria-hidden="true" />
                 </div>
-                {/* Text side */}
                 <div style={{ order: i % 2 === 0 ? 1 : 0 }}>
                   <span className="tp-label" style={{ marginBottom: 16, display: 'inline-block' }}>{item.label}</span>
                   <h3 style={{ fontFamily: 'var(--ff-head)', fontSize: 'clamp(22px,3vw,30px)', fontWeight: 600, color: 'var(--t0)', marginBottom: 16, lineHeight: 1.22, letterSpacing: -0.4 }}>{item.title}</h3>
                   <p style={{ fontSize: 15, color: 'var(--t1)', lineHeight: 1.72, fontWeight: 300 }}>{item.desc}</p>
                 </div>
-              </div>
+              </motion.div>
             ))}
           </div>
         </div>
@@ -751,7 +760,12 @@ export default function LandingPage() {
       {/* ── Core modules ── */}
       <section className="tp-section-surface" aria-label="Funcionalidades clave del software de control horario" style={{ padding: '0 clamp(18px,4vw,48px) clamp(56px,7vw,100px)', position: 'relative', zIndex: 1, overflow: 'hidden' }}>
         <div style={{ maxWidth: 1180, margin: '0 auto' }}>
-          <div style={{ textAlign: 'center', marginBottom: 34 }}>
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            style={{ textAlign: 'center', marginBottom: 34, marginTop: 100 }}
+          >
             <span className="tp-label">Funcionalidades clave</span>
             <h2 style={{ fontFamily: 'var(--ff-head)', fontSize: 42, fontWeight: 600, color: 'var(--t0)', marginBottom: 14, lineHeight: 1.15 }}>
               Todo lo necesario para controlar la jornada
@@ -759,30 +773,59 @@ export default function LandingPage() {
             <p style={{ fontSize: 15.5, color: 'var(--t1)', lineHeight: 1.7, maxWidth: 760, margin: '0 auto', fontWeight: 300 }}>
               Tempos combina software de control horario, gestión de equipo y cumplimiento legal en tres módulos conectados para que no dependas de hojas de cálculo ni procesos manuales.
             </p>
-          </div>
+          </motion.div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+          <motion.div 
+            style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}
+            initial="hidden"
+            whileInView="show"
+            viewport={{ once: true }}
+            variants={{
+              hidden: { opacity: 0 },
+              show: {
+                opacity: 1,
+                transition: { staggerChildren: 0.1 }
+              }
+            }}
+          >
             {modules.map((item) => (
-              <div key={item.title} className="tp-card" style={{ borderRadius: 22, padding: '30px 28px' }}>
+              <motion.div 
+                key={item.title} 
+                variants={{
+                  hidden: { opacity: 0, scale: 0.95 },
+                  show: { opacity: 1, scale: 1 }
+                }}
+                className="tp-card" 
+                style={{ borderRadius: 22, padding: '30px 28px' }}
+              >
                 <h3 style={{ fontFamily: 'var(--ff-head)', fontSize: 19, color: 'var(--t0)', marginBottom: 10 }}>{item.title}</h3>
                 <p style={{ fontSize: 13.5, color: 'var(--t1)', lineHeight: 1.65, marginBottom: 16 }}>{item.desc}</p>
                 <p style={{ fontSize: 12.5, color: 'var(--mg)', lineHeight: 1.5, fontWeight: 600 }}>{item.cta}</p>
-              </div>
+              </motion.div>
             ))}
-          </div>
-
-          <div style={{ marginTop: 22, border: '1px solid var(--border)', borderRadius: 20, padding: '18px 20px', background: 'rgba(255,255,255,0.015)' }}>
+          </motion.div>
+          <motion.div 
+            style={{ marginTop: 22, border: '1px solid var(--border)', borderRadius: 20, padding: '18px 20px', background: 'rgba(255,255,255,0.015)' }}
+            initial={{ opacity: 0 }}
+            whileInView={{ opacity: 1 }}
+            viewport={{ once: true }}
+          >
             <p style={{ fontSize: 13.5, color: 'var(--t1)', lineHeight: 1.7 }}>
               Además, puedes activar reglas de geolocalización, validación por IP y modo offline para adaptarte a entornos presenciales, remotos o mixtos.
             </p>
-          </div>
+          </motion.div>
         </div>
       </section>
 
       {/* ── Target profiles ── */}
       <section className="tp-section-surface" aria-label="Para quién es Tempos" style={{ padding: '0 48px 96px', position: 'relative', zIndex: 1 }}>
         <div style={{ maxWidth: 1180, margin: '0 auto' }}>
-          <div style={{ textAlign: 'center', marginBottom: 34 }}>
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            style={{ textAlign: 'center', marginBottom: 34 }}
+          >
             <span className="tp-label">Tipos de empresa</span>
             <h2 style={{ fontFamily: 'var(--ff-head)', fontSize: 40, fontWeight: 600, color: 'var(--t0)', marginBottom: 12 }}>
               Adaptado a distintas formas de trabajo
@@ -790,21 +833,41 @@ export default function LandingPage() {
             <p style={{ fontSize: 15, color: 'var(--t1)', lineHeight: 1.7, maxWidth: 760, margin: '0 auto', fontWeight: 300 }}>
               Desde autónomos hasta pymes con varios turnos o centros: Tempos se adapta a la operativa real y reduce el tiempo dedicado al control de jornada.
             </p>
-          </div>
+          </motion.div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+          <motion.div 
+            style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}
+            initial="hidden"
+            whileInView="show"
+            viewport={{ once: true }}
+            variants={{
+              hidden: { opacity: 0 },
+              show: {
+                opacity: 1,
+                transition: { staggerChildren: 0.1 }
+              }
+            }}
+          >
             {targetProfiles.map((item) => (
-              <div key={item.title} className="tp-card" style={{ borderRadius: 20, padding: '26px 24px' }}>
+              <motion.div 
+                key={item.title} 
+                variants={{
+                  hidden: { opacity: 0, y: 15 },
+                  show: { opacity: 1, y: 0 }
+                }}
+                className="tp-card" 
+                style={{ borderRadius: 20, padding: '26px 24px' }}
+              >
                 <h3 style={{ fontFamily: 'var(--ff-head)', fontSize: 18, fontWeight: 600, color: 'var(--t0)', marginBottom: 9 }}>{item.title}</h3>
                 <p style={{ fontSize: 13.5, color: 'var(--t1)', lineHeight: 1.65 }}>{item.desc}</p>
-              </div>
+              </motion.div>
             ))}
-          </div>
+          </motion.div>
         </div>
       </section>
 
       {/* ── How it works ── */}
-      <section className="tp-section-surface" id="proceso" ref={stepsRef} aria-label="Cómo usar Tempos — 3 pasos para empezar" style={{
+      <section className="tp-section-surface" id="pasos" aria-label="Cómo usar Tempos — 3 pasos para empezar" style={{
         padding: 'clamp(56px,7vw,100px) clamp(18px,4vw,48px)',
         background: 'rgba(255,255,255,0.012)',
         borderTop: '1px solid var(--border)',
@@ -812,18 +875,38 @@ export default function LandingPage() {
         position: 'relative', zIndex: 1,
       }}>
         <div style={{ maxWidth: 860, margin: '0 auto' }}>
-          <div className={`tp-reveal ${stepsVis ? 'tp-visible' : ''}`} style={{ textAlign: 'center', marginBottom: 72 }}>
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            style={{ textAlign: 'center', marginBottom: 72 }}
+          >
             <span className="tp-label">Despliegue instantáneo</span>
             <h2 style={{ fontFamily: 'var(--ff-head)', fontSize: 48, fontWeight: 600, letterSpacing: 0.5, color: 'var(--t0)' }}>
               100% operativo hoy mismo
             </h2>
-          </div>
+          </motion.div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+          <motion.div 
+            style={{ display: 'flex', flexDirection: 'column', gap: 0 }}
+            initial="hidden"
+            whileInView="show"
+            viewport={{ once: true }}
+            variants={{
+              hidden: { opacity: 0 },
+              show: {
+                opacity: 1,
+                transition: { staggerChildren: 0.15 }
+              }
+            }}
+          >
             {steps.map(({ n, title, desc }, i) => (
-              <div
+              <motion.div
                 key={n}
-                className={`tp-reveal ${stepsVis ? 'tp-visible' : ''} tp-d${i}`}
+                variants={{
+                  hidden: { opacity: 0, x: -20 },
+                  show: { opacity: 1, x: 0 }
+                }}
                 style={{
                   display: 'flex', gap: 36, alignItems: 'flex-start',
                   padding: '36px 0',
@@ -846,16 +929,21 @@ export default function LandingPage() {
                   <h3 style={{ fontFamily: 'var(--ff-head)', fontSize: 20, fontWeight: 700, color: 'var(--t0)', marginBottom: 10, letterSpacing: -0.5 }}>{title}</h3>
                   <p style={{ fontSize: 14, color: 'var(--t1)', lineHeight: 1.7, maxWidth: 540, fontWeight: 300 }}>{desc}</p>
                 </div>
-              </div>
+              </motion.div>
             ))}
-          </div>
+          </motion.div>
         </div>
       </section>
 
       {/* ── Use cases ── */}
       <section className="tp-section-surface" aria-label="Razones operativas y casos de uso de Tempos" style={{ padding: 'clamp(52px,6vw,88px) clamp(18px,4vw,48px)', position: 'relative', zIndex: 1 }}>
         <div style={{ maxWidth: 1180, margin: '0 auto' }}>
-          <div style={{ textAlign: 'center', marginBottom: 36 }}>
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            style={{ textAlign: 'center', marginBottom: 36 }}
+          >
             <span className="tp-label">Casos de uso</span>
             <h2 style={{ fontFamily: 'var(--ff-head)', fontSize: 42, fontWeight: 600, color: 'var(--t0)', marginBottom: 14 }}>
               Cuándo tiene sentido implantar Tempos
@@ -863,34 +951,80 @@ export default function LandingPage() {
             <p style={{ fontSize: 15.5, color: 'var(--t1)', lineHeight: 1.7, maxWidth: 760, margin: '0 auto', fontWeight: 300 }}>
               El valor no está solo en fichar. Está en reducir tiempo administrativo, ordenar incidencias y disponer de información fiable cuando la empresa la necesita.
             </p>
-          </div>
+          </motion.div>
 
-          <div className="tp-grid-3" style={{ marginBottom: 18 }}>
+          <motion.div 
+            className="tp-grid-3" 
+            style={{ marginBottom: 18 }}
+            initial="hidden"
+            whileInView="show"
+            viewport={{ once: true }}
+            variants={{
+              hidden: { opacity: 0 },
+              show: {
+                opacity: 1,
+                transition: { staggerChildren: 0.1 }
+              }
+            }}
+          >
             {proofItems.map((item) => (
-              <div key={item.value} className="tp-card" style={{ borderRadius: 20, padding: '26px 22px', textAlign: 'center' }}>
+              <motion.div 
+                key={item.value} 
+                variants={{
+                  hidden: { opacity: 0, scale: 0.9 },
+                  show: { opacity: 1, scale: 1 }
+                }}
+                className="tp-card" 
+                style={{ borderRadius: 20, padding: '26px 22px', textAlign: 'center' }}
+              >
                 <div style={{ fontFamily: 'var(--ff-head)', fontSize: 32, fontWeight: 600, color: 'var(--mg)', marginBottom: 8 }}>{item.value}</div>
                 <p style={{ fontSize: 13.5, color: 'var(--t1)', lineHeight: 1.65 }}>{item.label}</p>
-              </div>
+              </motion.div>
             ))}
-          </div>
+          </motion.div>
 
-          <div className="tp-grid-3">
+          <motion.div 
+            className="tp-grid-3"
+            initial="hidden"
+            whileInView="show"
+            viewport={{ once: true }}
+            variants={{
+              hidden: { opacity: 0 },
+              show: {
+                opacity: 1,
+                transition: { staggerChildren: 0.12, delayChildren: 0.3 }
+              }
+            }}
+          >
             {useCases.map((item) => (
-              <div key={item.name} className="tp-card" style={{ borderRadius: 20, padding: '24px 22px' }}>
+              <motion.div 
+                key={item.name} 
+                variants={{
+                  hidden: { opacity: 0, y: 15 },
+                  show: { opacity: 1, y: 0 }
+                }}
+                className="tp-card" 
+                style={{ borderRadius: 20, padding: '24px 22px' }}
+              >
                 <p style={{ fontSize: 14, color: 'var(--t0)', lineHeight: 1.75, marginBottom: 14 }}>
                   {item.quote}
                 </p>
                 <div style={{ fontSize: 12.5, color: 'var(--mg)', fontWeight: 600 }}>{item.name}</div>
-              </div>
+              </motion.div>
             ))}
-          </div>
+          </motion.div>
         </div>
       </section>
 
       {/* ── FAQs ── */}
       <section className="tp-section-surface" id="faqs" aria-label="Preguntas frecuentes sobre el software de control horario" style={{ padding: '0 clamp(18px,4vw,48px) clamp(56px,7vw,100px)', position: 'relative', zIndex: 1 }}>
         <div style={{ maxWidth: 980, margin: '0 auto' }}>
-          <div style={{ textAlign: 'center', marginBottom: 34 }}>
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            style={{ textAlign: 'center', marginBottom: 34, marginTop: 100 }}
+          >
             <span className="tp-label">FAQs</span>
             <h2 style={{ fontFamily: 'var(--ff-head)', fontSize: 40, fontWeight: 600, color: 'var(--t0)', marginBottom: 12 }}>
               Respuestas claras antes de empezar
@@ -898,23 +1032,48 @@ export default function LandingPage() {
             <p style={{ fontSize: 15, color: 'var(--t1)', lineHeight: 1.7, maxWidth: 740, margin: '0 auto', fontWeight: 300 }}>
               Todo lo que suele preguntar una empresa antes de implantar un software de control horario y registro de jornada laboral.
             </p>
-          </div>
+          </motion.div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <motion.div 
+            style={{ display: 'flex', flexDirection: 'column', gap: 12 }}
+            initial="hidden"
+            whileInView="show"
+            viewport={{ once: true }}
+            variants={{
+              hidden: { opacity: 0 },
+              show: {
+                opacity: 1,
+                transition: { staggerChildren: 0.08 }
+              }
+            }}
+          >
             {faqs.map((item) => (
-              <div key={item.q} className="tp-card" style={{ borderRadius: 16, padding: '18px 20px' }}>
+              <motion.div 
+                key={item.q} 
+                variants={{
+                  hidden: { opacity: 0, x: -10 },
+                  show: { opacity: 1, x: 0 }
+                }}
+                className="tp-card" 
+                style={{ borderRadius: 16, padding: '18px 20px' }}
+              >
                 <h3 style={{ fontSize: 15.5, color: 'var(--t0)', marginBottom: 8 }}>{item.q}</h3>
                 <p style={{ fontSize: 13.5, color: 'var(--t1)', lineHeight: 1.65 }}>{item.a}</p>
-              </div>
+              </motion.div>
             ))}
-          </div>
+          </motion.div>
         </div>
       </section>
 
       {/* ── Comparison ── */}
       <section className="tp-section-surface" aria-label="Comparativa entre control manual y control horario digital" style={{ padding: '0 48px 88px', position: 'relative', zIndex: 1 }}>
         <div style={{ maxWidth: 980, margin: '0 auto' }}>
-          <div style={{ textAlign: 'center', marginBottom: 30 }}>
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            style={{ textAlign: 'center', marginBottom: 30 }}
+          >
             <span className="tp-label">Comparativa</span>
             <h2 style={{ fontFamily: 'var(--ff-head)', fontSize: 40, fontWeight: 600, color: 'var(--t0)', marginBottom: 12 }}>
               Seguir con papel cuesta más de lo que parece
@@ -922,7 +1081,7 @@ export default function LandingPage() {
             <p style={{ fontSize: 15, color: 'var(--t1)', lineHeight: 1.7, maxWidth: 720, margin: '0 auto', fontWeight: 300 }}>
               Si el control horario depende de procesos manuales, la empresa pierde tiempo, consistencia y capacidad de respuesta ante incidencias o requerimientos de documentación.
             </p>
-          </div>
+          </motion.div>
 
           <div className="tp-card" style={{ borderRadius: 22, overflow: 'hidden' }}>
             {compareRows.map((row, index) => (
@@ -941,7 +1100,12 @@ export default function LandingPage() {
 
       {/* ── Mid CTA ── */}
       <section className="tp-section-surface" aria-label="Llamada a la acción antes de precios" style={{ padding: '0 clamp(18px,4vw,48px) clamp(52px,6vw,88px)', position: 'relative', zIndex: 1 }}>
-        <div style={{ maxWidth: 980, margin: '0 auto', border: '1px solid rgba(37,99,235,0.24)', background: 'linear-gradient(180deg, rgba(37,99,235,0.09), rgba(255,255,255,0.015))', borderRadius: 24, padding: '30px 30px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 20, flexWrap: 'wrap' }}>
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.98 }}
+          whileInView={{ opacity: 1, scale: 1 }}
+          viewport={{ once: true }}
+          style={{ maxWidth: 980, margin: '0 auto', border: '1px solid rgba(37,99,235,0.24)', background: 'linear-gradient(180deg, rgba(37,99,235,0.09), rgba(255,255,255,0.015))', borderRadius: 24, padding: '30px 30px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 20, flexWrap: 'wrap' }}
+        >
           <div>
             <h2 style={{ fontFamily: 'var(--ff-head)', fontSize: 28, fontWeight: 600, color: 'var(--t0)', marginBottom: 8 }}>
               Empieza a digitalizar el control horario sin complicarte
@@ -953,23 +1117,28 @@ export default function LandingPage() {
           <button onClick={() => navigateWithTransition('/trial')} className="tp-btn tp-btn-primary" style={{ borderRadius: 13, padding: '15px 24px', fontSize: 14.5, flexShrink: 0 }}>
             {ctaCopy.midPrimary}
           </button>
-        </div>
+        </motion.div>
       </section>
 
       {/* ── Pricing ── */}
-      <section className="tp-section-surface" id="precios" ref={pricingRef} aria-label="Precios de Tempos — Planes para autónomos y empresas" style={{
+      <section className="tp-section-surface" id="precios" aria-label="Precios de Tempos — Planes para autónomos y empresas" style={{
         padding: 'clamp(60px,8vw,120px) clamp(18px,4vw,48px) clamp(70px,9vw,140px)', borderTop: '1px solid var(--border)', overflow: 'hidden',
         background: 'rgba(255,255,255,0.012)',
         position: 'relative', zIndex: 1,
       }}>
         <div style={{ maxWidth: 920, margin: '0 auto' }}>
-          <div className={`tp-reveal ${pricingVis ? 'tp-visible' : ''}`} style={{ textAlign: 'center', marginBottom: 64 }}>
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            style={{ textAlign: 'center', marginBottom: 64 }}
+          >
             <span className="tp-label">Precios</span>
             <h2 style={{ fontFamily: 'var(--ff-head)', fontSize: 48, fontWeight: 600, letterSpacing: 0.5, color: 'var(--t0)', marginBottom: 12 }}>
               Transparente, sin sorpresas
             </h2>
             <p style={{ fontSize: 15, color: 'var(--t1)', fontWeight: 300 }}>14 días de prueba gratuita. Sin tarjeta de crédito. Sin permanencia.</p>
-          </div>
+          </motion.div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 24 }}>
 
@@ -1070,7 +1239,6 @@ export default function LandingPage() {
                 Contactar Ventas
               </button>
             </motion.div>
-
           </div>
 
           <motion.p 
@@ -1088,7 +1256,13 @@ export default function LandingPage() {
       {/* ── Final CTA ── */}
       <section className="tp-section-surface" aria-label="Empieza a usar Tempos hoy" style={{ padding: 'clamp(60px,8vw,120px) clamp(18px,4vw,48px)', textAlign: 'center', position: 'relative', zIndex: 1, overflow: 'hidden' }}>
         <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: 800, height: 400, background: 'radial-gradient(ellipse, rgba(37,99,235,0.1) 0%, transparent 65%)', pointerEvents: 'none' }}/>
-        <div style={{ maxWidth: 640, margin: '0 auto', position: 'relative' }}>
+        <motion.div 
+          style={{ maxWidth: 640, margin: '0 auto', position: 'relative' }}
+          initial={{ opacity: 0, scale: 0.95 }}
+          whileInView={{ opacity: 1, scale: 1 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.8 }}
+        >
           <span className="tp-label">Transformación inmediata</span>
           <h2 style={{ fontFamily: 'var(--ff-head)', fontSize: 56, fontWeight: 600, letterSpacing: 0.5, color: 'var(--t0)', marginBottom: 18, lineHeight: 1.08 }}>
             Es hora de liderar<br/>con mejores datos.
@@ -1101,19 +1275,17 @@ export default function LandingPage() {
             }}>
               {ctaCopy.finalPrimary} <Icon.ArrowRight />
             </button>
-        </div>
+        </motion.div>
       </section>
 
       </main>
 
-      {/* ── Footer Estratégico de Marca ── */}
       <footer role="contentinfo" style={{
         borderTop: '1px solid var(--border)',
         padding: '80px 48px 60px',
         background: 'radial-gradient(circle at top, rgba(37,99,235,0.02) 0%, transparent 70%)',
         position: 'relative', zIndex: 1,
       }}>
-        {/* Importación de fuentes */}
         <style>{`
           @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@800&display=swap');
           .tp-s9-footer-logo {
@@ -1139,8 +1311,6 @@ export default function LandingPage() {
         `}</style>
 
         <div style={{ maxWidth: 1200, margin: '0 auto' }}>
-          
-          {/* Fila Superior: Tempos (Producto Hero) */}
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', marginBottom: 60 }}>
             <div style={{ marginBottom: 16 }}>
               <Logo size="lg" />
@@ -1150,7 +1320,6 @@ export default function LandingPage() {
             </p>
           </div>
 
-          {/* Fila Inferior: Links y Firma Script 9 */}
           <div style={{ 
             display: 'flex', 
             justifyContent: 'space-between', 
@@ -1160,8 +1329,6 @@ export default function LandingPage() {
             borderTop: '1px solid var(--border)',
             paddingTop: 40
           }}>
-            
-            {/* Izquierda: Legal y Copyright */}
             <div style={{ flex: 1, minWidth: 280 }}>
               <div style={{ display: 'flex', gap: 24, marginBottom: 16 }}>
                 <Link to="/legal/terminos" className="tp-foot-link">Términos</Link>
@@ -1173,7 +1340,6 @@ export default function LandingPage() {
               </p>
             </div>
 
-            {/* Derecha: Firma Script 9 (Esquina) */}
             <div style={{ 
               display: 'flex', 
               flexDirection: 'column', 
@@ -1188,7 +1354,6 @@ export default function LandingPage() {
                 href="https://www.script-9.com" 
                 target="_blank" 
                 rel="noopener noreferrer"
-                className="group"
                 style={{ textDecoration: 'none' }}
               >
                 <div className="tp-s9-footer-logo" style={{ marginBottom: 6 }}>
@@ -1203,7 +1368,6 @@ export default function LandingPage() {
           </div>
         </div>
       </footer>
-
     </div>
   );
 }

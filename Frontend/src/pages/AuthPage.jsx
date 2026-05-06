@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { bootstrapLocalSession, getClientSession, registerMe, getMe, setClientSession } from '@/lib/api';
-import { signInAndGetIdToken, signInWithGoogleAndGetIdToken } from '@/lib/firebaseClient';
+import { signInAndGetIdToken, signInWithGoogleAndGetIdToken, handleGoogleRedirectResult } from '@/lib/firebaseClient';
 import Logo from '@/components/ui/Logo';
 
 const MIN_PASSWORD_LENGTH = 8;
@@ -101,6 +101,34 @@ export default function AuthPage({ mode }) {
     }
   }, [isLogin, navigate]);
 
+  // Manejar el retorno de Google (Redirect)
+  useEffect(() => {
+    const checkRedirect = async () => {
+      try {
+        const idToken = await handleGoogleRedirectResult();
+        if (idToken) {
+          setIsSubmitting(true);
+          try {
+            await registerMe(idToken, { role: 'admin', companyName: 'Google Company' });
+          } catch { /* Ignorar si ya existe */ }
+          const profile = await getMe(idToken);
+          setClientSession({ 
+            token: idToken, 
+            isAdmin: profile.role === 'admin' || profile.role === 'manager', 
+            localMode: false, 
+            profile 
+          });
+          navigate('/dashboard');
+        }
+      } catch (err) {
+        console.error('Error en retorno de Google:', err);
+      } finally {
+        setIsSubmitting(false);
+      }
+    };
+    checkRedirect();
+  }, [navigate]);
+
   const clearFieldError = (field) => {
     setErrors(prev => {
       if (!prev[field]) {
@@ -181,7 +209,12 @@ export default function AuthPage({ mode }) {
       }
 
       const profile = await getMe(idToken);
-      const session = { token: idToken, isAdmin: true, localMode: false, profile };
+      const session = { 
+        token: idToken, 
+        isAdmin: profile.role === 'admin' || profile.role === 'manager', 
+        localMode: false, 
+        profile 
+      };
       setClientSession(session);
       navigate('/dashboard');
       return;
@@ -201,6 +234,10 @@ export default function AuthPage({ mode }) {
 
     try {
       const idToken = await signInWithGoogleAndGetIdToken();
+      if (!idToken) {
+        setIsSubmitting(false);
+        return;
+      }
       
       // Intentar registro rápido (si ya existe, el backend devolverá 409 y seguimos)
       try {
@@ -210,7 +247,12 @@ export default function AuthPage({ mode }) {
       }
 
       const profile = await getMe(idToken);
-      const session = { token: idToken, isAdmin: true, localMode: false, profile };
+      const session = { 
+        token: idToken, 
+        isAdmin: profile.role === 'admin' || profile.role === 'manager', 
+        localMode: false, 
+        profile 
+      };
       setClientSession(session);
       navigate('/dashboard');
     } catch (err) {

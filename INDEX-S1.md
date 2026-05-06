@@ -93,7 +93,7 @@ cat DEPLOYMENT-S1.md  # leer instrucciones
 # Ejecutar: setup, migraciones, tests
 
 # C. Verificar que todo funciona
-curl http://localhost:8080/health
+curl http://localhost:8081/health
 ```
 
 ### 3. Merge a GitHub (5 min)

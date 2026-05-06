@@ -129,16 +129,16 @@ O usar Cloud Build trigger directamente en GitHub.
 
 ```bash
 # Registrar usuario (con token de Firebase)
-curl -X POST http://localhost:8080/api/v1/auth/register \
+curl -X POST http://localhost:8081/api/v1/auth/register \
   -H "Authorization: Bearer YOUR_FIREBASE_ID_TOKEN" \
   -H "Content-Type: application/json"
 
 # Get perfil
-curl -X GET http://localhost:8080/api/v1/auth/me \
+curl -X GET http://localhost:8081/api/v1/auth/me \
   -H "Authorization: Bearer YOUR_FIREBASE_ID_TOKEN"
 
 # Health check
-curl http://localhost:8080/health
+curl http://localhost:8081/health
 ```
 
 ---

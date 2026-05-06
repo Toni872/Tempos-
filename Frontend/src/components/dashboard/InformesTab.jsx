@@ -75,11 +75,17 @@ export default function InformesTab({ auditLogs, onExportAudit, onExportInspecti
                 <h4 className="text-lg font-black text-white group-hover:text-blue-400 transition-colors">{report.title}</h4>
                 <p className="text-sm text-zinc-500 font-medium leading-relaxed">{report.desc}</p>
                 <div className="pt-4 flex items-center gap-3">
-                   <button className="flex items-center gap-2 px-4 py-2 bg-white/[0.03] hover:bg-white/[0.08] border border-white/[0.06] rounded-xl text-[10px] font-black uppercase tracking-widest text-zinc-300 transition-all">
+                   <button 
+                    onClick={() => report.id === 'asistencia' ? onExportInspection('csv') : onExportAudit('csv')}
+                    className="flex items-center gap-2 px-4 py-2 bg-white/[0.03] hover:bg-white/[0.08] border border-white/[0.06] rounded-xl text-[10px] font-black uppercase tracking-widest text-zinc-300 transition-all"
+                   >
                       <FileCsv className="w-4 h-4 text-emerald-500" weight="fill" />
                       CSV
                    </button>
-                   <button className="flex items-center gap-2 px-4 py-2 bg-white/[0.03] hover:bg-white/[0.08] border border-white/[0.06] rounded-xl text-[10px] font-black uppercase tracking-widest text-zinc-300 transition-all">
+                   <button 
+                    onClick={() => report.id === 'asistencia' ? onExportInspection('pdf') : onExportAudit('pdf')}
+                    className="flex items-center gap-2 px-4 py-2 bg-white/[0.03] hover:bg-white/[0.08] border border-white/[0.06] rounded-xl text-[10px] font-black uppercase tracking-widest text-zinc-300 transition-all"
+                   >
                       <FilePdf className="w-4 h-4 text-rose-500" weight="fill" />
                       PDF
                    </button>
@@ -98,7 +104,10 @@ export default function InformesTab({ auditLogs, onExportAudit, onExportInspecti
             <p className="text-zinc-400 font-medium text-lg leading-relaxed">
               Descarga un archivo ZIP consolidado con todos los registros horarios firmados, auditorías de ubicación GPS y documentos laborales encriptados. Cumplimiento 100% garantizado con el RD 8/2019.
             </p>
-            <button className="flex items-center gap-3 px-8 py-4 bg-blue-600 hover:bg-blue-500 shadow-[0_0_30px_rgba(37,99,235,0.4)] hover:shadow-[0_0_40px_rgba(37,99,235,0.6)] text-white font-black text-xs uppercase tracking-[0.2em] rounded-2xl transition-all active:scale-[0.98]">
+            <button 
+              onClick={() => onExportInspection('pdf')}
+              className="flex items-center gap-3 px-8 py-4 bg-blue-600 hover:bg-blue-500 shadow-[0_0_30px_rgba(37,99,235,0.4)] hover:shadow-[0_0_40px_rgba(37,99,235,0.6)] text-white font-black text-xs uppercase tracking-[0.2em] rounded-2xl transition-all active:scale-[0.98]"
+            >
                Generar Pack Consolidado (PDF) <DownloadSimple weight="bold" className="w-5 h-5" />
             </button>
          </div>

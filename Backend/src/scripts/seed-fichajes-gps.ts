@@ -24,10 +24,10 @@ async function seedFichajesGPS() {
 
   const today = new Date().toISOString().split('T')[0];
 
-  const testFichas = [
+  const testFichas: Partial<Ficha>[] = [
     {
       userId: user.uid,
-      date: today,
+      date: new Date(today),
       startTime: "08:30",
       description: "Entrada Sede Central",
       status: "draft",
@@ -35,7 +35,7 @@ async function seedFichajesGPS() {
     },
     {
       userId: user.uid,
-      date: today,
+      date: new Date(today),
       startTime: "10:15",
       description: "Visita Cliente Calle Mayor",
       status: "draft",
@@ -43,7 +43,7 @@ async function seedFichajesGPS() {
     },
     {
       userId: user.uid,
-      date: today,
+      date: new Date(today),
       startTime: "12:00",
       description: "Reunión Palacio Real",
       status: "draft",

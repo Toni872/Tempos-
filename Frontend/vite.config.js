@@ -60,7 +60,11 @@ export default defineConfig({
 
           if (packageName === 'react-router-dom') return 'vendor-router';
           if (packageName === 'recharts') return 'vendor-recharts';
-          if (packageName === 'firebase') return 'vendor-firebase';
+          if (packageName.includes('firebase')) return 'vendor-firebase';
+          if (packageName === 'mapbox-gl') return 'vendor-maps';
+          if (packageName === 'leaflet' || packageName === 'react-leaflet') return 'vendor-maps';
+          if (packageName === 'lucide-react' || packageName.includes('phosphor-icons')) return 'vendor-icons';
+          if (packageName.includes('react-pdf')) return 'vendor-pdf';
           if (packageName === 'scheduler') return 'vendor-react';
           if (packageName === 'react' || packageName === 'react-dom') return 'vendor-react';
           if (packageName.startsWith('@capacitor')) return 'vendor-capacitor';
@@ -71,21 +75,21 @@ export default defineConfig({
   },
   server: {
     port: 5173,
+    host: true,
     headers: {
       'X-Content-Type-Options': 'nosniff',
       'X-XSS-Protection': '1; mode=block',
       'Referrer-Policy': 'no-referrer-when-downgrade',
       'Cross-Origin-Opener-Policy': 'unsafe-none',
-      // Eliminamos X-Frame-Options para permitir el handshake de Firebase en Chrome local
-      'Content-Security-Policy': "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://*.google.com https://*.googleapis.com https://*.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' http://localhost:8080 http://localhost:5173 http://localhost:5174 https:; worker-src 'self' blob:; frame-src 'self' https://*.firebaseapp.com https://*.google.com https:;"
+      'Content-Security-Policy': "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://*.google.com https://*.googleapis.com https://*.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' http://localhost:8081 http://localhost:5173 http://localhost:5174 https:; worker-src 'self' blob:; frame-src 'self' https://*.firebaseapp.com https://*.google.com https:;"
     },
     proxy: {
       '/api': {
-        target: 'http://localhost:8080',
+        target: 'http://localhost:8081',
         changeOrigin: true,
       },
       '/status': {
-        target: 'http://localhost:8080',
+        target: 'http://localhost:8081',
         changeOrigin: true,
       },
     },

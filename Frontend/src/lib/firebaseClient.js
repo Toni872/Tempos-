@@ -1,5 +1,17 @@
-// Carga Firebase de forma dinámica. Si la dependencia `firebase` no está instalada,
-// mostramos un error manejable en tiempo de ejecución en lugar de romper la carga del bundle.
+import { initializeApp, getApps } from 'firebase/app';
+import { 
+  getAuth, 
+  GoogleAuthProvider, 
+  signInWithPopup, 
+  signInWithRedirect,
+  getRedirectResult,
+  signInWithEmailAndPassword,
+  signOut,
+  browserPopupRedirectResolver,
+  indexedDBLocalPersistence,
+  initializeAuth
+} from 'firebase/auth';
+
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
@@ -9,89 +21,68 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID,
 };
 
-let _initialized = false;
-let _auth = null;
+const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
 
-async function _ensureFirebase() {
-  if (_initialized) return;
-  _initialized = true;
-  try {
-    const firebase = await import('firebase/app');
-    const { getAuth, signInWithEmailAndPassword } = await import('firebase/auth');
-    // initializeApp may throw if config is incomplete — surface a clear error
-    try {
-      firebase.initializeApp(firebaseConfig);
-    } catch (initErr) {
-      // If already initialized by another part, ignore
-      if (!/already exists/.test(String(initErr))) {
-        throw initErr;
-      }
-    }
-    _auth = getAuth();
-    // Guardamos la función de signin en el objeto para exportar en runtime
-    _ensureFirebase.signIn = async (email, password) => {
-      const userCredential = await signInWithEmailAndPassword(_auth, email, password);
-      if (!userCredential) throw new Error('No se pudo autenticar');
-      return userCredential.user.getIdToken();
-    };
-  } catch (err) {
-    // Dependencia ausente o fallo en init — proporcionar un error claro
-    const msg = (err && err.code === 'ERR_MODULE_NOT_FOUND') || /Cannot find module/.test(String(err))
-      ? 'Módulo "firebase" no instalado. Instala "firebase" en Frontend con `npm install firebase` para habilitar autenticación.'
-      : `Error inicializando Firebase: ${String(err)}`;
-    throw new Error(msg);
-  }
-}
+// Inicialización ultra-explícita para evitar bloqueos de Chrome
+const auth = initializeAuth(app, {
+  persistence: indexedDBLocalPersistence,
+  popupRedirectResolver: browserPopupRedirectResolver
+});
 
 export async function signInAndGetIdToken(email, password) {
-  await _ensureFirebase();
-  if (typeof _ensureFirebase.signIn !== 'function') {
-    throw new Error('Firebase no está disponible');
-  }
-  return _ensureFirebase.signIn(email, password);
+  const userCredential = await signInWithEmailAndPassword(auth, email, password);
+  return userCredential.user.getIdToken();
 }
 
-export async function signInWithGoogleAndGetIdToken() {
-  await _ensureFirebase();
-  if (!_auth) {
-    throw new Error('Firebase no está disponible');
-  }
-
-  const { GoogleAuthProvider, signInWithPopup, browserPopupRedirectResolver } = await import('firebase/auth');
+export const signInWithGoogleAndGetIdToken = async (mode = 'popup') => {
   const provider = new GoogleAuthProvider();
-  
+  provider.setCustomParameters({ 
+    prompt: 'select_account',
+    // Forzamos que no intente usar sesiones previas que puedan estar bloqueadas
+    auth_type: 'reauthenticate' 
+  });
+
   try {
-    console.log('🚀 [AUTH] Iniciando flujo Google con Popup...');
-    const userCredential = await signInWithPopup(_auth, provider, browserPopupRedirectResolver);
-    
-    if (!userCredential) {
-      throw new Error('No se pudo autenticar con Google (sin credenciales)');
-    }
-    
-    console.log('✅ [AUTH] Autenticación exitosa');
-    return userCredential.user.getIdToken();
-  } catch (err) {
-    console.error('❌ [AUTH] Error en Google SignIn:', err);
-    
-    // Mapeo de errores específicos para ayudar al usuario
-    if (err.code === 'auth/popup-blocked') {
-      throw new Error('El navegador ha bloqueado la ventana emergente. Por favor, permite los popups para este sitio.');
-    }
-    if (err.code === 'auth/internal-error') {
-      throw new Error('Error interno de Firebase. Comprueba que el dominio localhost:5173 esté autorizado en la consola de Firebase.');
-    }
-    if (err.code === 'auth/network-request-failed') {
-      throw new Error('Error de red. Comprueba tu conexión o si Chrome está bloqueando las peticiones a Google.');
-    }
-    if (err.code === 'auth/cancelled-popup-request' || err.code === 'auth/popup-closed-by-user') {
-      return null; // El usuario cerró la ventana, no es un error crítico
-    }
+    console.log('⚡ [AUTH] Iniciando proceso de Google...');
 
-    throw err;
+    if (mode === 'redirect') {
+      await signInWithRedirect(auth, provider);
+      return null;
+    }
+    const result = await signInWithPopup(auth, provider);
+    console.log('✅ [AUTH] Login exitoso!');
+    return await result.user.getIdToken();
+  } catch (error) {
+    console.error('❌ [AUTH] Error detallado:', {
+      code: error.code,
+      message: error.message,
+      customData: error.customData
+    });
+    
+    if (error.code === 'auth/popup-closed-by-user') {
+      console.warn('⚠️ [AUTH] El popup se cerró solo o fue bloqueado. Saltando a Redirect...');
+    }
+    
+    await signInWithRedirect(auth, provider);
+    return null;
   }
+};
+
+export const handleGoogleRedirectResult = async () => {
+  try {
+    const result = await getRedirectResult(auth);
+    if (result) {
+      return await result.user.getIdToken();
+    }
+    return null;
+  } catch (error) {
+    console.error('❌ [AUTH] Error en retorno:', error);
+    return null;
+  }
+};
+
+export async function logout() {
+  await signOut(auth);
 }
 
-export function initFirebase() {
-  // Mantener por compatibilidad: intenta inicializar pero no lanza si falla, para permitir modo local
-  return _ensureFirebase().then(() => ({ auth: _auth })).catch(() => null);
-}
+export { auth };
