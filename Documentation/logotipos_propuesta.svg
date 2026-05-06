@@ -1,0 +1,190 @@
+<svg viewBox="0 0 1200 900" xmlns="http://www.w3.org/2000/svg">
+  <!-- Fondo -->
+  <rect width="1200" height="900" fill="#f8f9fa"/>
+  
+  <!-- Títulos y separadores -->
+  <text x="600" y="40" font-size="36" font-weight="bold" text-anchor="middle" fill="#1a1a1a">
+    Propuestas de Logotipos - TEMPOS
+  </text>
+  <line x1="50" y1="60" x2="1150" y2="60" stroke="#ddd" stroke-width="2"/>
+  
+  <!-- ============ LOGOTIPO 1: Reloj Moderno ============ -->
+  <g>
+    <text x="300" y="130" font-size="18" font-weight="bold" fill="#2c3e50">
+      Opción 1: Reloj Moderno
+    </text>
+    <text x="300" y="155" font-size="12" fill="#666">
+      Concepto: Tiempo + Dinamismo
+    </text>
+    
+    <!-- Círculo fondo -->
+    <circle cx="300" cy="280" r="70" fill="#3498db" opacity="0.1" stroke="#3498db" stroke-width="2"/>
+    
+    <!-- Reloj minimalista -->
+    <circle cx="300" cy="280" r="55" fill="none" stroke="#3498db" stroke-width="3"/>
+    
+    <!-- Números simplificados -->
+    <circle cx="300" cy="230" r="3" fill="#3498db"/>
+    <circle cx="345" cy="280" r="3" fill="#3498db"/>
+    <circle cx="300" cy="330" r="3" fill="#3498db"/>
+    <circle cx="255" cy="280" r="3" fill="#3498db"/>
+    
+    <!-- Agujas dinámicas (ángulo 10:10 - posición clásica de relojes) -->
+    <line x1="300" y1="280" x2="300" y2="245" stroke="#3498db" stroke-width="3" stroke-linecap="round"/>
+    <line x1="300" y1="280" x2="330" y2="270" stroke="#2ecc71" stroke-width="3" stroke-linecap="round"/>
+    
+    <!-- Centro puntero -->
+    <circle cx="300" cy="280" r="5" fill="#3498db"/>
+    
+    <!-- Texto con logo -->
+    <text x="300" y="380" font-size="16" font-weight="bold" text-anchor="middle" fill="#1a1a1a">
+      TEMPOS
+    </text>
+    <text x="300" y="402" font-size="11" text-anchor="middle" fill="#666">
+      Tiempo de trabajo
+    </text>
+  </g>
+  
+  <!-- ============ LOGOTIPO 2: T + Gráfica ============ -->
+  <g>
+    <text x="600" y="130" font-size="18" font-weight="bold" fill="#2c3e50">
+      Opción 2: T + Estadísticas
+    </text>
+    <text x="600" y="155" font-size="12" fill="#666">
+      Concepto: Inicial + Datos
+    </text>
+    
+    <!-- Fondo cuadrado -->
+    <rect x="570" y="210" width="60" height="60" fill="#e74c3c" opacity="0.1" stroke="#e74c3c" stroke-width="2" rx="8"/>
+    
+    <!-- Letra T estilizada -->
+    <rect x="580" y="215" width="40" height="8" fill="#e74c3c" rx="2"/>
+    <rect x="595" y="223" width="10" height="40" fill="#e74c3c" rx="2"/>
+    
+    <!-- Barras de datos superpuestas (esquina inferior derecha) -->
+    <rect x="615" y="245" width="6" height="12" fill="#3498db" rx="1"/>
+    <rect x="625" y="240" width="6" height="17" fill="#2ecc71" rx="1"/>
+    <rect x="635" y="235" width="6" height="22" fill="#f39c12" rx="1"/>
+    
+    <!-- Texto con logo -->
+    <text x="600" y="320" font-size="16" font-weight="bold" text-anchor="middle" fill="#1a1a1a">
+      TEMPOS
+    </text>
+    <text x="600" y="342" font-size="11" text-anchor="middle" fill="#666">
+      Control de horas
+    </text>
+  </g>
+  
+  <!-- ============ LOGOTIPO 3: Hexágono + Flecha ============ -->
+  <g>
+    <text x="900" y="130" font-size="18" font-weight="bold" fill="#2c3e50">
+      Opción 3: Hexágono Progresivo
+    </text>
+    <text x="900" y="155" font-size="12" fill="#666">
+      Concepto: Productividad en alza
+    </text>
+    
+    <!-- Hexágonos concéntricos -->
+    <polygon points="900,240 925,255 925,285 900,300 875,285 875,255" 
+             fill="none" stroke="#9b59b6" stroke-width="2.5"/>
+    <polygon points="900,250 920,262 920,286 900,298 880,286 880,262" 
+             fill="none" stroke="#9b59b6" stroke-width="2"/>
+    
+    <!-- Flecha ascendente dentro -->
+    <line x1="900" y1="288" x2="900" y2="258" stroke="#9b59b6" stroke-width="2.5" stroke-linecap="round"/>
+    <polygon points="900,255 895,265 905,265" fill="#9b59b6"/>
+    
+    <!-- Fondo hexágono claro -->
+    <polygon points="900,235 928,252 928,288 900,305 872,288 872,252" 
+             fill="#9b59b6" opacity="0.08"/>
+    
+    <!-- Texto con logo -->
+    <text x="900" y="360" font-size="16" font-weight="bold" text-anchor="middle" fill="#1a1a1a">
+      TEMPOS
+    </text>
+    <text x="900" y="382" font-size="11" text-anchor="middle" fill="#666">
+      Gestión inteligente
+    </text>
+  </g>
+  
+  <!-- ============ LOGOTIPO 4: Relojero de Arena ============ -->
+  <g>
+    <text x="300" y="530" font-size="18" font-weight="bold" fill="#2c3e50">
+      Opción 4: Arena del Tiempo
+    </text>
+    <text x="300" y="555" font-size="12" fill="#666">
+      Concepto: Gestión fluida del tiempo
+    </text>
+    
+    <!-- Reloj de arena contenedor -->
+    <polygon points="280,620 280,700 300,710 320,700 320,620" fill="none" stroke="#16a085" stroke-width="2"/>
+    
+    <!-- Triángulo superior arena -->
+    <polygon points="280,620 300,660 320,620" fill="#16a085" opacity="0.3"/>
+    
+    <!-- Triángulo inferior arena -->
+    <polygon points="280,720 300,760 320,720" fill="#16a085" opacity="0.7"/>
+    
+    <!-- Línea cintura -->
+    <line x1="285" y1="710" x2="315" y2="710" stroke="#16a085" stroke-width="2"/>
+    <circle cx="300" cy="710" r="4" fill="#16a085"/>
+    
+    <!-- Puntos que caen -->
+    <circle cx="299" cy="675" r="1.5" fill="#16a085" opacity="0.8"/>
+    <circle cx="301" cy="685" r="1.5" fill="#16a085" opacity="0.6"/>
+    <circle cx="300" cy="695" r="1.5" fill="#16a085" opacity="0.4"/>
+    
+    <!-- Texto con logo -->
+    <text x="300" y="820" font-size="16" font-weight="bold" text-anchor="middle" fill="#1a1a1a">
+      TEMPOS
+    </text>
+    <text x="300" y="842" font-size="11" text-anchor="middle" fill="#666">
+      Precisión en registro
+    </text>
+  </g>
+  
+  <!-- ============ TABLA COMPARATIVA ============ -->
+  <g transform="translate(0, 450)">
+    <!-- Separador -->
+    <line x1="50" y1="0" x2="1150" y2="0" stroke="#ddd" stroke-width="2"/>
+    
+    <!-- Encabezado tabla -->
+    <rect x="50" y="20" width="1100" height="40" fill="#ecf0f1" stroke="#bdc3c7" stroke-width="1"/>
+    <text x="160" y="48" font-size="12" font-weight="bold" fill="#1a1a1a">Concepto</text>
+    <text x="400" y="48" font-size="12" font-weight="bold" fill="#1a1a1a">Fortalezas</text>
+    <text x="800" y="48" font-size="12" font-weight="bold" fill="#1a1a1a">Ideal para</text>
+    
+    <!-- Fila 1 -->
+    <rect x="50" y="60" width="1100" height="50" fill="white" stroke="#bdc3c7" stroke-width="1"/>
+    <text x="70" y="78" font-size="11" fill="#3498db" font-weight="bold">■ Opción 1</text>
+    <text x="400" y="78" font-size="11" fill="#333">Reconocibilidad + dinamismo</text>
+    <text x="400" y="93" font-size="11" fill="#333">Colores vibrantes y claros</text>
+    <text x="800" y="85" font-size="11" fill="#666">Favicon, favicon principal, apps</text>
+    
+    <!-- Fila 2 -->
+    <rect x="50" y="110" width="1100" height="50" fill="#f8f9fa" stroke="#bdc3c7" stroke-width="1"/>
+    <text x="70" y="128" font-size="11" fill="#e74c3c" font-weight="bold">■ Opción 2</text>
+    <text x="400" y="128" font-size="11" fill="#333">Tipografía + datos visuales</text>
+    <text x="400" y="143" font-size="11" fill="#333">Moderno y corporativo</text>
+    <text x="800" y="135" font-size="11" fill="#666">Dashboard, presentaciones B2B</text>
+    
+    <!-- Fila 3 -->
+    <rect x="50" y="160" width="1100" height="50" fill="white" stroke="#bdc3c7" stroke-width="1"/>
+    <text x="70" y="178" font-size="11" fill="#9b59b6" font-weight="bold">■ Opción 3</text>
+    <text x="400" y="178" font-size="11" fill="#333">Representación de progreso</text>
+    <text x="400" y="193" font-size="11" fill="#333">Elegante y profesional</text>
+    <text x="800" y="185" font-size="11" fill="#666">Marketing, redes sociales</text>
+    
+    <!-- Fila 4 -->
+    <rect x="50" y="210" width="1100" height="50" fill="#f8f9fa" stroke="#bdc3c7" stroke-width="1"/>
+    <text x="70" y="228" font-size="11" fill="#16a085" font-weight="bold">■ Opción 4</text>
+    <text x="400" y="228" font-size="11" fill="#333">Metáfora clara del tiempo</text>
+    <text x="400" y="243" font-size="11" fill="#333">Intuitivo y memorable</text>
+    <text x="800" y="235" font-size="11" fill="#666">Marca secundaria, icono app</text>
+  </g>
+  
+  <!-- Pie de página con recomendación -->
+  <text x="600" y="870" font-size="12" text-anchor="middle" fill="#7f8c8d" font-style="italic">
+    💡 Recomendación: La Opción 1 (Reloj Moderno) es la más versátil para aplicaciones web/móvil
+  </text>
+</svg>

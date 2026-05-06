@@ -1,0 +1,97 @@
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
+import path from 'path'
+import { VitePWA } from 'vite-plugin-pwa'
+
+export default defineConfig({
+  plugins: [
+    react(),
+    VitePWA({
+      strategies: 'injectManifest',
+      srcDir: 'src',
+      filename: 'sw.js',
+      registerType: 'autoUpdate',
+      includeAssets: ['pwa-icon.svg'],
+      manifest: {
+        name: 'Tempos — Control Horario',
+        short_name: 'Tempos',
+        description: 'Software de control horario legal para empresas y autónomos en España.',
+        theme_color: '#0a0a0c',
+        background_color: '#0a0a0c',
+        display: 'standalone',
+        orientation: 'portrait-primary',
+        scope: '/',
+        start_url: '/',
+        lang: 'es',
+        icons: [
+          {
+            src: '/pwa-icon.svg',
+            sizes: 'any',
+            type: 'image/svg+xml',
+            purpose: 'any',
+          },
+          {
+            src: '/pwa-icon.svg',
+            sizes: 'any',
+            type: 'image/svg+xml',
+            purpose: 'maskable',
+          },
+        ],
+      },
+      injectManifest: {
+        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
+      },
+    }),
+  ],
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, './src'),
+    },
+  },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return;
+          const rawPath = id.split('node_modules/')[1];
+          if (!rawPath) return;
+          const parts = rawPath.split('/');
+          const packageName = parts[0].startsWith('@') ? `${parts[0]}/${parts[1]}` : parts[0];
+
+          if (packageName === 'react-router-dom') return 'vendor-router';
+          if (packageName === 'recharts') return 'vendor-recharts';
+          if (packageName.includes('firebase')) return 'vendor-firebase';
+          if (packageName === 'mapbox-gl') return 'vendor-maps';
+          if (packageName === 'leaflet' || packageName === 'react-leaflet') return 'vendor-maps';
+          if (packageName === 'lucide-react' || packageName.includes('phosphor-icons')) return 'vendor-icons';
+          if (packageName.includes('react-pdf')) return 'vendor-pdf';
+          if (packageName === 'scheduler') return 'vendor-react';
+          if (packageName === 'react' || packageName === 'react-dom') return 'vendor-react';
+          if (packageName.startsWith('@capacitor')) return 'vendor-capacitor';
+          return 'vendor';
+        },
+      },
+    },
+  },
+  server: {
+    port: 5173,
+    host: true,
+    headers: {
+      'X-Content-Type-Options': 'nosniff',
+      'X-XSS-Protection': '1; mode=block',
+      'Referrer-Policy': 'no-referrer-when-downgrade',
+      'Cross-Origin-Opener-Policy': 'unsafe-none',
+      'Content-Security-Policy': "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://*.google.com https://*.googleapis.com https://*.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' http://localhost:8081 http://localhost:5173 http://localhost:5174 https:; worker-src 'self' blob:; frame-src 'self' https://*.firebaseapp.com https://*.google.com https:;"
+    },
+    proxy: {
+      '/api': {
+        target: 'http://localhost:8081',
+        changeOrigin: true,
+      },
+      '/status': {
+        target: 'http://localhost:8081',
+        changeOrigin: true,
+      },
+    },
+  },
+})

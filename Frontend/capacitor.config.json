@@ -1,0 +1,8 @@
+{
+  "appId": "es.tempos.app",
+  "appName": "Tempos",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https"
+  }
+}

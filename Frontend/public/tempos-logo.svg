@@ -1,0 +1,25 @@
+<svg width="128" height="128" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+  <!-- Fondo -->
+  <rect width="128" height="128" fill="#0a0a0a" rx="32"/>
+  
+  <!-- Círculo fondo sutil -->
+  <circle cx="64" cy="64" r="52" fill="none" stroke="#2563eb" strokeWidth="2" opacity="0.15"/>
+  
+  <!-- Círculo principal -->
+  <circle cx="64" cy="64" r="48" fill="none" stroke="#2563eb" strokeWidth="3"/>
+  
+  <!-- Puntos de hora (12, 3, 6, 9) -->
+  <circle cx="64" cy="18" r="2.5" fill="#2563eb"/>
+  <circle cx="110" cy="64" r="2.5" fill="#2563eb"/>
+  <circle cx="64" cy="110" r="2.5" fill="#2563eb"/>
+  <circle cx="18" cy="64" r="2.5" fill="#2563eb"/>
+  
+  <!-- Aguja hora (más corta, posición 10) -->
+  <line x1="64" y1="64" x2="64" y2="32" stroke="#2563eb" strokeWidth="3" strokeLinecap="round" opacity="0.9"/>
+  
+  <!-- Aguja minutos (más larga, posición 2) -->
+  <line x1="64" y1="64" x2="87" y2="55" stroke="#60a5fa" strokeWidth="2.5" strokeLinecap="round" opacity="0.7"/>
+  
+  <!-- Centro puntero -->
+  <circle cx="64" cy="64" r="4.5" fill="#2563eb"/>
+</svg>

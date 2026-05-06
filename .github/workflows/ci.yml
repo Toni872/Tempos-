@@ -1,0 +1,57 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      - name: Install backend deps
+        working-directory: Backend
+        run: |
+          npm ci
+      - name: Lint / Build backend
+        working-directory: Backend
+        run: |
+          npm run lint
+          npm run build
+
+  docker-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify Docker and Compose are available
+        run: |
+          docker --version
+          docker compose version
+      - name: Validate backend docker-compose config
+        working-directory: Backend
+        run: |
+          docker compose -f docker-compose.yml config > /tmp/tempos-compose-config.yml
+          test -s /tmp/tempos-compose-config.yml
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      - name: Install frontend deps
+        working-directory: Frontend
+        run: |
+          npm ci
+      - name: Build frontend
+        working-directory: Frontend
+        run: |
+          npm run build

@@ -1,0 +1,439 @@
+import { Repository, IsNull } from "typeorm";
+import { Ficha } from "../entities/Ficha.js";
+import {
+  TimeEntry,
+  TimeEntryType,
+  TimeEntrySource,
+} from "../entities/TimeEntry.js";
+import {
+  TimeEntryChangeLog,
+  ChangeAction,
+} from "../entities/TimeEntryChangeLog.js";
+import { AppDataSource } from "../database.js";
+
+export interface RecordClockEventParams {
+  userId: string;
+  fichaId: string;
+  type: TimeEntryType;
+  source: TimeEntrySource;
+  timestampUtc: Date;
+  localDateTime?: string;
+  ip?: string;
+  userAgent?: string;
+  latitude?: number;
+  longitude?: number;
+  deviceId?: string;
+}
+
+export interface LogChangeParams {
+  timeEntryId: string;
+  changedBy: string;
+  action: ChangeAction;
+  changeSet: {
+    before?: Record<string, unknown>;
+    after?: Record<string, unknown>;
+  };
+  reason?: string;
+  ip?: string;
+  userAgent?: string;
+}
+
+/**
+ * TimeEntryService
+ * Centraliza la lógica de creación y auditoría de eventos de fichaje atómicos.
+ * Responsable de:
+ * - Registrar eventos CLOCK_IN, CLOCK_OUT, BREAK_START, BREAK_END
+ * - Mantener log de cambios (correcciones, sincronización, etc.)
+ * - Proveer trazabilidad completa para cumplimiento legal (art. 34.9 ET, RGPD)
+ */
+export class TimeEntryService {
+  private timeEntryRepo: Repository<TimeEntry>;
+  private changeLogRepo: Repository<TimeEntryChangeLog>;
+
+  constructor(
+    timeEntryRepo?: Repository<TimeEntry>,
+    changeLogRepo?: Repository<TimeEntryChangeLog>,
+  ) {
+    this.timeEntryRepo =
+      timeEntryRepo || AppDataSource.getRepository(TimeEntry);
+    this.changeLogRepo =
+      changeLogRepo || AppDataSource.getRepository(TimeEntryChangeLog);
+  }
+
+  /**
+   * Registra un evento atómico de fichaje (entrada, salida, pausa inicio/fin)
+   * @param params datos del evento
+   * @returns TimeEntry creado
+   */
+  async recordClockEvent(params: RecordClockEventParams): Promise<TimeEntry> {
+    const timeEntry = this.timeEntryRepo.create({
+      fichaId: params.fichaId,
+      userId: params.userId,
+      type: params.type,
+      timestampUtc: params.timestampUtc,
+      localDateTime: params.localDateTime,
+      source: params.source,
+      ip: params.ip,
+      userAgent: params.userAgent,
+      latitude: params.latitude,
+      longitude: params.longitude,
+      deviceId: params.deviceId,
+      metadata: {
+        deviceId: params.deviceId,
+      },
+    });
+
+    return this.timeEntryRepo.save(timeEntry);
+  }
+
+  /**
+   * Inicia una nueva jornada (Ficha + Evento CLOCK_IN)
+   */
+  async clockIn(params: {
+    userId: string;
+    companyId: string;
+    timestamp: Date;
+    location?: { lat: number; lng: number };
+    ip?: string;
+    userAgent?: string;
+  }): Promise<Ficha> {
+    const fichaRepo = AppDataSource.getRepository(Ficha);
+    
+    const openFicha = await fichaRepo.findOne({
+      where: { userId: params.userId, endTime: IsNull() }
+    });
+    
+    // INGENIERÍA SENIOR: Idempotencia. Si ya hay una ficha abierta, no fallamos, la devolvemos.
+    if (openFicha) {
+      console.log("⚠️ [CLOCK-IN] El usuario ya tenía una ficha activa, devolviendo la existente.");
+      return openFicha;
+    }
+
+    const dateStr = params.timestamp.toISOString().split('T')[0];
+    const timeStr = params.timestamp.toTimeString().split(' ')[0].slice(0, 5);
+
+    const ficha = fichaRepo.create({
+      userId: params.userId,
+      date: new Date(dateStr),
+      startTime: timeStr,
+      status: "draft",
+      metadata: {
+        location: params.location ? `${params.location.lat},${params.location.lng}` : undefined,
+      }
+    });
+    await fichaRepo.save(ficha);
+
+    await this.recordClockEvent({
+      fichaId: ficha.id,
+      userId: params.userId,
+      type: TimeEntryType.CLOCK_IN,
+      source: TimeEntrySource.WEB,
+      timestampUtc: params.timestamp,
+      ip: params.ip,
+      userAgent: params.userAgent,
+      latitude: params.location?.lat,
+      longitude: params.location?.lng,
+    });
+
+    return ficha;
+  }
+
+  /**
+   * Inicia una pausa (Evento BREAK_START)
+   */
+  async breakStart(params: {
+    userId: string;
+    timestamp: Date;
+    location?: { lat: number; lng: number };
+    ip?: string;
+  }): Promise<TimeEntry> {
+    const fichaRepo = AppDataSource.getRepository(Ficha);
+    const openFicha = await fichaRepo.findOne({
+      where: { userId: params.userId, endTime: IsNull() }
+    });
+    if (!openFicha) throw new Error("No hay ninguna jornada activa para pausar.");
+
+    return this.recordClockEvent({
+      fichaId: openFicha.id,
+      userId: params.userId,
+      type: TimeEntryType.BREAK_START,
+      source: TimeEntrySource.WEB,
+      timestampUtc: params.timestamp,
+      ip: params.ip,
+      latitude: params.location?.lat,
+      longitude: params.location?.lng,
+    });
+  }
+
+  /**
+   * Finaliza una pausa (Evento BREAK_END)
+   */
+  async breakEnd(params: {
+    userId: string;
+    timestamp: Date;
+    location?: { lat: number; lng: number };
+    ip?: string;
+  }): Promise<TimeEntry> {
+    const fichaRepo = AppDataSource.getRepository(Ficha);
+    const openFicha = await fichaRepo.findOne({
+      where: { userId: params.userId, endTime: IsNull() }
+    });
+    if (!openFicha) throw new Error("No hay ninguna jornada activa para reanudar.");
+
+    return this.recordClockEvent({
+      fichaId: openFicha.id,
+      userId: params.userId,
+      type: TimeEntryType.BREAK_END,
+      source: TimeEntrySource.WEB,
+      timestampUtc: params.timestamp,
+      ip: params.ip,
+      latitude: params.location?.lat,
+      longitude: params.location?.lng,
+    });
+  }
+
+  /**
+   * Finaliza la jornada actual (Evento CLOCK_OUT + Cierre Ficha)
+   */
+  async clockOut(params: {
+    userId: string;
+    timestamp: Date;
+    location?: { lat: number; lng: number };
+    ip?: string;
+  }): Promise<Ficha> {
+    const fichaRepo = AppDataSource.getRepository(Ficha);
+
+    const openFicha = await fichaRepo.findOne({
+      where: { userId: params.userId, endTime: IsNull() }
+    });
+    if (!openFicha) throw new Error("No hay ninguna jornada activa para cerrar.");
+
+    const timeStr = params.timestamp.toTimeString().split(' ')[0].slice(0, 5);
+    openFicha.endTime = timeStr;
+    openFicha.status = "confirmed";
+
+    await this.recordClockEvent({
+      fichaId: openFicha.id,
+      userId: params.userId,
+      type: TimeEntryType.CLOCK_OUT,
+      source: TimeEntrySource.WEB,
+      timestampUtc: params.timestamp,
+      ip: params.ip,
+      latitude: params.location?.lat,
+      longitude: params.location?.lng,
+    });
+
+    openFicha.hoursWorked = await this.calculateWorkingHours(openFicha.id);
+    await fichaRepo.save(openFicha);
+
+    return openFicha;
+  }
+
+  /**
+   * Registra un cambio en un evento de fichaje (corrección, sincronización, etc.)
+   * @param params datos del cambio
+   * @returns TimeEntryChangeLog creado
+   */
+  async logChange(params: LogChangeParams): Promise<TimeEntryChangeLog> {
+    const changeLog = this.changeLogRepo.create({
+      timeEntryId: params.timeEntryId,
+      changedBy: params.changedBy,
+      action: params.action,
+      changeSet: params.changeSet,
+      reason: params.reason,
+      ip: params.ip,
+      userAgent: params.userAgent,
+      metadata: {
+        approvalStatus: "pending", // por defecto pendiente de aprobación
+      },
+    });
+
+    return this.changeLogRepo.save(changeLog);
+  }
+
+  /**
+   * Obtiene el historial de cambios de un TimeEntry
+   * @param timeEntryId ID del evento
+   * @returns array de cambios ordenados por fecha
+   */
+  async getChangeHistory(timeEntryId: string): Promise<TimeEntryChangeLog[]> {
+    return this.changeLogRepo
+      .createQueryBuilder("log")
+      .where("log.timeEntryId = :timeEntryId", { timeEntryId })
+      .orderBy("log.createdAt", "ASC")
+      .getMany();
+  }
+
+  /**
+   * Obtiene todos los eventos de una ficha en orden cronológico
+   * @param fichaId ID de la ficha
+   * @returns array de TimeEntry
+   */
+  async getsFichaEvents(fichaId: string): Promise<TimeEntry[]> {
+    return this.timeEntryRepo
+      .createQueryBuilder("entry")
+      .where("entry.fichaId = :fichaId", { fichaId })
+      .orderBy("entry.timestampUtc", "ASC")
+      .getMany();
+  }
+
+  /**
+   * Obtiene eventos de un usuario en un rango de fechas
+   * Usado para auditoría y reportes
+   * @param userId UID del usuario
+   * @param startDate fecha inicio (ISO)
+   * @param endDate fecha fin (ISO)
+   * @returns array de TimeEntry
+   */
+  async getUserEventsByDateRange(
+    userId: string,
+    startDate: string,
+    endDate: string,
+  ): Promise<TimeEntry[]> {
+    return this.timeEntryRepo
+      .createQueryBuilder("entry")
+      .where("entry.userId = :userId", { userId })
+      .andWhere("DATE(entry.timestampUtc AT TIME ZONE 'UTC') >= :startDate", {
+        startDate,
+      })
+      .andWhere("DATE(entry.timestampUtc AT TIME ZONE 'UTC') <= :endDate", {
+        endDate,
+      })
+      .orderBy("entry.timestampUtc", "ASC")
+      .getMany();
+  }
+
+  /**
+   * Obtiene el último evento de un usuario (para validaciones)
+   * @param userId UID del usuario
+   * @returns último TimeEntry o null
+   */
+  async getLastEventForUser(userId: string): Promise<TimeEntry | null> {
+    return this.timeEntryRepo
+      .createQueryBuilder("entry")
+      .where("entry.userId = :userId", { userId })
+      .orderBy("entry.timestampUtc", "DESC")
+      .limit(1)
+      .getOne();
+  }
+
+  /**
+   * Registra la solicitud de correcciones para todos los eventos de una ficha
+   * @param params datos de la solicitud
+   */
+  async requestCorrections(params: {
+    fichaId: string;
+    requestedBy: string;
+    reason: string;
+    beforeState: Record<string, unknown>;
+    afterState: Record<string, unknown>;
+    ip?: string;
+    userAgent?: string;
+  }): Promise<void> {
+    const timeEntries = await this.getsFichaEvents(params.fichaId);
+
+    for (const entry of timeEntries) {
+      await this.logChange({
+        timeEntryId: entry.id,
+        changedBy: params.requestedBy,
+        action: ChangeAction.CORRECTED,
+        changeSet: {
+          before: params.beforeState,
+          after: params.afterState,
+        },
+        reason: params.reason,
+        ip: params.ip,
+        userAgent: params.userAgent,
+      });
+
+      // El método logChange ya establece approvalStatus: 'pending' por defecto en el constructor/creación
+    }
+  }
+
+  /**
+   * Revisa y cierra el ciclo de vida de las correcciones pendientes de una ficha
+   * @param params datos de la revisión
+   */
+  async reviewCorrections(params: {
+    fichaId: string;
+    reviewedBy: string;
+    decision: "approved" | "rejected";
+    comment?: string;
+    ip?: string;
+    userAgent?: string;
+  }): Promise<void> {
+    const timeEntries = await this.getsFichaEvents(params.fichaId);
+
+    for (const entry of timeEntries) {
+      // Buscamos por historial y filtramos en memoria para mayor compatibilidad de queries JSON
+      const history = await this.getChangeHistory(entry.id);
+      const pendingLog = history
+        .reverse()
+        .find((log) => (log.metadata as any)?.approvalStatus === "pending");
+
+      if (pendingLog) {
+        pendingLog.metadata = {
+          ...(pendingLog.metadata || {}),
+          approvalStatus: params.decision,
+          reviewedBy: params.reviewedBy,
+          reviewedAt: new Date().toISOString(),
+          reviewComment: params.comment,
+          reviewIp: params.ip,
+          reviewUserAgent: params.userAgent,
+        };
+        await this.changeLogRepo.save(pendingLog);
+      }
+    }
+  }
+
+  /**
+   * Calcula las horas trabajadas totales para una ficha, descontando las pausas.
+   * Lógica:
+   * - CLOCK_IN -> Sumar desde aquí
+   * - BREAK_START -> Parar de sumar
+   * - BREAK_END -> Volver a sumar
+   * - CLOCK_OUT -> Finalizar suma
+   * @param fichaId ID de la ficha
+   * @returns total de horas trabajadas (float)
+   */
+  async calculateWorkingHours(fichaId: string): Promise<number> {
+    const events = await this.getsFichaEvents(fichaId);
+    if (events.length === 0) return 0;
+
+    let totalMs = 0;
+    let lastStartTime: number | null = null;
+
+    for (const event of events) {
+      const timestamp = new Date(event.timestampUtc).getTime();
+
+      switch (event.type) {
+        case "CLOCK_IN":
+        case "BREAK_END":
+          if (lastStartTime === null) {
+            lastStartTime = timestamp;
+          }
+          break;
+
+        case "BREAK_START":
+        case "CLOCK_OUT":
+          if (lastStartTime !== null) {
+            totalMs += timestamp - lastStartTime;
+            lastStartTime = null;
+          }
+          break;
+      }
+    }
+
+    return parseFloat((totalMs / 3600000).toFixed(2));
+  }
+}
+
+// Singleton para uso desde controllers
+let instance: TimeEntryService | null = null;
+
+export function getTimeEntryService(): TimeEntryService {
+  if (!instance) {
+    instance = new TimeEntryService();
+  }
+  return instance;
+}

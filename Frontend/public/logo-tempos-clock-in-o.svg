@@ -1,0 +1,42 @@
+<svg width="1200" height="1200" viewBox="0 0 1200 1200" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&display=swap');
+    </style>
+  </defs>
+  
+  <!-- Background (transparent) -->
+  <rect width="1200" height="1200" fill="transparent"/>
+  
+  <!-- Text: "Tem" -->
+  <text x="280" y="750" font-family="Space Grotesk, Arial, sans-serif" font-size="520" font-weight="700" fill="#f2f2f0" letter-spacing="-8">
+    Tem
+  </text>
+  
+  <!-- CLOCK ICON replacing the "o" -->
+  <!-- Clock circle (main body) -->
+  <g transform="translate(720, 640)">
+    <!-- Outer circle -->
+    <circle cx="0" cy="0" r="110" fill="transparent" stroke="#2563eb" stroke-width="12"/>
+    
+    <!-- Position markers (12, 3, 6, 9 o'clock) -->
+    <circle cx="0" cy="-95" r="8" fill="#2563eb"/>
+    <circle cx="95" cy="0" r="8" fill="#2563eb"/>
+    <circle cx="0" cy="95" r="8" fill="#2563eb"/>
+    <circle cx="-95" cy="0" r="8" fill="#2563eb"/>
+    
+    <!-- Hour hand (short, pointing to 10) -->
+    <line x1="0" y1="0" x2="-45" y2="-55" stroke="#f2f2f0" stroke-width="10" stroke-linecap="round"/>
+    
+    <!-- Minute hand (long, pointing to 2) -->
+    <line x1="0" y1="0" x2="60" y2="-50" stroke="#60a5fa" stroke-width="8" stroke-linecap="round" opacity="0.8"/>
+    
+    <!-- Center dot -->
+    <circle cx="0" cy="0" r="6" fill="#2563eb"/>
+  </g>
+  
+  <!-- Text: "s" after the clock -->
+  <text x="900" y="750" font-family="Space Grotesk, Arial, sans-serif" font-size="520" font-weight="700" fill="#2563eb" letter-spacing="-8">
+    s
+  </text>
+</svg>
