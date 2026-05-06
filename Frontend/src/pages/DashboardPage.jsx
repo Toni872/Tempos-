@@ -1,6 +1,40 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import api from '@/lib/api';
+import { useDashboardData } from '@/hooks/useDashboardData';
+import api, { 
+  getClientSession,
+  getMe,
+  getActiveFicha,
+  listEmployees,
+  createEmployee,
+  updateEmployee,
+  deleteEmployee,
+  listWorkCenters,
+  createWorkCenter,
+  updateWorkCenter,
+  deleteWorkCenter,
+  listDocuments,
+  uploadDocument,
+  downloadDocument,
+  signDocument,
+  listAbsences,
+  requestAbsence,
+  approveAbsence,
+  rejectAbsence,
+  listFichas,
+  getDashboardStats,
+  exportReport,
+  exportAuditLog,
+  listAuditLog,
+  acceptTerms,
+  clockIn,
+  clockOut,
+  breakStart,
+  breakEnd,
+  assignShift,
+  createSchedule,
+  listSchedules
+} from '@/lib/api';
 
 // Icons
 import { Clock, Users, MapPin, Calendar, FileText, Search, Download, LayoutDashboard } from 'lucide-react';
@@ -50,83 +84,48 @@ import ComplianceTab from '@/components/dashboard/ComplianceTab';
 import ExpedienteEmpleado from '@/components/dashboard/ExpedienteEmpleado';
 import MapaAuditoria from '@/components/dashboard/MapaAuditoria';
 import SchedulingGrid from '@/components/dashboard/SchedulingGrid';
-
-import {
-  getClientSession,
-  clearClientSession,
-  getMe,
-  getDailyStats,
-  listEmployees,
-  createEmployee,
-  deleteEmployee,
-  listDocuments,
-  uploadDocument,
-  downloadDocument,
-  signDocument,
-  acceptTerms,
-  listAbsences,
-  requestAbsence,
-  approveAbsence,
-  rejectAbsence,
-  exportReport,
-  clockIn,
-  clockOut,
-  breakStart,
-  breakEnd,
-  getActiveFicha,
-  getReportSummary,
-  listAuditLog,
-  exportAuditLog,
-  closeFichaPeriod,
-  listWorkCenters,
-  deleteWorkCenter,
-  listSchedules,
-  createSchedule,
-  listShiftAssignments,
-  assignShift,
-  listFichas,
-  getDashboardStats,
-} from '@/lib/api';
+import TabErrorBoundary from '@/components/TabErrorBoundary';
+import ErrorBoundary from "@/components/ui/ErrorBoundary";
 
 function cn(...classes) {
   return classes.filter(Boolean).join(' ');
 }
-import ErrorBoundary from '@/components/ui/ErrorBoundary';
 
 export default function DashboardPage() {
   const navigate = useNavigate();
-  const location = useLocation();
-
-  const handleLogout = useCallback(() => {
-    clearClientSession();
-    navigate('/login', { replace: true });
-  }, [navigate]);
-
   const [activeTab, setActiveTab] = useState('Inicio');
-  const [clockedIn, setClockedIn] = useState(false);
-  const [isOnBreak, setIsOnBreak] = useState(false);
+  const [registrosFilters, setRegistrosFilters] = useState({ employeeId: '', startDate: '', endDate: '' });
 
-  const [profile, setProfile] = useState(null);
+  // Hook de Datos Centralizado
+  const {
+    profile, setProfile,
+    activeFicha, setActiveFicha,
+    clockedIn, setClockedIn,
+    isOnBreak, setIsOnBreak,
+    employees, setEmployees,
+    documents, setDocuments,
+    absences, setAbsences,
+    registros, setRegistros,
+    workCenters, setWorkCenters,
+    dashboardStats, setDashboardStats,
+    loading,
+    setLoading,
+    loadData,
+    handleLogout
+  } = useDashboardData(registrosFilters, true);
+
   const isAdmin = useMemo(() => profile?.role === 'admin' || profile?.role === 'manager', [profile]);
-  const [activeFicha, setActiveFicha] = useState(null);
+  
+  // UI States
   const [stats, setStats] = useState({ activeEmployees: 0, presentNow: 0, totalHoursMonth: 0, pendingAbsences: 0 });
   const [dailyStats, setDailyStats] = useState([]);
-  const [employees, setEmployees] = useState([]);
-  const [documents, setDocuments] = useState([]);
-  const [absences, setAbsences] = useState([]);
-  const [registros, setRegistros] = useState([]);
-  const [workCenters, setWorkCenters] = useState([]);
   const [schedules, setSchedules] = useState([]);
   const [shiftAssignments, setShiftAssignments] = useState([]);
-  const [reportSummary, setReportSummary] = useState(null);
-  const [dashboardStats, setDashboardStats] = useState(null);
   const [auditLogRows, setAuditLogRows] = useState([]);
   const [auditFilters, setAuditFilters] = useState({ action: '', userId: '', startDate: '', endDate: '' });
   const [auditModalOpen, setAuditModalOpen] = useState(false);
   const [selectedAuditFichaId, setSelectedAuditFichaId] = useState(null);
-  const [registrosFilters, setRegistrosFilters] = useState({ employeeId: '', startDate: '', endDate: '' });
 
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
@@ -136,15 +135,19 @@ export default function DashboardPage() {
   const [selectedEmployee, setSelectedEmployee] = useState(null);
 
   const [showGeolocationConsent, setShowGeolocationConsent] = useState(false);
-  const [geolocationModalMode, setGeolocationModalMode] = useState('consent'); // 'consent' or 'revoke'
+  const [geolocationModalMode, setGeolocationModalMode] = useState('consent'); 
   const { location: geoLocation, error: geoError, loading: geoLoading, consentGiven, requestLocation, revokeConsent } = useGeolocation();
 
   const elapsedWorkingTime = useClockTimer(activeFicha, clockedIn, isOnBreak);
 
   const showFeedback = (type, message) => {
-    if (type === 'error') setError(message);
-    else if (type === 'success') setSuccess(message);
-    // Loading handled by local state or feedback modal if needed
+    if (type === 'error') {
+      setError(message);
+      setTimeout(() => setError(''), 4000);
+    } else if (type === 'success') {
+      setSuccess(message);
+      setTimeout(() => setSuccess(''), 4000);
+    }
   };
 
   const closeModal = () => {
@@ -158,115 +161,6 @@ export default function DashboardPage() {
     setModalMode(mode);
     setModalData(data);
   };
-
-  const loadCollections = useCallback(async (token, isUserAdmin = true) => {
-    try {
-      // Common data for everyone
-      const [docs, abs, fxs] = await Promise.all([
-        listDocuments(token),
-        listAbsences(token),
-        listFichas(token, { 
-          userId: registrosFilters.employeeId,
-          startDate: registrosFilters.startDate,
-          endDate: registrosFilters.endDate
-        })
-      ]);
-
-      setDocuments(Array.isArray(docs) ? docs : []);
-      setAbsences(Array.isArray(abs) ? abs : []);
-      setRegistros(Array.isArray(fxs) ? fxs : (fxs?.data || []));
-
-      // Admin only data
-      if (isUserAdmin) {
-        const [emp, wcs, schs, shifts, dbStats] = await Promise.all([
-          listEmployees(token),
-          listWorkCenters(token),
-          listSchedules(token),
-          listShiftAssignments(token),
-          getDashboardStats(token)
-        ]);
-        setEmployees(emp?.data || []);
-        setWorkCenters(wcs?.data || wcs || []);
-        setSchedules(schs?.data || schs || []);
-        setShiftAssignments(shifts?.data || shifts || []);
-        setDashboardStats(dbStats);
-
-        const activeEmp = emp?.data || [];
-        const present = activeEmp.filter(e => e.isWorking).length;
-        setStats(prev => ({ 
-          ...prev, 
-          activeEmployees: activeEmp.length, 
-          presentNow: present, 
-          pendingAbsences: (Array.isArray(abs) ? abs : []).filter(a => a.status === 'pending').length 
-        }));
-      }
-    } catch (err) {
-      console.error('Error loading collections:', err);
-      if (err.status === 401) {
-        handleLogout();
-      }
-    }
-  }, [handleLogout, registrosFilters.employeeId, registrosFilters.startDate, registrosFilters.endDate]);
-
-  const refreshAllData = useCallback(async () => {
-    const session = getClientSession();
-    if (session?.token) await loadCollections(session.token, isAdmin);
-  }, [loadCollections, isAdmin]);
-
-  // Efecto para recargar registros cuando cambian los filtros
-  useEffect(() => {
-    refreshAllData();
-  }, [registrosFilters]);
-
-  useEffect(() => {
-    const session = getClientSession();
-    if (!session?.token) {
-      navigate('/login', { replace: true });
-      return;
-    }
-
-    const init = async () => {
-      setLoading(true);
-      try {
-        const user = await getMe(session.token);
-        if (user) {
-          setProfile(user);
-        }
-
-        const ficha = await getActiveFicha(session.token);
-        const extractFicha = (res) => {
-          if (!res) return null;
-          if (res.data !== undefined) return res.data;
-          if (res.ficha) return res.ficha;
-          if (res.id) return res;
-          return null;
-        };
-        const fichaData = extractFicha(ficha);
-        setActiveFicha(fichaData);
-        setClockedIn(!!fichaData);
-        setIsOnBreak(fichaData?.lastEvent?.type === 'BREAK_START' || (fichaData?.status === 'on_break'));
-
-        await loadCollections(session.token);
-        const dStats = await getDailyStats(session.token);
-        setDailyStats(Array.isArray(dStats) ? dStats : []);
-        
-        const summary = await getReportSummary(session.token);
-        setReportSummary(summary);
-
-      } catch (err) {
-        console.error('Init error:', err);
-        if (err.status === 401) {
-          handleLogout();
-          return; // STOP EXECUTION
-        } else {
-        }
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    init();
-  }, [navigate]);
 
   const handleAcceptTerms = async () => {
     setLoading(true);
@@ -313,33 +207,22 @@ export default function DashboardPage() {
 
       if (clockedIn) {
         await clockOut(session.token, { ...payload, authMethod: 'password' });
-        // Reset total y síncrono
         setClockedIn(false);
         setIsOnBreak(false);
         setActiveFicha(null);
         showFeedback('success', 'Turno finalizado.');
       } else {
-        if (workCenters && workCenters.length > 0) {
-          payload.workCenterId = workCenters[0].id;
-        }
-        const extractFicha = (res) => {
-          if (!res) return null;
-          if (res.data !== undefined) return res.data;
-          if (res.ficha) return res.ficha;
-          if (res.id) return res;
-          return null;
-        };
         const res = await clockIn(session.token, { ...payload, authMethod: 'password' });
-        const newFicha = extractFicha(res);
+        const newFicha = res?.data ?? res?.ficha ?? res;
         setActiveFicha(newFicha);
-        setClockedIn(!!newFicha);
+        setClockedIn(true);
         setIsOnBreak(false);
         showFeedback('success', 'Turno iniciado.');
       }
-      await refreshAllData();
+      await loadData('core');
     } catch (err) {
-      console.error('Clock toggle error:', err);
-      showFeedback('error', err.message || 'Error al cambiar estado de fichaje.');
+      const msg = err.response?.data?.error || err.message || 'Error en fichaje.';
+      showFeedback('error', msg);
     }
   };
 
@@ -368,7 +251,8 @@ export default function DashboardPage() {
       };
       setActiveFicha(extractFicha(ficha));
     } catch (err) {
-      showFeedback('error', 'Error al cambiar estado de pausa.');
+      const msg = err.response?.data?.error || err.message || 'Error al cambiar estado de pausa.';
+      showFeedback('error', msg);
     }
   };
 
@@ -581,14 +465,14 @@ export default function DashboardPage() {
     }
   };
 
-  const handleExportReport = async () => {
+  const handleExportReport = async (format = 'pdf') => {
     const session = getClientSession();
     try {
-      const blob = await exportReport(session.token, { format: 'pdf' });
+      const blob = await exportReport(session.token, { format });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = 'informe_inspeccion.pdf';
+      a.download = `informe_jornada.${format === 'csv' ? 'csv' : 'pdf'}`;
       a.click();
     } catch (err) {
       showFeedback('error', 'Error al exportar.');
@@ -647,7 +531,7 @@ export default function DashboardPage() {
         />
       </div>
 
-      <ErrorBoundary>
+      <TabErrorBoundary>
         <div className="flex-1">
           {activeTab === 'Inicio' && (
             <HomeHub 
@@ -777,7 +661,7 @@ export default function DashboardPage() {
           )}
 
           {activeTab === 'Mensajes' && (
-            <MensajesTab profile={profile} />
+            <MensajesTab profile={profile} employees={employees} />
           )}
 
           {activeTab === 'Mi Perfil' && (
@@ -785,6 +669,7 @@ export default function DashboardPage() {
               profile={profile || {}}
               consentGiven={consentGiven}
               openRevokeModal={openRevokeModal}
+              onUpdate={() => loadData('core')}
             />
           )}
 
@@ -795,7 +680,7 @@ export default function DashboardPage() {
             />
           )}
         </div>
-      </ErrorBoundary>
+      </TabErrorBoundary>
 
 
       <ModalBase open={!!modal} onClose={closeModal} title={modal}>

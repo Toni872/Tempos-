@@ -289,7 +289,9 @@ export const updateAuthProfileSchema = z.object({
     .string()
     .trim()
     .min(2, "displayName debe tener al menos 2 caracteres.")
-    .max(120, "displayName admite maximo 120 caracteres."),
+    .max(120, "displayName admite maximo 120 caracteres.")
+    .optional(),
+  photoURL: z.string().url("URL de foto inválida").optional().or(z.literal("")),
 });
 
 export const userRoleSchema = z.enum([
@@ -354,6 +356,7 @@ export const clockInSchema = z.object({
   qrToken: z.string().optional(),
   deviceId: z.string().optional(),
   authMethod: z.enum(["password", "pin", "qr", "biometric"]).optional(),
+  offlineTimestamp: z.string().datetime().optional(),
 });
 
 export const clockOutSchema = z.object({
@@ -366,6 +369,7 @@ export const clockOutSchema = z.object({
   qrToken: z.string().optional(),
   deviceId: z.string().optional(),
   authMethod: z.enum(["password", "pin", "qr", "biometric"]).optional(),
+  offlineTimestamp: z.string().datetime().optional(),
 });
 
 export const scheduleSchema = z.object({

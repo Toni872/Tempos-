@@ -30,6 +30,7 @@ type FichaCorrectionRequest = {
 @Entity("fichas")
 @Index(["userId", "date"])
 @Index(["userId", "status"])
+@Index(["userId", "endTime"])
 export class Ficha {
   @PrimaryGeneratedColumn("uuid")
   id!: string;

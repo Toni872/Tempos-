@@ -230,7 +230,7 @@ npm run migration:run -- -d dist/database.js
 npm run dev
 
 # 5. Test endpoints (see VALIDATION-CHECKLIST.md for detailed steps)
-curl -X POST http://localhost:8080/api/v1/fichas/clockin \
+curl -X POST http://localhost:8081/api/v1/fichas/clockin \
   -H "Authorization: Bearer test-token"
 ```
 

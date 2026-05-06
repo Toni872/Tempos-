@@ -1,4 +1,5 @@
-import { Repository } from "typeorm";
+import { Repository, IsNull } from "typeorm";
+import { Ficha } from "../entities/Ficha.js";
 import {
   TimeEntry,
   TimeEntryType,
@@ -83,6 +84,149 @@ export class TimeEntryService {
     });
 
     return this.timeEntryRepo.save(timeEntry);
+  }
+
+  /**
+   * Inicia una nueva jornada (Ficha + Evento CLOCK_IN)
+   */
+  async clockIn(params: {
+    userId: string;
+    companyId: string;
+    timestamp: Date;
+    location?: { lat: number; lng: number };
+    ip?: string;
+    userAgent?: string;
+  }): Promise<Ficha> {
+    const fichaRepo = AppDataSource.getRepository(Ficha);
+    
+    const openFicha = await fichaRepo.findOne({
+      where: { userId: params.userId, endTime: IsNull() }
+    });
+    
+    // INGENIERÍA SENIOR: Idempotencia. Si ya hay una ficha abierta, no fallamos, la devolvemos.
+    if (openFicha) {
+      console.log("⚠️ [CLOCK-IN] El usuario ya tenía una ficha activa, devolviendo la existente.");
+      return openFicha;
+    }
+
+    const dateStr = params.timestamp.toISOString().split('T')[0];
+    const timeStr = params.timestamp.toTimeString().split(' ')[0].slice(0, 5);
+
+    const ficha = fichaRepo.create({
+      userId: params.userId,
+      date: new Date(dateStr),
+      startTime: timeStr,
+      status: "draft",
+      metadata: {
+        location: params.location ? `${params.location.lat},${params.location.lng}` : undefined,
+      }
+    });
+    await fichaRepo.save(ficha);
+
+    await this.recordClockEvent({
+      fichaId: ficha.id,
+      userId: params.userId,
+      type: TimeEntryType.CLOCK_IN,
+      source: TimeEntrySource.WEB,
+      timestampUtc: params.timestamp,
+      ip: params.ip,
+      userAgent: params.userAgent,
+      latitude: params.location?.lat,
+      longitude: params.location?.lng,
+    });
+
+    return ficha;
+  }
+
+  /**
+   * Inicia una pausa (Evento BREAK_START)
+   */
+  async breakStart(params: {
+    userId: string;
+    timestamp: Date;
+    location?: { lat: number; lng: number };
+    ip?: string;
+  }): Promise<TimeEntry> {
+    const fichaRepo = AppDataSource.getRepository(Ficha);
+    const openFicha = await fichaRepo.findOne({
+      where: { userId: params.userId, endTime: IsNull() }
+    });
+    if (!openFicha) throw new Error("No hay ninguna jornada activa para pausar.");
+
+    return this.recordClockEvent({
+      fichaId: openFicha.id,
+      userId: params.userId,
+      type: TimeEntryType.BREAK_START,
+      source: TimeEntrySource.WEB,
+      timestampUtc: params.timestamp,
+      ip: params.ip,
+      latitude: params.location?.lat,
+      longitude: params.location?.lng,
+    });
+  }
+
+  /**
+   * Finaliza una pausa (Evento BREAK_END)
+   */
+  async breakEnd(params: {
+    userId: string;
+    timestamp: Date;
+    location?: { lat: number; lng: number };
+    ip?: string;
+  }): Promise<TimeEntry> {
+    const fichaRepo = AppDataSource.getRepository(Ficha);
+    const openFicha = await fichaRepo.findOne({
+      where: { userId: params.userId, endTime: IsNull() }
+    });
+    if (!openFicha) throw new Error("No hay ninguna jornada activa para reanudar.");
+
+    return this.recordClockEvent({
+      fichaId: openFicha.id,
+      userId: params.userId,
+      type: TimeEntryType.BREAK_END,
+      source: TimeEntrySource.WEB,
+      timestampUtc: params.timestamp,
+      ip: params.ip,
+      latitude: params.location?.lat,
+      longitude: params.location?.lng,
+    });
+  }
+
+  /**
+   * Finaliza la jornada actual (Evento CLOCK_OUT + Cierre Ficha)
+   */
+  async clockOut(params: {
+    userId: string;
+    timestamp: Date;
+    location?: { lat: number; lng: number };
+    ip?: string;
+  }): Promise<Ficha> {
+    const fichaRepo = AppDataSource.getRepository(Ficha);
+
+    const openFicha = await fichaRepo.findOne({
+      where: { userId: params.userId, endTime: IsNull() }
+    });
+    if (!openFicha) throw new Error("No hay ninguna jornada activa para cerrar.");
+
+    const timeStr = params.timestamp.toTimeString().split(' ')[0].slice(0, 5);
+    openFicha.endTime = timeStr;
+    openFicha.status = "confirmed";
+
+    await this.recordClockEvent({
+      fichaId: openFicha.id,
+      userId: params.userId,
+      type: TimeEntryType.CLOCK_OUT,
+      source: TimeEntrySource.WEB,
+      timestampUtc: params.timestamp,
+      ip: params.ip,
+      latitude: params.location?.lat,
+      longitude: params.location?.lng,
+    });
+
+    openFicha.hoursWorked = await this.calculateWorkingHours(openFicha.id);
+    await fichaRepo.save(openFicha);
+
+    return openFicha;
   }
 
   /**

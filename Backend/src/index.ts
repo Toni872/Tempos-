@@ -18,6 +18,7 @@ import workCenterRoutes from "./controllers/workcenters.controller.js";
 import scheduleController from "./controllers/schedule.controller.js";
 import pushRoutes from "./controllers/push.controller.js";
 import webauthnRoutes from "./routes/webauthn.routes.js";
+import logRoutes from "./controllers/log.controller.js";
 import { GdprController } from "./controllers/gdpr.controller.js";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler.js";
 import { firebaseAuthMiddleware } from "./middleware/auth.middleware.js";
@@ -27,19 +28,22 @@ import {
 } from "./middleware/rate-limit.middleware.js";
 
 const app: Express = express();
-const PORT = process.env.PORT || 8080;
+const PORT = process.env.PORT || 8081;
 
 // ─── Middleware ────────────────────────────────────────────────────────────────
 
-app.use(helmet());
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+  contentSecurityPolicy: false,
+}));
 app.use(hpp());
-app.set("trust proxy", 1); // Confía en el proxy de Railway/CloudRun para rate limiting
+app.set("trust proxy", 1); 
 app.disable("x-powered-by");
 
 app.use((req, _res, next) => {
-  console.log(
-    `[${new Date().toISOString()}] ${req.method} ${req.url} - Origin: ${req.headers.origin}`,
-  );
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+  console.log(` > Origin: ${req.headers.origin || "Direct/Same-Origin"}`);
+  console.log(` > Auth: ${req.headers.authorization ? "Presente (Bearer ...)" : "AUSENTE"}`);
   next();
 });
 
@@ -135,6 +139,7 @@ app.use("/api/v1/work-centers", workCenterRoutes);
 app.use("/api/v1/schedules", scheduleController);
 app.use("/api/v1/push", pushRoutes);
 app.use("/api/v1/webauthn", webauthnRoutes);
+app.use("/api/v1/logs", logRoutes);
 
 // Health check for Railway/CloudRun
 app.get("/health", (_req, res) => {

@@ -69,11 +69,11 @@ psql $DATABASE_URL -c "\di" | grep time_entries
 ```bash
 # 8. Iniciar backend
 npm run dev
-# ✅ Esperado: "Server running on http://localhost:8080"
+# ✅ Esperado: "Server running on http://localhost:8081"
 # ✅ Esperado: Database connection successful
 
 # 9. Verificar health
-curl http://localhost:8080/health
+curl http://localhost:8081/health
 # ✅ Esperado: {"status": "ok"}
 ```
 
@@ -81,7 +81,7 @@ curl http://localhost:8080/health
 
 ```bash
 # 10. Test clockin (crear Ficha + TimeEntry)
-curl -X POST http://localhost:8080/api/v1/fichas/clockin \
+curl -X POST http://localhost:8081/api/v1/fichas/clockin \
   -H "Authorization: Bearer test-token" \
   -H "Content-Type: application/json" \
   -d '{}'
@@ -92,7 +92,7 @@ psql $DATABASE_URL -c "SELECT * FROM time_entries ORDER BY created_at DESC LIMIT
 # ✅ Esperado: 1 fila con type='CLOCK_IN', timestampUtc=NOW()
 
 # 12. Test clockout (actualizar Ficha + TimeEntry)
-curl -X POST http://localhost:8080/api/v1/fichas/clockout \
+curl -X POST http://localhost:8081/api/v1/fichas/clockout \
   -H "Authorization: Bearer test-token" \
   -H "Content-Type: application/json" \
   -d '{}'
@@ -104,7 +104,7 @@ psql $DATABASE_URL -c "SELECT * FROM time_entries WHERE type='CLOCK_OUT' ORDER B
 
 # 14. Test audit-trail (ver trazabilidad)
 FICHA_ID="..." # copiar ficha.id del test anterior
-curl http://localhost:8080/api/v1/fichas/$FICHA_ID/audit-trail \
+curl http://localhost:8081/api/v1/fichas/$FICHA_ID/audit-trail \
   -H "Authorization: Bearer test-token"
 # ✅ Respuesta: { "ficha": {...}, "timeEntries": [...], "changeLog": {...} }
 ```

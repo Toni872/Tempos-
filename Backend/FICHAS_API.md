@@ -234,7 +234,7 @@ GET /api/v1/fichas/stats/daily?startDate=2026-03-01&endDate=2026-03-31
 
 ### 1. Crear ficha
 ```bash
-curl -X POST http://localhost:8080/api/v1/fichas \
+curl -X POST http://localhost:8081/api/v1/fichas \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer YOUR_FIREBASE_TOKEN" \
   -d '{
@@ -248,19 +248,19 @@ curl -X POST http://localhost:8080/api/v1/fichas \
 
 ### 2. Listar fichas
 ```bash
-curl -X GET "http://localhost:8080/api/v1/fichas?startDate=2026-03-01&endDate=2026-03-31" \
+curl -X GET "http://localhost:8081/api/v1/fichas?startDate=2026-03-01&endDate=2026-03-31" \
   -H "Authorization: Bearer YOUR_FIREBASE_TOKEN"
 ```
 
 ### 3. Obtener ficha por ID
 ```bash
-curl -X GET http://localhost:8080/api/v1/fichas/550e8400-e29b-41d4-a716-446655440000 \
+curl -X GET http://localhost:8081/api/v1/fichas/550e8400-e29b-41d4-a716-446655440000 \
   -H "Authorization: Bearer YOUR_FIREBASE_TOKEN"
 ```
 
 ### 4. Actualizar ficha
 ```bash
-curl -X PUT http://localhost:8080/api/v1/fichas/550e8400-e29b-41d4-a716-446655440000 \
+curl -X PUT http://localhost:8081/api/v1/fichas/550e8400-e29b-41d4-a716-446655440000 \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer YOUR_FIREBASE_TOKEN" \
   -d '{
@@ -270,13 +270,13 @@ curl -X PUT http://localhost:8080/api/v1/fichas/550e8400-e29b-41d4-a716-44665544
 
 ### 5. Archivar ficha
 ```bash
-curl -X DELETE http://localhost:8080/api/v1/fichas/550e8400-e29b-41d4-a716-446655440000 \
+curl -X DELETE http://localhost:8081/api/v1/fichas/550e8400-e29b-41d4-a716-446655440000 \
   -H "Authorization: Bearer YOUR_FIREBASE_TOKEN"
 ```
 
 ### 6. Estadísticas diarias
 ```bash
-curl -X GET "http://localhost:8080/api/v1/fichas/stats/daily?startDate=2026-03-01&endDate=2026-03-31" \
+curl -X GET "http://localhost:8081/api/v1/fichas/stats/daily?startDate=2026-03-01&endDate=2026-03-31" \
   -H "Authorization: Bearer YOUR_FIREBASE_TOKEN"
 ```
 

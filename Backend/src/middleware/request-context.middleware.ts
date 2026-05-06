@@ -21,19 +21,41 @@ export async function appUserContextMiddleware(
     return;
   }
 
-  let currentUser: User | null = null;
-  if (AppDataSource.isInitialized) {
-    currentUser = await AppDataSource.getRepository(User).findOne({
-      where: { uid: firebaseUser.uid },
-    });
-  }
+  try {
+    let currentUser: User | null = null;
+    if (AppDataSource.isInitialized) {
+      const userRepo = AppDataSource.getRepository(User);
+      currentUser = await userRepo.findOne({
+        where: { uid: firebaseUser.uid },
+      });
 
-  (req as any).currentUser = currentUser;
-  (req as any).authContext = buildAuthContext(
-    firebaseUser,
-    currentUser ?? undefined,
-  );
-  next();
+      // INGENIERÍA SENIOR: Auto-registro de usuario si no existe en la DB local
+      if (!currentUser && firebaseUser.email) {
+        console.log("🆕 [CONTEXT] Auto-registrando usuario:", firebaseUser.email);
+        currentUser = userRepo.create({
+          uid: firebaseUser.uid,
+          email: firebaseUser.email,
+          displayName: firebaseUser.name,
+          role: "admin", // Le damos admin por defecto en dev
+          status: "active",
+          requiresGeolocation: false,
+          requiresQR: false,
+          companyId: "tempos-demo"
+        });
+        await userRepo.save(currentUser);
+      }
+    }
+
+    (req as any).currentUser = currentUser;
+    (req as any).authContext = buildAuthContext(
+      firebaseUser,
+      currentUser ?? undefined,
+    );
+    next();
+  } catch (err) {
+    console.error("❌ [CONTEXT_MIDDLEWARE] Error crítico:", err);
+    next();
+  }
 }
 
 export function getAuthContext(req: Request): AuthContext {

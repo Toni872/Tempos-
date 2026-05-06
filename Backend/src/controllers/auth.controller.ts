@@ -142,6 +142,7 @@ router.get(
       role: user.role,
       companyId: user.companyId,
       status: user.status,
+      photoURL: user.photoURL,
       createdAt: user.createdAt,
     });
   }),
@@ -176,7 +177,8 @@ router.put(
       return;
     }
 
-    user.displayName = displayName;
+    if (displayName) user.displayName = displayName;
+    if (req.body.photoURL !== undefined) user.photoURL = req.body.photoURL;
 
     await userRepository.save(user);
 

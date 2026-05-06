@@ -1,24 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   ChartLineUp, 
+  Clock, 
+  UsersThree, 
   TrendUp, 
   TrendDown, 
-  Clock, 
-  Calendar, 
-  UsersThree,
-  ArrowRight,
-  DownloadSimple,
   ChartPieSlice,
   MagicWand,
-  Sparkle,
+  Monitor,
   Warning,
-  HardDrive,
-  Cpu,
-  Monitor
+  Sparkle,
+  Cpu
 } from '@phosphor-icons/react';
-import SectionHeader from '@/components/ui/SectionHeader';
-import Badge from '@/components/ui/Badge';
-import { cn } from '@/lib/utils';
 import { 
   AreaChart, 
   Area, 
@@ -32,46 +25,69 @@ import {
   Cell
 } from 'recharts';
 import { motion, AnimatePresence } from 'framer-motion';
+import { cn } from '../../lib/utils';
+import Badge from '../ui/Badge';
+import { getAiInsights } from '../../lib/api';
 
 const dataWeekly = [
-  { day: 'LUN', val: 85 },
-  { day: 'MAR', val: 92 },
-  { day: 'MIE', val: 78 },
-  { day: 'JUE', val: 95 },
-  { day: 'VIE', val: 88 },
-  { day: 'SAB', val: 40 },
-  { day: 'DOM', val: 35 },
+  { day: 'LUN', val: 45 },
+  { day: 'MAR', val: 52 },
+  { day: 'MIE', val: 48 },
+  { day: 'JUE', val: 61 },
+  { day: 'VIE', val: 55 },
+  { day: 'SAB', val: 32 },
+  { day: 'DOM', val: 28 },
 ];
 
 const dataHours = [
-  { sede: 'MADRID', hrs: 420 },
-  { sede: 'BARCELONA', hrs: 380 },
-  { sede: 'VALENCIA', hrs: 290 },
-  { sede: 'SEVILLA', hrs: 150 },
+  { sede: 'MADRID HQ', hrs: 840 },
+  { sede: 'BARCELONA', hrs: 620 },
+  { sede: 'VALENCIA', hrs: 410 },
+  { sede: 'REMOTO', hrs: 1250 },
 ];
 
 export default function AnalisisTab() {
-  const [isGenerating, setIsGenerating] = useState(false);
   const [showAI, setShowAI] = useState(false);
+  const [insights, setInsights] = useState([]);
+  const [isLoadingAI, setIsLoadingAI] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
 
-  const handleGenerateReport = () => {
-    setIsGenerating(true);
-    setTimeout(() => {
-      setIsGenerating(false);
-      alert('Auditoría generada exitosamente. Se ha descargado el informe PDF en su dispositivo.');
-    }, 2000);
+  useEffect(() => {
+    setIsMounted(true);
+    if (showAI && insights.length === 0) {
+      fetchAI();
+    }
+  }, [showAI]);
+
+  const fetchAI = async () => {
+    setIsLoadingAI(true);
+    try {
+      const data = await getAiInsights();
+      setInsights(data);
+    } catch (error) {
+      console.error("Error fetching AI insights:", error);
+    } finally {
+      setIsLoadingAI(false);
+    }
   };
 
   return (
-    <div className="space-y-10 animate-in fade-in duration-700">
-      <SectionHeader 
-        icon={ChartLineUp}
-        title="Inteligencia Operativa"
-        subtitle="Analítica y KPIs críticos para la optimización del rendimiento."
-        actionLabel={isGenerating ? "PROCESANDO..." : "GENERAR AUDITORÍA"}
-        actionIcon={DownloadSimple}
-        onAction={handleGenerateReport}
-      />
+    <div className="space-y-12 pb-20">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+        <div className="space-y-2">
+          <h2 className="text-4xl font-black text-white italic uppercase tracking-tighter">
+            Business <span className="text-blue-500">Intelligence</span>
+          </h2>
+          <p className="text-white/40 font-bold uppercase tracking-widest text-[10px]">
+            Análisis avanzado de métricas de rendimiento y asistencia operativa
+          </p>
+        </div>
+        
+        <div className="flex items-center gap-3">
+          <div className="h-2 w-2 rounded-full bg-blue-500 animate-pulse" />
+          <span className="text-[10px] font-black text-blue-500/80 uppercase tracking-widest">Sincronización en tiempo real</span>
+        </div>
+      </div>
 
       {/* KPI GRID */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -97,39 +113,42 @@ export default function AnalisisTab() {
             <Badge color="blue">DATOS EN VIVO</Badge>
           </div>
           
-          <div className="h-[300px] min-h-[300px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={dataWeekly}>
-                <defs>
-                  <linearGradient id="colorVal" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.03)" />
-                <XAxis 
-                  dataKey="day" 
-                  axisLine={false} 
-                  tickLine={false} 
-                  tick={{fill: 'rgba(255,255,255,0.2)', fontSize: 10, fontWeight: 900}} 
-                  dy={10}
-                />
-                <YAxis hide />
-                <Tooltip 
-                  contentStyle={{backgroundColor: '#111114', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.1)', fontSize: '10px', fontWeight: '900', color: '#fff'}}
-                  itemStyle={{color: '#3b82f6'}}
-                  cursor={{stroke: 'rgba(255,255,255,0.1)', strokeWidth: 1}}
-                />
-                <Area 
-                  type="monotone" 
-                  dataKey="val" 
-                  stroke="#3b82f6" 
-                  strokeWidth={3}
-                  fillOpacity={1} 
-                  fill="url(#colorVal)" 
-                />
-              </AreaChart>
-            </ResponsiveContainer>
+          {/* Fijamos altura para evitar error de ResponsiveContainer */}
+          <div className="h-[300px] w-full">
+            {isMounted && (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={dataWeekly}>
+                  <defs>
+                    <linearGradient id="colorVal" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.03)" />
+                  <XAxis 
+                    dataKey="day" 
+                    axisLine={false} 
+                    tickLine={false} 
+                    tick={{fill: 'rgba(255,255,255,0.2)', fontSize: 10, fontWeight: 900}} 
+                    dy={10}
+                  />
+                  <YAxis hide />
+                  <Tooltip 
+                    contentStyle={{backgroundColor: '#111114', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.1)', fontSize: '10px', fontWeight: '900', color: '#fff'}}
+                    itemStyle={{color: '#3b82f6'}}
+                    cursor={{stroke: 'rgba(255,255,255,0.1)', strokeWidth: 1}}
+                  />
+                  <Area 
+                    type="monotone" 
+                    dataKey="val" 
+                    stroke="#3b82f6" 
+                    strokeWidth={3}
+                    fillOpacity={1} 
+                    fill="url(#colorVal)" 
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            )}
           </div>
         </div>
 
@@ -148,30 +167,33 @@ export default function AnalisisTab() {
             <Badge color="emerald">AUDITORÍA ACTIVA</Badge>
           </div>
           
-          <div className="h-[300px] min-h-[300px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={dataHours} layout="vertical">
-                <XAxis type="number" hide />
-                <YAxis 
-                  dataKey="sede" 
-                  type="category" 
-                  axisLine={false} 
-                  tickLine={false} 
-                  tick={{fill: 'rgba(255,255,255,0.4)', fontSize: 9, fontWeight: 900}}
-                  width={100}
-                />
-                <Tooltip 
-                  cursor={{fill: 'rgba(255,255,255,0.02)'}}
-                  contentStyle={{backgroundColor: '#111114', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.1)', fontSize: '10px', fontWeight: '900', color: '#fff'}}
-                  itemStyle={{color: '#fbbf24'}}
-                />
-                <Bar dataKey="hrs" radius={[0, 10, 10, 0]}>
-                  {dataHours.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={index === 0 ? '#3b82f6' : 'rgba(255,255,255,0.05)'} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+          {/* Fijamos altura para evitar error de ResponsiveContainer */}
+          <div className="h-[300px] w-full">
+            {isMounted && (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={dataHours} layout="vertical">
+                  <XAxis type="number" hide />
+                  <YAxis 
+                    dataKey="sede" 
+                    type="category" 
+                    axisLine={false} 
+                    tickLine={false} 
+                    tick={{fill: 'rgba(255,255,255,0.4)', fontSize: 9, fontWeight: 900}}
+                    width={100}
+                  />
+                  <Tooltip 
+                    cursor={{fill: 'rgba(255,255,255,0.02)'}}
+                    contentStyle={{backgroundColor: '#111114', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.1)', fontSize: '10px', fontWeight: '900', color: '#fff'}}
+                    itemStyle={{color: '#fbbf24'}}
+                  />
+                  <Bar dataKey="hrs" radius={[0, 10, 10, 0]}>
+                    {dataHours.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={index === 0 ? '#3b82f6' : 'rgba(255,255,255,0.05)'} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            )}
           </div>
         </div>
       </div>
@@ -215,21 +237,38 @@ export default function AnalisisTab() {
               exit={{ height: 0, opacity: 0 }}
               className="overflow-hidden"
             >
-              <div className="p-10 border-t border-white/5 bg-black/20 grid grid-cols-1 md:grid-cols-2 gap-8">
-                 <div className="p-8 rounded-[2.5rem] bg-white/[0.02] border border-white/5 relative group hover:border-blue-500/30 transition-all">
-                    <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-400 mb-6">
-                       <MagicWand size={20} weight="fill" />
-                    </div>
-                    <h5 className="text-[10px] font-black text-white/20 uppercase tracking-[0.3em] mb-3">INSIGHT DE EFICIENCIA</h5>
-                    <p className="text-sm text-white/80 font-medium leading-relaxed italic">"Se detecta un aumento del 14% en la puntualidad los martes tras el ajuste de horarios en la Sede Central. Recomendado replicar patrón en Barcelona."</p>
-                 </div>
-                 <div className="p-8 rounded-[2.5rem] bg-white/[0.02] border border-white/5 relative group hover:border-emerald-500/30 transition-all">
-                    <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-400 mb-6">
-                       <Monitor size={20} weight="fill" />
-                    </div>
-                    <h5 className="text-[10px] font-black text-white/20 uppercase tracking-[0.3em] mb-3">RECOMENDACIÓN TÉCNICA</h5>
-                    <p className="text-sm text-white/80 font-medium leading-relaxed italic">"Considera implementar un turno flexible de 15 min los viernes para reducir el estrés térmico de entrada y optimizar la salida escalonada."</p>
-                 </div>
+              <div className="p-10 border-t border-white/5 bg-black/20">
+                {isLoadingAI ? (
+                  <div className="flex flex-col items-center justify-center py-10 gap-4">
+                    <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                    <p className="text-[10px] font-black text-white/40 uppercase tracking-widest">Consultando a Gemini AI...</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    {insights.length > 0 ? (
+                      insights.map((insight, idx) => (
+                        <div key={idx} className="p-8 rounded-[2.5rem] bg-white/[0.02] border border-white/5 relative group hover:border-blue-500/30 transition-all">
+                          <div className={cn(
+                            "w-10 h-10 rounded-xl flex items-center justify-center mb-6",
+                            insight.type === 'efficiency' ? "bg-blue-500/10 text-blue-400" : 
+                            insight.type === 'technical' ? "bg-emerald-500/10 text-emerald-400" :
+                            "bg-rose-500/10 text-rose-400"
+                          )}>
+                             {insight.type === 'efficiency' ? <MagicWand size={20} weight="fill" /> : 
+                              insight.type === 'technical' ? <Monitor size={20} weight="fill" /> :
+                              <Warning size={20} weight="fill" />}
+                          </div>
+                          <h5 className="text-[10px] font-black text-white/20 uppercase tracking-[0.3em] mb-3">{insight.title}</h5>
+                          <p className="text-sm text-white/80 font-medium leading-relaxed italic">"{insight.text}"</p>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="col-span-2 text-center py-10">
+                        <p className="text-white/40 text-xs italic">No hay suficientes datos para generar insights en este momento.</p>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </motion.div>
           )}
@@ -244,24 +283,24 @@ function AnalyticStat({ label, value, trend, color, icon: Icon }) {
     emerald: "text-emerald-500 bg-emerald-500/5 border-emerald-500/10",
     blue: "text-blue-500 bg-blue-500/5 border-blue-500/10",
     indigo: "text-indigo-500 bg-indigo-500/5 border-indigo-500/10",
-    rose: "text-rose-500 bg-rose-500/5 border-rose-500/10",
+    rose: "text-rose-500 bg-rose-500/5 border-rose-500/10"
   };
 
   return (
-    <div className="bg-white/[0.01] border border-white/5 rounded-[2.5rem] p-8 shadow-2xl transition-all hover:scale-[1.02] relative group overflow-hidden">
-       <div className="flex items-center justify-between relative z-10">
-          <div>
-            <p className="text-[9px] font-black text-white/20 uppercase tracking-[0.3em] mb-2">{label}</p>
-            <p className="text-3xl font-black text-white italic tracking-tighter">{value}</p>
-            <div className={cn("mt-3 text-[10px] font-black flex items-center gap-1", trend.startsWith('+') ? "text-emerald-500" : "text-rose-500")}>
-               {trend} <span className="opacity-20 uppercase">vs mes ant.</span>
-            </div>
-          </div>
-          <div className={cn("w-14 h-14 rounded-2xl flex items-center justify-center border shadow-inner", themes[color])}>
-             <Icon size={28} weight="duotone" />
-          </div>
-       </div>
-       <div className="absolute inset-0 bg-gradient-to-br from-white/[0.02] to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+    <div className="bg-white/[0.01] border border-white/5 p-6 rounded-[2rem] group hover:border-white/10 transition-colors">
+      <div className="flex items-center justify-between mb-4">
+        <div className={cn("p-3 rounded-2xl border transition-colors", themes[color])}>
+          <Icon size={20} weight="fill" />
+        </div>
+        <div className={cn(
+          "text-[10px] font-black px-3 py-1 rounded-full",
+          trend.startsWith('+') ? "text-emerald-400 bg-emerald-400/10" : "text-rose-400 bg-rose-400/10"
+        )}>
+          {trend}
+        </div>
+      </div>
+      <p className="text-[10px] font-black text-white/20 uppercase tracking-[0.3em] mb-1">{label}</p>
+      <p className="text-2xl font-black text-white italic">{value}</p>
     </div>
   );
 }

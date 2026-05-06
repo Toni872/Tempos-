@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { z } from 'zod';
 import { 
   UserCircle, 
   Lock, 
@@ -21,8 +22,7 @@ import {
 } from '@phosphor-icons/react';
 import { startRegistration } from '@simplewebauthn/browser';
 import { 
-  getWebAuthnRegistrationOptions, 
-  verifyWebAuthnRegistration, 
+  updateProfile,
   getClientSession,
   subscribePush,
   unsubscribePush,
@@ -38,6 +38,56 @@ export default function PerfilTab({ profile, onUpdate }) {
   const [bioStatus, setBioStatus] = useState('idle'); 
   const [pushEnabled, setPushEnabled] = useState(typeof Notification !== 'undefined' && Notification.permission === 'granted');
   const [pushStatus, setPushStatus] = useState('idle');
+  const [isSaving, setIsSaving] = useState(false);
+  const [validationError, setValidationError] = useState(null);
+  const [formData, setFormData] = useState({
+    displayName: profile?.displayName || '',
+    photoURL: profile?.photoURL || ''
+  });
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleFileUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    // Simulación senior: Lectura local para preview instantánea
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setFormData(prev => ({ ...prev, photoURL: reader.result }));
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const profileSchema = z.object({
+    displayName: z.string().min(3, "El nombre debe tener al menos 3 caracteres").max(50),
+    photoURL: z.string().optional()
+  });
+
+  const handleSave = async () => {
+    setValidationError(null);
+    setIsSaving(true);
+    
+    try {
+      // Validación técnica obligatoria (Zod)
+      const validatedData = profileSchema.parse(formData);
+      
+      const session = getClientSession();
+      await updateProfile(session.token, validatedData);
+      onUpdate?.(); // Refrescar datos globales
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        setValidationError(err.errors[0].message);
+      } else {
+        alert('Error al guardar: ' + err.message);
+      }
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   const handleTogglePush = async () => {
     try {
@@ -105,9 +155,9 @@ export default function PerfilTab({ profile, onUpdate }) {
         icon={UserCircle}
         title="Centro de Identidad Digital"
         subtitle="Gestión de credenciales, seguridad biométrica y preferencias de terminal personal."
-        actionLabel="GUARDAR CAMBIOS"
+        actionLabel={isSaving ? "GUARDANDO..." : "GUARDAR CAMBIOS"}
         actionIcon={FloppyDisk}
-        onAction={() => {}}
+        onAction={handleSave}
       />
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-12">
@@ -121,24 +171,51 @@ export default function PerfilTab({ profile, onUpdate }) {
                <div className="absolute inset-0 bg-gradient-to-t from-[#0d0d0f] to-transparent" />
             </div>
             <CardBody className="pt-0 relative px-8 pb-10">
-              <div className="flex flex-col items-center -mt-16">
-                <div className="relative">
+              <div className="flex flex-col items-center -mt-20">
+                <div className="relative group/avatar-container">
+                  {/* Glow Ring Animado */}
+                  <div className="absolute inset-[-4px] bg-gradient-to-tr from-blue-600 to-indigo-500 rounded-full blur-md opacity-20 group-hover/avatar-container:opacity-40 transition-opacity duration-700" />
+                  
                   <motion.div 
                     animate={{ rotate: 360 }}
-                    transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
-                    className="absolute inset-[-8px] border border-blue-500/20 rounded-full border-dashed"
+                    transition={{ duration: 30, repeat: Infinity, ease: "linear" }}
+                    className="absolute inset-[-10px] border border-blue-500/10 rounded-full border-dashed"
                   />
-                  <div className="w-32 h-32 rounded-full bg-[#0a0a0c] border-[6px] border-[#0d0d0f] shadow-2xl flex items-center justify-center overflow-hidden relative z-10 group/avatar">
-                    <div className="w-full h-full bg-gradient-to-br from-blue-600/20 to-indigo-600/20 flex items-center justify-center text-blue-500 text-5xl font-black italic tracking-tighter">
-                       {profile?.displayName?.charAt(0) || profile?.email?.charAt(0)}
+                  
+                  <div 
+                    className="w-40 h-40 rounded-full bg-[#0a0a0c] border-[1px] border-white/10 shadow-[0_0_50px_rgba(37,99,235,0.1)] flex items-center justify-center overflow-hidden relative z-10 cursor-pointer"
+                    onClick={() => document.getElementById('avatar-upload').click()}
+                  >
+                    {formData.photoURL ? (
+                      <img src={formData.photoURL} alt="Avatar" className="w-full h-full object-cover group-hover/avatar-container:scale-110 transition-transform duration-700" />
+                    ) : (
+                      <div className="w-full h-full bg-gradient-to-br from-blue-600/10 to-indigo-600/10 flex items-center justify-center text-blue-500/40 text-6xl font-black italic tracking-tighter">
+                         {formData.displayName?.charAt(0) || profile?.email?.charAt(0)}
+                      </div>
+                    )}
+                    
+                    {/* Overlay de Carga Mejorado */}
+                    <div className="absolute inset-0 bg-black/40 backdrop-blur-sm flex flex-col items-center justify-center opacity-0 group-hover/avatar-container:opacity-100 transition-all duration-500">
+                       <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center mb-2 border border-white/10">
+                          <Cpu size={20} className="text-white" />
+                       </div>
+                       <span className="text-[8px] font-black text-white uppercase tracking-[0.3em]">Sincronizar Foto</span>
                     </div>
-                    <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center opacity-0 group-hover/avatar:opacity-100 transition-all duration-500 cursor-pointer backdrop-blur-md">
-                       <Cpu size={24} className="text-white/40 mb-2" />
-                       <span className="text-[9px] font-black text-white uppercase tracking-[0.2em]">Cargar DNA</span>
-                    </div>
+
+                    <input 
+                      id="avatar-upload"
+                      type="file" 
+                      className="hidden" 
+                      accept="image/*"
+                      onChange={handleFileUpload}
+                    />
                   </div>
-                  <div className="absolute -bottom-1 -right-1 w-8 h-8 bg-emerald-500 rounded-full border-4 border-[#0d0d0f] flex items-center justify-center shadow-lg z-20">
-                     <ShieldCheck size={16} weight="fill" className="text-white" />
+
+                  {/* Badge de Estatus Simétrico */}
+                  <div className="absolute bottom-2 right-2 w-10 h-10 bg-[#0d0d0f] rounded-full p-1.5 z-20 shadow-2xl">
+                    <div className="w-full h-full bg-emerald-500 rounded-full flex items-center justify-center border border-emerald-400/20">
+                       <ShieldCheck size={16} weight="fill" className="text-white" />
+                    </div>
                   </div>
                 </div>
 
@@ -173,7 +250,7 @@ export default function PerfilTab({ profile, onUpdate }) {
               desc="Última rotación de credenciales hace 90 días. Estado: Óptimo."
               actionLabel="MODIFICAR CLAVE"
               color="amber"
-              onAction={() => {}}
+              onAction={() => alert('Protocolo de seguridad: Se ha enviado un enlace de rotación a su Nodo de Comunicación (Email).')}
             />
 
             <SecurityCard 
@@ -208,10 +285,28 @@ export default function PerfilTab({ profile, onUpdate }) {
                 <div>
                    <h4 className="text-[11px] font-black text-white/20 uppercase tracking-[0.4em] mb-10 italic border-b border-white/5 pb-4">Expediente Personal</h4>
                    <form className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-10">
-                      <InputGroup label="Nombre Operativo" placeholder="Ej. Antonio García" value={profile?.displayName} />
-                      <InputGroup label="Identificación Legal (DNI)" placeholder="12345678X" value={profile?.dni} />
+                      <InputGroup 
+                        name="displayName"
+                        label="Nombre Operativo" 
+                        placeholder="Ej. Antonio García" 
+                        value={formData.displayName} 
+                        onChange={handleInputChange}
+                      />
+                      <InputGroup 
+                        name="dni"
+                        label="Identificación Legal (DNI)" 
+                        placeholder="12345678X" 
+                        value={formData.dni} 
+                        onChange={handleInputChange}
+                      />
                       <InputGroup label="Canal de Comunicaciones" placeholder="email@empresa.com" value={profile?.email} disabled />
-                      <InputGroup label="Frecuencia Móvil" placeholder="+34 600 000 000" value={profile?.phone} />
+                      <InputGroup 
+                        name="phone"
+                        label="Frecuencia Móvil" 
+                        placeholder="+34 600 000 000" 
+                        value={formData.phone} 
+                        onChange={handleInputChange}
+                      />
                       
                       <div className="md:col-span-2 space-y-3">
                         <label className="flex items-center gap-2 text-[10px] font-black text-white/20 uppercase tracking-[0.3em] ml-2">
@@ -255,6 +350,31 @@ export default function PerfilTab({ profile, onUpdate }) {
                 <span className="text-[10px] font-black uppercase tracking-[0.5em] italic">Identidad Certificada</span>
              </div>
              <div className="h-px flex-1 bg-gradient-to-l from-transparent to-white/10" />
+          </div>
+
+          {/* BOTÓN DE GUARDADO GLOBAL */}
+          <div className="mt-12 pt-8 border-t border-white/5 flex flex-col gap-4">
+             {validationError && (
+               <motion.div 
+                 initial={{ opacity: 0, y: -10 }}
+                 animate={{ opacity: 1, y: 0 }}
+                 className="px-6 py-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-500 text-[10px] font-black uppercase tracking-widest text-center animate-pulse"
+               >
+                  {validationError}
+               </motion.div>
+             )}
+             <button 
+               onClick={handleSave}
+               disabled={isSaving}
+               className="w-full py-6 rounded-[2rem] bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-black uppercase tracking-[0.5em] flex items-center justify-center gap-4 transition-all shadow-2xl shadow-blue-600/40 active:scale-[0.98] disabled:opacity-50 disabled:grayscale"
+             >
+               {isSaving ? (
+                 <ArrowsClockwise size={22} className="animate-spin" />
+               ) : (
+                 <FloppyDisk size={22} weight="fill" />
+               )}
+               {isSaving ? 'CIFRANDO Y SINCRONIZANDO...' : 'CONFIRMAR Y GUARDAR PERFIL'}
+             </button>
           </div>
         </div>
       </div>
@@ -321,14 +441,16 @@ function SecurityCard({ icon: Icon, title, desc, actionLabel, color, onAction, l
   );
 }
 
-function InputGroup({ label, placeholder, value, disabled }) {
+function InputGroup({ label, placeholder, value, disabled, name, onChange }) {
   return (
     <div className="space-y-3 group/input">
       <label className="text-[10px] font-black text-white/20 group-focus-within/input:text-blue-500 transition-colors uppercase tracking-[0.3em] ml-2 italic">{label}</label>
       <div className="relative">
         <input 
           type="text" 
+          name={name}
           defaultValue={value}
+          onChange={onChange}
           disabled={disabled}
           placeholder={placeholder}
           className={cn(

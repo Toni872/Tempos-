@@ -66,13 +66,13 @@ psql $DATABASE_URL -c "\di" | grep time_entry
 npm run dev
 
 # ✅ Esperado en logs:
-# - "Server running on http://localhost:8080"
+# - "Server running on http://localhost:8081"
 # - "Database connection successful"
 # - Ningún ERROR
 
 # En otra terminal:
 # 9. Health check
-curl http://localhost:8080/health
+curl http://localhost:8081/health
 # ✅ Esperado: {"status": "ok"}
 ```
 
@@ -84,7 +84,7 @@ curl http://localhost:8080/health
 
 ```bash
 # 10. clockin
-FICHA_RESPONSE=$(curl -s -X POST http://localhost:8080/api/v1/fichas/clockin \
+FICHA_RESPONSE=$(curl -s -X POST http://localhost:8081/api/v1/fichas/clockin \
   -H "Authorization: Bearer test-token" \
   -H "Content-Type: application/json" \
   -d '{}')
@@ -123,7 +123,7 @@ psql $DATABASE_URL -c "SELECT id, type, timestamp_utc, created_at FROM time_entr
 
 ```bash
 # 12. clockout
-curl -X POST http://localhost:8080/api/v1/fichas/clockout \
+curl -X POST http://localhost:8081/api/v1/fichas/clockout \
   -H "Authorization: Bearer test-token" \
   -H "Content-Type: application/json" \
   -d '{}' | jq .
@@ -151,7 +151,7 @@ psql $DATABASE_URL -c "SELECT id, type, timestamp_utc FROM time_entries WHERE fi
 
 ```bash
 # 14. Ver audit trail (incluye eventos + cambios)
-curl http://localhost:8080/api/v1/fichas/$FICHA_ID/audit-trail \
+curl http://localhost:8081/api/v1/fichas/$FICHA_ID/audit-trail \
   -H "Authorization: Bearer test-token" | jq .
 
 # ✅ Esperado estructura:
@@ -164,6 +164,20 @@ curl http://localhost:8080/api/v1/fichas/$FICHA_ID/audit-trail \
 #   "changeLog": {},
 #   "auditMeta": { ... }
 # }
+
+### Test Pausas (Fase 6: HARDENING)
+
+```bash
+# 14b. Iniciar Pausa
+curl -X POST http://localhost:8081/api/v1/fichas/break-start \
+  -H "Authorization: Bearer test-token" \
+  -H "Content-Type: application/json" -d '{}'
+
+# 14c. Finalizar Pausa
+curl -X POST http://localhost:8081/api/v1/fichas/break-end \
+  -H "Authorization: Bearer test-token" \
+  -H "Content-Type: application/json" -d '{}'
+```
 ```
 
 ---
@@ -174,7 +188,7 @@ curl http://localhost:8080/api/v1/fichas/$FICHA_ID/audit-trail \
 
 ```bash
 # 15. Empleado solicita corrección
-CORRECTION=$(curl -s -X POST http://localhost:8080/api/v1/fichas/$FICHA_ID/request-correction \
+CORRECTION=$(curl -s -X POST http://localhost:8081/api/v1/fichas/$FICHA_ID/request-correction \
   -H "Authorization: Bearer test-token" \
   -H "Content-Type: application/json" \
   -d '{
@@ -194,7 +208,7 @@ echo $CORRECTION | jq .
 
 ```bash
 # 16. Manager aprueba corrección
-REVIEW=$(curl -s -X POST http://localhost:8080/api/v1/fichas/$FICHA_ID/review-correction \
+REVIEW=$(curl -s -X POST http://localhost:8081/api/v1/fichas/$FICHA_ID/review-correction \
   -H "Authorization: Bearer test-admin" \
   -H "Content-Type: application/json" \
   -d '{
@@ -246,16 +260,24 @@ curl http://localhost:8080/api/v1/fichas/$FICHA_ID/audit-trail \
 ```bash
 # 19. Test: employee NO puede ver audit-trail de otro usuario
 # (usar token de otro usuario)
-curl http://localhost:8080/api/v1/fichas/$FICHA_ID/audit-trail \
+curl http://localhost:8081/api/v1/fichas/$FICHA_ID/audit-trail \
   -H "Authorization: Bearer test-token-user-2"
 
 # ✅ Esperado: 404 (ficha no encontrada para ese usuario)
 
 # 20. Test: auditor SI puede ver audit-trail
-curl http://localhost:8080/api/v1/fichas/$FICHA_ID/audit-trail \
+curl http://localhost:8081/api/v1/fichas/$FICHA_ID/audit-trail \
   -H "Authorization: Bearer test-auditor"
 
 # ✅ Esperado: 200 OK + respuesta completa
+
+### Fase 7: Validación de Monitoreo
+
+```bash
+# 21. Test Slack (Simular error crítico)
+node scratch/test-slack.js
+# ✅ Esperado: Mensaje en Slack #reportes-errores-tempos
+```
 ```
 
 ---

@@ -1,69 +1,73 @@
-// En desarrollo, usamos rutas relativas para que el proxy de Vite las reenvíe al backend.
-// En producción, VITE_API_URL apuntará al dominio real del backend.
+import { z } from 'zod';
 import { apiRateLimiter, authRateLimiter, generateCSRFToken } from './security';
+import logger from './logger';
+import { 
+  UserSchema, 
+  FichaSchema, 
+  EmployeeSchema, 
+  WorkCenterSchema, 
+  DocumentSchema, 
+  AbsenceSchema 
+} from './schemas';
 
-const DEFAULT_LOCAL_API = '';
+const DEFAULT_LOCAL_API = 'http://localhost:8081';
 const SESSION_STORAGE_KEY = 'tempos.session';
 const OFFLINE_QUEUE_KEY = 'tempos.offline_queue';
 
-let currentCsrfToken = generateCSRFToken(); // Generate once per session for the frontend
+let currentCsrfToken = generateCSRFToken();
 
 function getApiBaseUrl() {
   const fromEnv = import.meta.env.VITE_API_URL;
   if (typeof fromEnv === 'string' && fromEnv.trim()) {
     return fromEnv.trim().replace(/\/$/, '');
   }
-
   return DEFAULT_LOCAL_API;
 }
 
 function buildUrl(path) {
-  if (path.startsWith('http://') || path.startsWith('https://')) {
-    return path;
-  }
-
+  if (path.startsWith('http://') || path.startsWith('https://')) return path;
   const base = getApiBaseUrl();
   return `${base}${path.startsWith('/') ? '' : '/'}${path}`;
 }
 
 function toQueryString(params = {}) {
   const qs = new URLSearchParams();
-
   Object.entries(params).forEach(([key, value]) => {
-    if (value === undefined || value === null) return;
-    const text = String(value).trim();
-    if (!text) return;
-    qs.set(key, text);
+    if (value !== undefined && value !== null && String(value).trim() !== '') qs.set(key, String(value).trim());
   });
-
   return qs.toString();
 }
 
-// --- OFFLINE SUPPORT LOGIC ---
+/**
+ * Clase de error personalizada para respuestas de la API
+ */
+export class ApiError extends Error {
+  constructor(message, status, code, details) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.code = code;
+    this.details = details;
+  }
+}
+
 const getOfflineQueue = () => {
   try {
     return JSON.parse(localStorage.getItem(OFFLINE_QUEUE_KEY) || '[]');
-  } catch {
-    return [];
-  }
+  } catch { return []; }
 };
 
 const addToOfflineQueue = (path, options) => {
   const queue = getOfflineQueue();
-  // Solo encolamos acciones críticas de fichaje que no pueden perderse
   if (path.includes('/fichas/clock') || path.includes('/fichas/break')) {
     queue.push({
       id: crypto.randomUUID(),
       path,
-      options: {
-        ...options,
-        body: options.body ? JSON.parse(options.body) : null
-      },
+      options: { ...options, body: options.body ? JSON.parse(options.body) : null },
       timestamp: new Date().toISOString(),
       retryCount: 0
     });
     localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(queue));
-    console.log('📡 [OFFLINE] Fichaje guardado en cola local.');
     return true;
   }
   return false;
@@ -73,79 +77,60 @@ export async function syncOfflineQueue(token) {
   const queue = getOfflineQueue();
   if (queue.length === 0) return;
 
-  console.log(`🔄 [SYNC] Sincronizando ${queue.length} eventos pendientes...`);
   const remaining = [];
-
   for (const item of queue) {
     try {
       await request(item.path, {
         ...item.options,
-        token: token || item.options.token,
-        body: JSON.stringify({
-          ...item.options.body,
-          offlineTimestamp: item.timestamp,
-          isOfflineSync: true
-        })
+        token,
+        body: JSON.stringify({ ...item.options.body, offlineTimestamp: item.timestamp, isOfflineSync: true })
       });
     } catch (err) {
-      console.error('❌ [SYNC] Error sincronizando item:', err);
-      if (item.retryCount < 5) {
-        remaining.push({ ...item, retryCount: item.retryCount + 1 });
-      }
+      if (item.retryCount < 5) remaining.push({ ...item, retryCount: item.retryCount + 1 });
     }
   }
-
   localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(remaining));
 }
 
-// Auto-sync listener
 if (typeof window !== 'undefined') {
   window.addEventListener('online', () => {
     const session = getClientSession();
-    if (session?.token) {
-      syncOfflineQueue(session.token);
-    }
+    if (session?.token) syncOfflineQueue(session.token);
   });
 }
 
-async function request(path, options = {}) {
-	if (!apiRateLimiter.canMakeRequest()) {
-		throw new Error("Tasa de peticiones excedida. Por favor, espera un momento por seguridad.");
-	}
+const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-	const { token, headers, ...rest } = options;
+async function request(path, options = {}, retryCount = 0) {
+  if (!apiRateLimiter.canMakeRequest()) throw new Error("Tasa de peticiones excedida.");
 
+  const { token, headers, ...rest } = options;
   try {
     const response = await fetch(buildUrl(path), {
       ...rest,
       headers: {
         'Content-Type': 'application/json',
-        'X-CSRF-Token': currentCsrfToken, // Anti-CSRF measure
+        'X-CSRF-Token': currentCsrfToken,
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...(headers || {}),
       },
     });
 
     let payload = null;
-    try {
-      payload = await response.json();
-    } catch {
-      payload = null;
-    }
+    const contentType = response.headers.get('content-type');
+    if (contentType?.includes('application/json')) payload = await response.json();
 
     if (!response.ok) {
-      const message = payload?.error || payload?.message || `Error HTTP ${response.status}`;
-      const error = new Error(message);
-      error.status = response.status;
-      throw error;
+      const errorData = payload?.error || {};
+      throw new ApiError(errorData.message || `Error ${response.status}`, response.status, errorData.code);
     }
-
     return payload;
   } catch (error) {
-    // Si es un error de conexión, intentamos encolar
     if (!navigator.onLine || error.message === 'Failed to fetch') {
-      if (addToOfflineQueue(path, options)) {
-        return { offline: true, message: 'Fichaje guardado localmente (sin conexión)' };
+      if (addToOfflineQueue(path, options)) return { offline: true };
+      if (retryCount < 3) {
+        await wait(Math.pow(2, retryCount) * 1000);
+        return request(path, options, retryCount + 1);
       }
     }
     throw error;
@@ -217,12 +202,30 @@ export async function registerMe(token, data = {}) {
   });
 }
 
+
 export async function getMe(token) {
-  return request('/api/v1/auth/me', {
-    method: 'GET',
-    token,
-  });
+  try {
+    const res = await request('/api/v1/auth/me', { method: 'GET', token });
+    return UserSchema.parse(res?.data || res);
+  } catch (err) {
+    logger.error('Error in getMe (Profile)', err);
+    throw err;
+  }
 }
+
+export async function getActiveFicha(token) {
+  try {
+    const res = await request('/api/v1/fichas/active', { method: 'GET', token });
+    const data = res?.data ?? res?.ficha ?? res;
+    if (!data || !data.id) return null;
+    return FichaSchema.parse(data);
+  } catch (err) {
+    logger.error('Error in getActiveFicha', err);
+    throw err;
+  }
+}
+
+
 
 export async function pingStatus(token) {
   return request('/status', {
@@ -256,9 +259,51 @@ export async function getDailyStats(token, startDate, endDate) {
   });
 }
 
-// Employees
+
 export async function listEmployees(token) {
-  return request('/api/v1/employees', { method: 'GET', token });
+  try {
+    const res = await request('/api/v1/employees', { method: 'GET', token });
+    const data = res?.data || res;
+    return z.array(EmployeeSchema).parse(Array.isArray(data) ? data : []);
+  } catch (err) {
+    logger.error('Error in listEmployees', err);
+    return [];
+  }
+}
+
+export async function listWorkCenters(token) {
+  try {
+    const res = await request('/api/v1/work-centers', { method: 'GET', token });
+    const data = res?.data || res;
+    return z.array(WorkCenterSchema).parse(Array.isArray(data) ? data : []);
+  } catch (err) {
+    logger.error('Error in listWorkCenters', err);
+    return [];
+  }
+}
+
+export async function listDocuments(token, params = {}) {
+  try {
+    const qs = toQueryString(params);
+    const path = `/api/v1/documents${qs ? `?${qs}` : ''}`;
+    const res = await request(path, { method: 'GET', token });
+    const data = res?.data || res;
+    return z.array(DocumentSchema).parse(Array.isArray(data) ? data : []);
+  } catch (err) {
+    logger.error('Error in listDocuments', err);
+    return [];
+  }
+}
+
+export async function listAbsences(token) {
+  try {
+    const res = await request('/api/v1/absences', { method: 'GET', token });
+    const data = res?.data || res;
+    return z.array(AbsenceSchema).parse(Array.isArray(data) ? data : []);
+  } catch (err) {
+    logger.error('Error in listAbsences', err);
+    return [];
+  }
 }
 
 export async function createEmployee(token, data) {
@@ -273,11 +318,6 @@ export async function deleteEmployee(token, id) {
   return request(`/api/v1/employees/${id}`, { method: 'DELETE', token });
 }
 
-// Work Centers (Centros de Trabajo)
-export async function listWorkCenters(token) {
-  return request('/api/v1/work-centers', { method: 'GET', token });
-}
-
 export async function createWorkCenter(token, data) {
   return request('/api/v1/work-centers', { method: 'POST', token, body: JSON.stringify(data) });
 }
@@ -285,11 +325,19 @@ export async function createWorkCenter(token, data) {
 export async function updateWorkCenter(token, id, data) {
   return request(`/api/v1/work-centers/${id}`, { method: 'PUT', token, body: JSON.stringify(data) });
 }
+
 export async function deleteWorkCenter(token, id) {
   return request(`/api/v1/work-centers/${id}`, { method: 'DELETE', token });
 }
 
-// Schedules & Shifts
+export async function updateProfile(token, data) {
+  return request('/api/v1/auth/profile', { 
+    method: 'PUT', 
+    token,
+    body: JSON.stringify(data)
+  });
+}
+
 export async function listSchedules(token) {
   return request('/api/v1/schedules', { method: 'GET', token });
 }
@@ -345,19 +393,9 @@ export async function acceptTerms(token) {
   return request('/api/v1/auth/accept-terms', { method: 'POST', token });
 }
 
-export async function listDocuments(token, params = {}) {
-  const qs = toQueryString(params);
-  const path = `/api/v1/documents${qs ? `?${qs}` : ''}`;
-  return request(path, { method: 'GET', token });
-}
-
 // Absences
 export async function requestAbsence(token, data) {
   return request('/api/v1/absences', { method: 'POST', token, body: JSON.stringify(data) });
-}
-
-export async function listAbsences(token) {
-  return request('/api/v1/absences', { method: 'GET', token });
 }
 
 export async function approveAbsence(token, id) {
@@ -388,6 +426,10 @@ export async function listAuditLog(token, params = {}) {
   return request(path, { method: 'GET', token });
 }
 
+export async function getAiInsights(token) {
+  return request('/api/v1/reports/ai-predictive-analysis', { method: 'GET', token });
+}
+
 export async function exportAuditLog(token, params = {}) {
   const qs = toQueryString(params);
   const path = `/api/v1/reports/audit-log/export${qs ? `?${qs}` : ''}`;
@@ -407,6 +449,10 @@ export async function exportReport(token, params = {}) {
 
 export async function exportAuditPDF(token) {
   return requestBlob('/api/v1/reports/audit-pdf', { method: 'GET', token });
+}
+
+export async function exportInspectionPDF(token) {
+  return requestBlob('/api/v1/reports/inspection-pdf', { method: 'GET', token });
 }
 
 // Clock in/out
@@ -438,9 +484,6 @@ export async function breakEnd(token, payload = {}) {
   return request('/api/v1/fichas/break-end', { method: 'POST', token, body: JSON.stringify(body) });
 }
 
-export async function getActiveFicha(token) {
-  return request('/api/v1/fichas/active', { method: 'GET', token });
-}
 
 export async function bootstrapLocalSession({ isAdmin = false } = {}) {
   const roleToken = isAdmin ? 'test-admin' : 'test-employee';
