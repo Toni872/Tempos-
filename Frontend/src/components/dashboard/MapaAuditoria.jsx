@@ -58,7 +58,7 @@ const MapController = memo(({ isFullscreen, zoom, setZoom, centerRequest }) => {
   return null;
 });
 
-const MapContent = memo(({ center, markers, workCenters, isFullscreen, showGeofence, showHeatmap, zoom, setZoom, centerRequest }) => {
+const MapContent = memo(({ center, markers, workCenters, isFullscreen, showGeofence, showHeatmap, zoom, setZoom, centerRequest, userLocation }) => {
   return (
     <MapContainer 
       center={center || DEFAULT_CENTER} 
@@ -81,6 +81,28 @@ const MapContent = memo(({ center, markers, workCenters, isFullscreen, showGeofe
           />
         )
       ))}
+      {/* Marcador de la ubicación actual del usuario */}
+      {userLocation && (
+        <Marker 
+          position={[userLocation.lat, userLocation.lng]}
+          icon={L.divIcon({
+            className: 'user-location-marker',
+            html: `
+              <div class="relative flex items-center justify-center">
+                <div class="absolute w-12 h-12 bg-blue-500/20 rounded-full animate-ping"></div>
+                <div class="relative w-5 h-5 bg-blue-500 border-2 border-white rounded-full shadow-[0_0_15px_rgba(59,130,246,0.8)]"></div>
+              </div>
+            `,
+            iconSize: [48, 48],
+            iconAnchor: [24, 24]
+          })}
+        >
+          <Tooltip permanent direction="top" offset={[0, -10]} className="user-tooltip">
+            <span className="text-[10px] font-black uppercase text-blue-600 px-2">TU UBICACIÓN</span>
+          </Tooltip>
+        </Marker>
+      )}
+
       {markers.map((m, idx) => {
         const isActive = !m.endTime;
         const iconHtml = showHeatmap 
@@ -141,6 +163,8 @@ export default function MapaAuditoria({ fichas = [], workCenters = [], employees
   const [zoom, setZoom] = useState(14);
   const [centerRequest, setCenterRequest] = useState(null);
   const [isExporting, setIsExporting] = useState(false);
+  const [userLocation, setUserLocation] = useState(null);
+  const [isLocating, setIsLocating] = useState(false);
 
   const markers = useMemo(() => {
     return (fichas || []).map(f => {
@@ -168,6 +192,39 @@ export default function MapaAuditoria({ fichas = [], workCenters = [], employees
       setTimeout(() => setCenterRequest(null), 100);
     }
   }, [center, markers]);
+
+  const handleDetectLocation = useCallback(() => {
+    console.log('📡 [GPS] Iniciando detección...');
+    if (!navigator.geolocation) {
+      console.error('❌ [GPS] Geolocalización no soportada');
+      alert("Tu navegador no soporta geolocalización.");
+      return;
+    }
+
+    setIsLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        console.log('✅ [GPS] Ubicación obtenida:', position.coords);
+        const { latitude, longitude } = position.coords;
+        const newLoc = { lat: latitude, lng: longitude };
+        setUserLocation(newLoc);
+        setCenterRequest([latitude, longitude]);
+        setZoom(16);
+        setIsLocating(false);
+        setTimeout(() => setCenterRequest(null), 100);
+      },
+      (error) => {
+        console.error("❌ [GPS] Error detectando ubicación:", error);
+        let msg = "No se pudo obtener tu ubicación.";
+        if (error.code === 1) msg = "Permiso denegado. Por favor, activa el GPS en el candado de la barra de direcciones.";
+        if (error.code === 2) msg = "Ubicación no disponible.";
+        if (error.code === 3) msg = "Tiempo de espera agotado.";
+        alert(msg);
+        setIsLocating(false);
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  }, []);
 
   // FUNCIÓN DE EXPORTACIÓN FINAL Y SEGURA
   const handleExport = async () => {
@@ -198,6 +255,34 @@ export default function MapaAuditoria({ fichas = [], workCenters = [], employees
     }
   };
 
+  const handleExportInspection = async () => {
+    try {
+      setIsExporting(true);
+      const session = getClientSession();
+      if (!session?.token) throw new Error("No hay sesión activa");
+
+      const blob = await exportInspectionPDF(session.token);
+      
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `registro_legal_jornada_${new Date().toISOString().split('T')[0]}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      
+      setTimeout(() => {
+        window.URL.revokeObjectURL(url);
+        link.remove();
+      }, 100);
+
+    } catch (error) {
+      console.error("Error al descargar registro legal:", error);
+      alert("Error de descarga. Por favor, asegúrate de tener conexión.");
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   useEffect(() => {
     const handleEsc = (e) => e.key === 'Escape' && setIsFullscreen(false);
     window.addEventListener('keydown', handleEsc);
@@ -218,31 +303,85 @@ export default function MapaAuditoria({ fichas = [], workCenters = [], employees
           </div>
         </div>
         <div className="bg-[#111114]/95 backdrop-blur-2xl p-2 rounded-[28px] border border-white/10 shadow-2xl pointer-events-auto flex items-center gap-2">
-          <button onClick={toggleGeofence} className={cn("p-3 rounded-2xl transition-all", showGeofence ? "bg-emerald-500 text-white shadow-[0_0_20px_rgba(16,185,129,0.4)]" : "bg-white/5 text-zinc-500 hover:text-white")}>
-            <SelectionBackground size={20} weight="fill" />
-          </button>
-          <button onClick={toggleHeatmap} className={cn("p-3 rounded-2xl transition-all", showHeatmap ? "bg-red-600 text-white shadow-[0_0_20px_rgba(220,38,38,0.4)]" : "bg-white/5 text-zinc-500 hover:text-white")}>
-            <Fire size={20} weight="fill" />
-          </button>
+          {/* Geovallas */}
+          <div className="group relative">
+            <button onClick={toggleGeofence} className={cn("p-3 rounded-2xl transition-all", showGeofence ? "bg-emerald-500 text-white shadow-[0_0_20px_rgba(16,185,129,0.4)]" : "bg-white/5 text-zinc-500 hover:text-white")}>
+              <SelectionBackground size={20} weight="fill" />
+            </button>
+            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 px-3 py-1.5 bg-zinc-900 text-white text-[10px] font-black uppercase tracking-widest rounded-lg opacity-0 group-hover:opacity-100 transition-all pointer-events-none whitespace-nowrap border border-white/10 shadow-2xl">
+              Geovallas
+            </div>
+          </div>
+
+          {/* Mapa de Calor */}
+          <div className="group relative">
+            <button onClick={toggleHeatmap} className={cn("p-3 rounded-2xl transition-all", showHeatmap ? "bg-red-600 text-white shadow-[0_0_20px_rgba(220,38,38,0.4)]" : "bg-white/5 text-zinc-500 hover:text-white")}>
+              <Fire size={20} weight="fill" />
+            </button>
+            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 px-3 py-1.5 bg-zinc-900 text-white text-[10px] font-black uppercase tracking-widest rounded-lg opacity-0 group-hover:opacity-100 transition-all pointer-events-none whitespace-nowrap border border-white/10 shadow-2xl">
+              Mapa de Calor
+            </div>
+          </div>
+
           <div className="w-px h-8 bg-white/10 mx-2" />
-          <button onClick={handleRecenter} className="p-3 bg-white/5 hover:bg-white/10 text-white rounded-2xl transition-all">
-            <Crosshair size={20} weight="bold" />
-          </button>
-          <button onClick={toggleFullscreen} className="p-3 bg-white/5 hover:bg-white/10 text-white rounded-2xl">
-            {isFull ? <X size={20} weight="bold" /> : <ArrowsOutCardinal size={20} weight="bold" />}
-          </button>
+
+          {/* Ubicación Actual */}
+          <div className="group relative">
+            <button onClick={handleDetectLocation} className={cn("p-3 rounded-2xl transition-all", isLocating ? "bg-blue-600 animate-pulse text-white" : "bg-white/5 text-zinc-500 hover:text-blue-400")}>
+              <NavigationArrow size={20} weight={isLocating ? "fill" : "bold"} />
+            </button>
+            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 px-3 py-1.5 bg-zinc-900 text-white text-[10px] font-black uppercase tracking-widest rounded-lg opacity-0 group-hover:opacity-100 transition-all pointer-events-none whitespace-nowrap border border-white/10 shadow-2xl">
+              Mi Ubicación
+            </div>
+          </div>
+
+          <div className="w-px h-8 bg-white/10 mx-2" />
+
+          {/* Recentrar */}
+          <div className="group relative">
+            <button onClick={handleRecenter} className="p-3 bg-white/5 hover:bg-white/10 text-white rounded-2xl transition-all">
+              <Crosshair size={20} weight="bold" />
+            </button>
+            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 px-3 py-1.5 bg-zinc-900 text-white text-[10px] font-black uppercase tracking-widest rounded-lg opacity-0 group-hover:opacity-100 transition-all pointer-events-none whitespace-nowrap border border-white/10 shadow-2xl">
+              Recentrar Radar
+            </div>
+          </div>
+
+          {/* Pantalla Completa */}
+          <div className="group relative">
+            <button onClick={toggleFullscreen} className="p-3 bg-white/5 hover:bg-white/10 text-white rounded-2xl">
+              {isFull ? <X size={20} weight="bold" /> : <ArrowsOutCardinal size={20} weight="bold" />}
+            </button>
+            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 px-3 py-1.5 bg-zinc-900 text-white text-[10px] font-black uppercase tracking-widest rounded-lg opacity-0 group-hover:opacity-100 transition-all pointer-events-none whitespace-nowrap border border-white/10 shadow-2xl">
+              {isFull ? 'Salir' : 'Pantalla Completa'}
+            </div>
+          </div>
         </div>
       </div>
+
+      {/* Controles de Zoom */}
       <div className="absolute right-8 top-1/2 -translate-y-1/2 z-[2000] flex flex-col items-center gap-5 bg-[#111114]/95 backdrop-blur-2xl px-3 py-6 rounded-[32px] border border-white/10 shadow-2xl">
-        <button onClick={() => setZoom(z => Math.min(MAX_ZOOM, z+1))} className="text-zinc-500 hover:text-blue-400 transition-colors">
-          <MagnifyingGlassPlus size={20} weight="bold" />
-        </button>
+        <div className="group relative">
+          <button onClick={() => setZoom(z => Math.min(MAX_ZOOM, z+1))} className="text-zinc-500 hover:text-blue-400 transition-colors">
+            <MagnifyingGlassPlus size={20} weight="bold" />
+          </button>
+          <div className="absolute right-full top-1/2 -translate-y-1/2 mr-3 px-3 py-1.5 bg-zinc-900 text-white text-[10px] font-black uppercase tracking-widest rounded-lg opacity-0 group-hover:opacity-100 transition-all pointer-events-none whitespace-nowrap border border-white/10 shadow-2xl">
+            Acercar
+          </div>
+        </div>
+        
         <div className="h-28 flex items-center">
           <input type="range" min={MIN_ZOOM} max={MAX_ZOOM} value={zoom} onChange={(e) => setZoom(Number(e.target.value))} className="zoom-slider-v-final" />
         </div>
-        <button onClick={() => setZoom(z => Math.max(MIN_ZOOM, z-1))} className="text-zinc-500 hover:text-blue-400 transition-colors">
-          <MagnifyingGlassMinus size={20} weight="bold" />
-        </button>
+
+        <div className="group relative">
+          <button onClick={() => setZoom(z => Math.max(MIN_ZOOM, z-1))} className="text-zinc-500 hover:text-blue-400 transition-colors">
+            <MagnifyingGlassMinus size={20} weight="bold" />
+          </button>
+          <div className="absolute right-full top-1/2 -translate-y-1/2 mr-3 px-3 py-1.5 bg-zinc-900 text-white text-[10px] font-black uppercase tracking-widest rounded-lg opacity-0 group-hover:opacity-100 transition-all pointer-events-none whitespace-nowrap border border-white/10 shadow-2xl">
+            Alejar
+          </div>
+        </div>
       </div>
       <div className="absolute bottom-8 left-8 right-8 z-[2000] flex flex-col md:flex-row gap-4 pointer-events-none">
         <div className="flex-1 bg-[#111114]/95 backdrop-blur-2xl p-6 rounded-[32px] border border-white/10 shadow-2xl pointer-events-auto">
@@ -264,11 +403,26 @@ export default function MapaAuditoria({ fichas = [], workCenters = [], employees
              <DownloadSimple size={18} weight="bold" className="group-hover:translate-y-0.5 transition-transform" />
              {isExporting ? 'GENERANDO...' : 'AUDITORÍA PDF'}
            </button>
+           <button onClick={handleExportInspection} disabled={isExporting} className="flex items-center gap-2 px-5 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-emerald-600/20 group">
+             <ShieldCheck size={18} weight="bold" className="group-hover:scale-110 transition-transform" />
+             {isExporting ? 'GENERANDO...' : 'REGISTRO LEGAL'}
+           </button>
         </div>
       </div>
       <div className="absolute inset-0 z-[1000]">
         <div style={{ filter: 'invert(90%) hue-rotate(180deg) brightness(0.85)', height: '100%', width: '100%' }}>
-          <MapContent center={center} markers={markers} workCenters={workCenters} isFullscreen={isFull} showGeofence={showGeofence} showHeatmap={showHeatmap} zoom={zoom} setZoom={setZoom} centerRequest={centerRequest} />
+          <MapContent 
+            center={center} 
+            markers={markers} 
+            workCenters={workCenters} 
+            isFullscreen={isFull} 
+            showGeofence={showGeofence} 
+            showHeatmap={showHeatmap} 
+            zoom={zoom} 
+            setZoom={setZoom} 
+            centerRequest={centerRequest}
+            userLocation={userLocation}
+          />
         </div>
       </div>
       <style>{`
@@ -281,6 +435,7 @@ export default function MapaAuditoria({ fichas = [], workCenters = [], employees
       `}</style>
     </div>
   );
+
   return (
     <>
       {renderMapLayout(false)}

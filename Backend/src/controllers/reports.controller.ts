@@ -237,7 +237,7 @@ router.get(
         date: f.date.toString(),
         clockIn: f.startTime,
         clockOut: f.endTime || "--:--",
-        total: `${f.hoursWorked?.toFixed(2) || '0'}h`,
+        total: `${Number(f.hoursWorked || 0).toFixed(2)}h`,
         status: f.status
       }))
     };
@@ -245,6 +245,59 @@ router.get(
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", 'attachment; filename="auditoria_gps.pdf"');
     await PdfService.generateAuditPDF(res, pdfData);
+  })
+);
+
+/**
+ * GET /api/v1/reports/inspection-pdf
+ * Genera el informe legal para la Inspección de Trabajo
+ */
+router.get(
+  "/inspection-pdf",
+  firebaseAuthMiddleware,
+  appUserContextMiddleware,
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const auth = getAuthContext(req);
+    if (!hasPermission(auth, "view_employees")) {
+      res.status(403).json({ error: "Acceso denegado." });
+      return;
+    }
+
+    const { startDate, endDate, userId } = req.query;
+
+    const qb = AppDataSource.getRepository(Ficha)
+      .createQueryBuilder("ficha")
+      .innerJoinAndSelect("ficha.user", "user")
+      .where("user.companyId = :companyId", { companyId: auth.companyId });
+
+    if (startDate && endDate) {
+      qb.andWhere("ficha.date BETWEEN :start AND :end", { start: startDate, end: endDate });
+    }
+
+    if (userId) {
+      qb.andWhere("ficha.userId = :userId", { userId });
+    }
+
+    const fichas = await qb.orderBy("ficha.date", "DESC").getMany();
+
+    const pdfData = {
+      employeeName: userId ? (fichas[0] as any)?.user?.displayName : "Reporte Agregado",
+      employeeEmail: userId ? (fichas[0] as any)?.user?.email : "multi-usuario@tempos.es",
+      companyName: "TEMPOS CLOUD CLIENTE",
+      period: startDate && endDate ? `${startDate} a ${endDate}` : "Periodo Actual",
+      totalHours: fichas.reduce((acc, f) => acc + Number(f.hoursWorked || 0), 0),
+      records: fichas.map(f => ({
+        date: f.date.toString(),
+        clockIn: f.startTime,
+        clockOut: f.endTime || "--:--",
+        total: `${Number(f.hoursWorked || 0).toFixed(2)}h`,
+        status: f.status
+      }))
+    };
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", 'attachment; filename="registro_legal_jornada.pdf"');
+    await PdfService.generateInspectionPDF(res, pdfData);
   })
 );
 

@@ -451,6 +451,10 @@ export async function exportAuditPDF(token) {
   return requestBlob('/api/v1/reports/audit-pdf', { method: 'GET', token });
 }
 
+export async function exportInspectionPDF(token) {
+  return requestBlob('/api/v1/reports/inspection-pdf', { method: 'GET', token });
+}
+
 // Clock in/out
 export async function clockIn(token, payload = {}) {
   const deviceId = getDeviceId();
