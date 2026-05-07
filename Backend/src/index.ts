@@ -34,6 +34,7 @@ const PORT = process.env.PORT || 8081;
 
 app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" },
+  crossOriginOpenerPolicy: false, // Necesario para Firebase Auth (Google Login)
   contentSecurityPolicy: false,
 }));
 app.use(hpp());
