@@ -10,6 +10,7 @@ import {
   ChangeAction,
 } from "../entities/TimeEntryChangeLog.js";
 import { AppDataSource } from "../database.js";
+import { logger } from "../utils/logger.js";
 
 export interface RecordClockEventParams {
   userId: string;
@@ -94,6 +95,7 @@ export class TimeEntryService {
     companyId: string;
     timestamp: Date;
     location?: { lat: number; lng: number };
+    projectCode?: string;
     ip?: string;
     userAgent?: string;
   }): Promise<Ficha> {
@@ -105,7 +107,7 @@ export class TimeEntryService {
     
     // INGENIERÍA SENIOR: Idempotencia. Si ya hay una ficha abierta, no fallamos, la devolvemos.
     if (openFicha) {
-      console.log("⚠️ [CLOCK-IN] El usuario ya tenía una ficha activa, devolviendo la existente.");
+      logger.info(`[CLOCK-IN] El usuario ${params.userId} ya tenía una ficha activa. Devolviendo existente.`);
       return openFicha;
     }
 
@@ -117,6 +119,7 @@ export class TimeEntryService {
       date: new Date(dateStr),
       startTime: timeStr,
       status: "draft",
+      projectCode: params.projectCode,
       metadata: {
         location: params.location ? `${params.location.lat},${params.location.lng}` : undefined,
       }
@@ -269,7 +272,7 @@ export class TimeEntryService {
    * @param fichaId ID de la ficha
    * @returns array de TimeEntry
    */
-  async getsFichaEvents(fichaId: string): Promise<TimeEntry[]> {
+  async getFichaEvents(fichaId: string): Promise<TimeEntry[]> {
     return this.timeEntryRepo
       .createQueryBuilder("entry")
       .where("entry.fichaId = :fichaId", { fichaId })
@@ -330,7 +333,7 @@ export class TimeEntryService {
     ip?: string;
     userAgent?: string;
   }): Promise<void> {
-    const timeEntries = await this.getsFichaEvents(params.fichaId);
+    const timeEntries = await this.getFichaEvents(params.fichaId);
 
     for (const entry of timeEntries) {
       await this.logChange({
@@ -362,7 +365,7 @@ export class TimeEntryService {
     ip?: string;
     userAgent?: string;
   }): Promise<void> {
-    const timeEntries = await this.getsFichaEvents(params.fichaId);
+    const timeEntries = await this.getFichaEvents(params.fichaId);
 
     for (const entry of timeEntries) {
       // Buscamos por historial y filtramos en memoria para mayor compatibilidad de queries JSON
@@ -397,7 +400,7 @@ export class TimeEntryService {
    * @returns total de horas trabajadas (float)
    */
   async calculateWorkingHours(fichaId: string): Promise<number> {
-    const events = await this.getsFichaEvents(fichaId);
+    const events = await this.getFichaEvents(fichaId);
     if (events.length === 0) return 0;
 
     let totalMs = 0;

@@ -10,7 +10,10 @@ import {
   AbsenceSchema 
 } from './schemas';
 
+import { Capacitor, CapacitorHttp } from '@capacitor/core';
+
 const DEFAULT_LOCAL_API = 'http://localhost:8081';
+const MOBILE_DEV_API = 'http://10.0.2.2:8081'; // URL para emulador Android
 const SESSION_STORAGE_KEY = 'tempos.session';
 const OFFLINE_QUEUE_KEY = 'tempos.offline_queue';
 
@@ -21,6 +24,13 @@ function getApiBaseUrl() {
   if (typeof fromEnv === 'string' && fromEnv.trim()) {
     return fromEnv.trim().replace(/\/$/, '');
   }
+  
+  if (Capacitor.isNativePlatform()) {
+    console.log('⚡ [API] Modo Nativo detectado. Usando IP de emulador:', MOBILE_DEV_API);
+    return MOBILE_DEV_API;
+  }
+  
+  console.log('🌐 [API] Modo Web detectado. Usando:', DEFAULT_LOCAL_API);
   return DEFAULT_LOCAL_API;
 }
 
@@ -104,27 +114,60 @@ const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 async function request(path, options = {}, retryCount = 0) {
   if (!apiRateLimiter.canMakeRequest()) throw new Error("Tasa de peticiones excedida.");
 
-  const { token, headers, ...rest } = options;
+  const { token, headers, method = 'GET', body, ...rest } = options;
+  const url = buildUrl(path);
+
   try {
-    const response = await fetch(buildUrl(path), {
-      ...rest,
-      headers: {
-        'Content-Type': 'application/json',
-        'X-CSRF-Token': currentCsrfToken,
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        ...(headers || {}),
-      },
-    });
+    let responseData;
+    let responseStatus;
+    let responseOk;
 
-    let payload = null;
-    const contentType = response.headers.get('content-type');
-    if (contentType?.includes('application/json')) payload = await response.json();
+    if (Capacitor.isNativePlatform()) {
+      // Usar CapacitorHttp para evitar errores de 'Mixed Content' (HTTPS -> HTTP) en el emulador
+      const nativeOptions = {
+        url,
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-Token': currentCsrfToken,
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          ...(headers || {}),
+        },
+        data: body ? JSON.parse(body) : undefined,
+        ...rest
+      };
 
-    if (!response.ok) {
-      const errorData = payload?.error || {};
-      throw new ApiError(errorData.message || `Error ${response.status}`, response.status, errorData.code);
+      const nativeRes = await CapacitorHttp.request(nativeOptions);
+      responseData = nativeRes.data;
+      responseStatus = nativeRes.status;
+      responseOk = responseStatus >= 200 && responseStatus < 300;
+    } else {
+      // Comportamiento estándar en Web
+      const response = await fetch(url, {
+        method,
+        body,
+        ...rest,
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-Token': currentCsrfToken,
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          ...(headers || {}),
+        },
+      });
+
+      responseStatus = response.status;
+      responseOk = response.ok;
+      const contentType = response.headers.get('content-type');
+      if (contentType?.includes('application/json')) {
+        responseData = await response.json();
+      }
     }
-    return payload;
+
+    if (!responseOk) {
+      const errorData = responseData?.error || {};
+      throw new ApiError(errorData.message || `Error ${responseStatus}`, responseStatus, errorData.code);
+    }
+    return responseData;
   } catch (error) {
     if (!navigator.onLine || error.message === 'Failed to fetch') {
       if (addToOfflineQueue(path, options)) return { offline: true };
@@ -182,7 +225,15 @@ export function clearClientSession() {
 }
 
 export function getDeviceId() {
+  // Prioridad: Hardware ID nativo > UUID generado
+  const HARDWARE_KEY = 'tempos.hardware_device_id';
   const DEVICE_ID_KEY = 'tempos.device_id';
+  
+  // Si hay un ID de hardware (vinculado por nativeServices), usarlo
+  const hardwareId = localStorage.getItem(HARDWARE_KEY);
+  if (hardwareId) return hardwareId;
+  
+  // Fallback: UUID generado (web)
   let deviceId = localStorage.getItem(DEVICE_ID_KEY);
   
   if (!deviceId) {
@@ -430,14 +481,22 @@ export async function getAiInsights(token) {
   return request('/api/v1/reports/ai-predictive-analysis', { method: 'GET', token });
 }
 
+export async function getAnomalies(token) {
+  return request('/api/v1/reports/anomalies', { method: 'GET', token });
+}
+
 export async function exportAuditLog(token, params = {}) {
   const qs = toQueryString(params);
   const path = `/api/v1/reports/audit-log/export${qs ? `?${qs}` : ''}`;
   return requestBlob(path, { method: 'GET', token });
 }
 
-export async function closeFichaPeriod(token, payload) {
-  return request('/api/v1/fichas/close-period', { method: 'POST', token, body: JSON.stringify(payload) });
+export async function verifyPeriod(token, payload) {
+  return request('/api/v1/fichas/verify-period', { method: 'POST', token, body: JSON.stringify(payload) });
+}
+
+export async function runAutoClock(token) {
+  return request('/api/v1/system/run-autoclock', { method: 'POST', token });
 }
 
 // Reports & export

@@ -70,6 +70,7 @@ router.post(
       startDate: new Date(parsed.data.startDate),
       endDate: new Date(parsed.data.endDate),
       reason: parsed.data.reason,
+      documentId: parsed.data.documentId,
       status: "pending",
     });
 

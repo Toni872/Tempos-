@@ -175,8 +175,8 @@ export default function EmpleadoForm({ initialValues, onSubmit, onCancel, isSubm
               <SecurityToggle 
                 title="Modo Automático"
                 subtitle="David's Zero-Touch Mode"
-                active={formData.isAutoClockEnabled}
-                onClick={() => setFormData(p => ({ ...p, isAutoClockEnabled: !p.isAutoClockEnabled }))}
+                active={formData.hasAutoClock}
+                onClick={() => setFormData(p => ({ ...p, hasAutoClock: !p.hasAutoClock }))}
               />
             </div>
 

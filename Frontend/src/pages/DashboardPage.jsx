@@ -58,7 +58,9 @@ import PerfilTab from '@/components/dashboard/PerfilTab';
 import ConfiguracionTab from '@/components/dashboard/ConfiguracionTab';
 import GeoMapaTab from '@/components/dashboard/GeoMapaTab';
 import QuickClock from '@/components/dashboard/QuickClock';
+import MobileQuickClock from '@/components/dashboard/MobileQuickClock';
 import AuditTrailModal from '@/components/dashboard/AuditTrailModal';
+import { Capacitor } from '@capacitor/core';
 
 // Specific Forms
 import ScheduleForm from '@/components/dashboard/ScheduleForm';
@@ -71,6 +73,7 @@ import GeolocationConsentModal from '@/components/GeolocationConsentModal';
 // Hooks
 import { useGeolocation } from '@/hooks/useGeolocation';
 import { useClockTimer } from '@/hooks/useClockTimer';
+import { useAutoClock } from '@/hooks/useAutoClock';
 import Loader from '@/components/dashboard/Loader';
 import Success from '@/components/dashboard/Success';
 import ErrorComponent from '@/components/dashboard/Error';
@@ -86,6 +89,7 @@ import MapaAuditoria from '@/components/dashboard/MapaAuditoria';
 import SchedulingGrid from '@/components/dashboard/SchedulingGrid';
 import TabErrorBoundary from '@/components/TabErrorBoundary';
 import ErrorBoundary from "@/components/ui/ErrorBoundary";
+import EmployeeDashboard from '@/components/dashboard/EmployeeDashboard';
 
 function cn(...classes) {
   return classes.filter(Boolean).join(' ');
@@ -114,6 +118,7 @@ export default function DashboardPage() {
     handleLogout
   } = useDashboardData(registrosFilters, true);
 
+  const isMobile = useMemo(() => Capacitor.isNativePlatform(), []);
   const isAdmin = useMemo(() => profile?.role === 'admin' || profile?.role === 'manager', [profile]);
   
   // UI States
@@ -139,6 +144,32 @@ export default function DashboardPage() {
   const { location: geoLocation, error: geoError, loading: geoLoading, consentGiven, requestLocation, revokeConsent } = useGeolocation();
 
   const elapsedWorkingTime = useClockTimer(activeFicha, clockedIn, isOnBreak);
+
+  // 🔒 Auto-Clock (Geofencing automático para empleados en móvil)
+  const {
+    autoClockStatus,
+    lastCheck: autoClockLastCheck,
+    nearestCenter: autoClockCenter,
+    distanceMeters: autoClockDistance,
+  } = useAutoClock({
+    workCenters,
+    clockedIn,
+    clockInFn: clockIn,
+    clockOutFn: clockOut,
+    enabled: isMobile && !isAdmin, // Solo para empleados en móvil
+    onClockAction: async (result) => {
+      // Recargar datos después de un fichaje automático
+      await loadData('core');
+      if (result.action === 'clock_in') {
+        setClockedIn(true);
+        showFeedback('success', `✅ Entrada automática en ${result.center || 'tu centro'}`);
+      } else if (result.action === 'clock_out') {
+        setClockedIn(false);
+        setActiveFicha(null);
+        showFeedback('success', `🚪 Salida automática de ${result.center || 'tu centro'}`);
+      }
+    },
+  });
 
   const showFeedback = (type, message) => {
     if (type === 'error') {
@@ -514,6 +545,30 @@ export default function DashboardPage() {
 
   if (loading) return <Loader />;
 
+  // ─── EMPLEADO: Interfaz dedicada, sin acceso a funciones admin ───
+  if (!isAdmin) {
+    return (
+      <EmployeeDashboard
+        profile={profile}
+        clockedIn={clockedIn}
+        isOnBreak={isOnBreak}
+        activeFicha={activeFicha}
+        elapsedTime={elapsedWorkingTime}
+        registros={registros}
+        absences={absences}
+        workCenters={workCenters}
+        onClockToggle={handleClockToggle}
+        onBreakToggle={handleBreakToggle}
+        onRequestAbsence={() => openModal('ausencia')}
+        onLogout={handleLogout}
+        autoClockStatus={autoClockStatus}
+        autoClockCenter={autoClockCenter}
+        autoClockDistance={autoClockDistance}
+      />
+    );
+  }
+
+  // ─── ADMIN: Dashboard completo ───
   return (
     <DashboardShell
       activeTab={activeTab}
@@ -521,19 +576,29 @@ export default function DashboardPage() {
       onLogout={handleLogout}
       profile={profile}
     >
-      <div className="mb-10">
-        <QuickClock 
-          clockedIn={clockedIn}
-          isOnBreak={isOnBreak}
-          onClockToggle={handleClockToggle}
-          onBreakToggle={handleBreakToggle}
-          elapsedTime={elapsedWorkingTime}
-        />
-      </div>
+      {!isMobile && (
+        <div className="mb-10">
+          <QuickClock 
+            clockedIn={clockedIn}
+            isOnBreak={isOnBreak}
+            onClockToggle={handleClockToggle}
+            onBreakToggle={handleBreakToggle}
+            elapsedTime={elapsedWorkingTime}
+          />
+        </div>
+      )}
 
       <TabErrorBoundary>
         <div className="flex-1">
-          {activeTab === 'Inicio' && (
+          {isMobile && !isAdmin && activeTab === 'Inicio' ? (
+            <MobileQuickClock
+              clockedIn={clockedIn}
+              onClockToggle={handleClockToggle}
+              elapsedTime={elapsedWorkingTime}
+            />
+          ) : (
+            <>
+              {activeTab === 'Inicio' && (
             <HomeHub 
               profile={profile}
               setActiveTab={setActiveTab}
@@ -678,6 +743,8 @@ export default function DashboardPage() {
               profile={profile}
               isAdmin={isAdmin}
             />
+          )}
+            </>
           )}
         </div>
       </TabErrorBoundary>

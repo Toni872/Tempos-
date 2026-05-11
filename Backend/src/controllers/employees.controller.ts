@@ -139,6 +139,7 @@ router.post(
       overtimeRate: parsed.data.overtimeRate ?? 0,
       requiresGeolocation: parsed.data.requiresGeolocation ?? false,
       requiresQR: parsed.data.requiresQR ?? false,
+      hasAutoClock: parsed.data.hasAutoClock ?? false,
       kioskPin: parsed.data.kioskPin,
       metadata: {
         invitedBy: auth.uid,
@@ -216,6 +217,8 @@ router.put(
       employee.requiresGeolocation = parsed.data.requiresGeolocation;
     if (parsed.data.requiresQR !== undefined)
       employee.requiresQR = parsed.data.requiresQR;
+    if (parsed.data.hasAutoClock !== undefined)
+      employee.hasAutoClock = parsed.data.hasAutoClock;
     if (parsed.data.kioskPin !== undefined)
       employee.kioskPin = parsed.data.kioskPin;
 

@@ -1,6 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { 
-  Clock, 
   Coffee, 
   Play, 
   Stop, 
@@ -16,6 +15,7 @@ export default function QuickClock({
   isOnBreak,
   elapsedTime = "00:00:00" 
 }) {
+  const [projectCode, setProjectCode] = useState('');
   return (
     <div className="bg-[#111114] border border-white/[0.06] rounded-[2rem] p-6 shadow-2xl shadow-black/40 flex flex-col md:flex-row items-center justify-between gap-6 overflow-hidden relative group">
       {/* Background Glow */}
@@ -50,6 +50,18 @@ export default function QuickClock({
           <div className="text-3xl font-mono font-black text-white tracking-tighter tabular-nums">
             {elapsedTime}
           </div>
+          
+          {!clockedIn && (
+            <div className="pt-2">
+              <input 
+                type="text"
+                placeholder="PROYECTO (EJ: PRJ-001)"
+                value={projectCode}
+                onChange={(e) => setProjectCode(e.target.value)}
+                className="bg-white/[0.03] border border-white/[0.06] rounded-xl px-3 py-1.5 text-[9px] font-black uppercase tracking-widest text-zinc-500 focus:text-blue-500 focus:border-blue-500/40 outline-none w-full transition-all"
+              />
+            </div>
+          )}
         </div>
       </div>
 
@@ -70,7 +82,7 @@ export default function QuickClock({
         )}
 
         <button
-          onClick={onClockToggle}
+          onClick={() => onClockToggle({ projectCode })}
           className={cn(
             "flex-[2] md:flex-none flex items-center justify-center gap-2 px-8 py-4 rounded-2xl font-black text-[11px] uppercase tracking-widest transition-all shadow-lg",
             clockedIn 

@@ -18,6 +18,7 @@ import { cn } from '@/lib/utils';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
 import MapaAuditoria from './MapaAuditoria';
+import AnomalyMonitor from './AnomalyMonitor';
 
 export default function OverviewTab({ 
   profile, 
@@ -124,6 +125,8 @@ export default function OverviewTab({
           />
         </section>
       )}
+      
+      {isAdmin && <AnomalyMonitor />}
 
       {/* Metrics Grid */}
       <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

@@ -225,6 +225,38 @@ export default function ConfiguracionTab() {
               </div>
             </SettingsGroup>
 
+            <SettingsGroup title="Automatización de Jornada" icon={ArrowsClockwise} badge="NUEVO">
+               <div className="space-y-8">
+                  <div className="p-8 rounded-[2rem] bg-blue-600/5 border border-blue-500/10 space-y-4">
+                     <div className="flex items-center gap-3 text-blue-500">
+                        <Cpu size={24} weight="fill" />
+                        <span className="text-[11px] font-black uppercase tracking-[0.2em]">Tecnología Zero-Touch</span>
+                     </div>
+                     <p className="text-[11px] text-white/40 italic leading-relaxed font-medium">
+                        Sincronice los registros de jornada basados en los horarios asignados para empleados con "Modo Automático" activado.
+                     </p>
+                     <button 
+                       onClick={async () => {
+                         try {
+                           const { token } = JSON.parse(localStorage.getItem('tempos.session'));
+                           await import('@/lib/api').then(api => api.runAutoClock(token));
+                           alert("¡Sincronización masiva de fichajes completada con éxito!");
+                         } catch (err) {
+                           alert("Error al sincronizar: " + err.message);
+                         }
+                       }}
+                       className="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-black uppercase tracking-[0.3em] rounded-2xl shadow-xl shadow-blue-600/20 transition-all active:scale-95 flex items-center justify-center gap-3"
+                     >
+                        <ArrowsClockwise size={18} weight="bold" />
+                        SINCRONIZAR AHORA
+                     </button>
+                  </div>
+                  <p className="text-[9px] text-white/10 font-black uppercase tracking-widest text-center italic">
+                     Los fichajes se generarán retroactivamente para el día de hoy si no existen registros previos.
+                  </p>
+               </div>
+            </SettingsGroup>
+
             <SettingsGroup title="Interfaz de Desarrollo (API)" icon={Key} badge="DESARROLLO">
                <div className="space-y-6">
                   <SettingRow 

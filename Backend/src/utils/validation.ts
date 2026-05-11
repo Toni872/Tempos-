@@ -273,6 +273,7 @@ export const createAbsenceSchema = z
     startDate: dateStringSchema,
     endDate: dateStringSchema,
     reason: z.string().trim().max(1000).optional(),
+    documentId: z.string().uuid().optional(),
   })
   .superRefine((value, ctx) => {
     if (value.startDate > value.endDate) {
@@ -314,6 +315,7 @@ export const createEmployeeSchema = z.object({
   overtimeRate: z.coerce.number().min(0).optional(),
   requiresGeolocation: z.boolean().optional(),
   requiresQR: z.boolean().optional(),
+  hasAutoClock: z.boolean().optional(),
   kioskPin: z
     .string()
     .regex(/^\d{4,10}$/, "El PIN debe tener entre 4 y 10 dígitos")
@@ -335,6 +337,7 @@ export const updateEmployeeSchema = z
     overtimeRate: z.coerce.number().min(0).optional(),
     requiresGeolocation: z.boolean().optional(),
     requiresQR: z.boolean().optional(),
+    hasAutoClock: z.boolean().optional(),
     kioskPin: z
       .string()
       .regex(/^\d{4,10}$/, "El PIN debe tener entre 4 y 10 dígitos")
@@ -372,19 +375,68 @@ export const clockOutSchema = z.object({
   offlineTimestamp: z.string().datetime().optional(),
 });
 
-export const scheduleSchema = z.object({
-  name: z.string().trim().min(2).max(255),
-  startTime: timeStringSchema,
-  endTime: timeStringSchema,
-  daysOfWeek: z.array(z.number().min(1).max(7)).min(1),
-  gracePeriodMinutes: z.number().int().min(0).max(120).default(0),
-});
+export const scheduleSchema = z
+  .object({
+    name: z.string().trim().min(2).max(255),
+    startTime: timeStringSchema,
+    endTime: timeStringSchema,
+    startTime2: timeStringSchema.optional(),
+    endTime2: timeStringSchema.optional(),
+    daysOfWeek: z.array(z.number().min(1).max(7)).min(1),
+    gracePeriodMinutes: z.number().int().min(0).max(120).default(0),
+  })
+  .superRefine((data, ctx) => {
+    // Validar Turno 1
+    if (toMinutes(data.endTime) <= toMinutes(data.startTime)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["endTime"],
+        message: "La hora de salida del Turno 1 debe ser posterior a la entrada.",
+      });
+    }
+
+    // Validar Turno 2 si existe
+    if (data.startTime2 || data.endTime2) {
+      if (!data.startTime2 || !data.endTime2) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["startTime2"],
+          message: "Para jornada partida, debes definir entrada y salida del Turno 2.",
+        });
+        return;
+      }
+
+      if (toMinutes(data.startTime2) <= toMinutes(data.endTime)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["startTime2"],
+          message: "La entrada del Turno 2 debe ser posterior a la salida del Turno 1.",
+        });
+      }
+
+      if (toMinutes(data.endTime2) <= toMinutes(data.startTime2)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["endTime2"],
+          message: "La salida del Turno 2 debe ser posterior a su entrada.",
+        });
+      }
+    }
+  });
 
 export const assignShiftSchema = z.object({
   userId: z.string().uuid(),
   scheduleId: z.string().uuid(),
   startDate: dateStringSchema,
   endDate: dateStringSchema.optional(),
+});
+
+export const verifyPeriodSchema = z.object({
+  startDate: dateStringSchema,
+  endDate: dateStringSchema,
+}).refine(data => new Date(data.startDate) <= new Date(data.endDate), {
+  message: "startDate debe ser anterior o igual a endDate",
+  path: ["endDate"],
 });
 
 export function buildValidationError(error: z.ZodError): {

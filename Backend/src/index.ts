@@ -19,6 +19,7 @@ import scheduleController from "./controllers/schedule.controller.js";
 import pushRoutes from "./controllers/push.controller.js";
 import webauthnRoutes from "./routes/webauthn.routes.js";
 import logRoutes from "./controllers/log.controller.js";
+import systemRoutes from "./controllers/system.controller.js";
 import { GdprController } from "./controllers/gdpr.controller.js";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler.js";
 import { firebaseAuthMiddleware } from "./middleware/auth.middleware.js";
@@ -26,6 +27,10 @@ import {
   authRateLimiter,
   apiRateLimiter,
 } from "./middleware/rate-limit.middleware.js";
+import {
+  appUserContextMiddleware,
+  getAuthContext,
+} from "./middleware/request-context.middleware.js";
 
 const app: Express = express();
 const PORT = process.env.PORT || 8081;
@@ -41,12 +46,14 @@ app.use(hpp());
 app.set("trust proxy", 1); 
 app.disable("x-powered-by");
 
-app.use((req, _res, next) => {
-  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
-  console.log(` > Origin: ${req.headers.origin || "Direct/Same-Origin"}`);
-  console.log(` > Auth: ${req.headers.authorization ? "Presente (Bearer ...)" : "AUSENTE"}`);
-  next();
-});
+// Logging de requests gestionado por Morgan (ver abajo)
+// En modo dev, se puede habilitar logging verboso vía env:
+if (process.env.VERBOSE_LOG === "true") {
+  app.use((req, _res, next) => {
+    console.log(`[${new Date().toISOString()}] ${req.method} ${req.url} Origin:${req.headers.origin || "direct"}`);
+    next();
+  });
+}
 
 // 1. CORS - Configuración dinámica para producción
 const allowedOrigins = [
@@ -141,11 +148,9 @@ app.use("/api/v1/schedules", scheduleController);
 app.use("/api/v1/push", pushRoutes);
 app.use("/api/v1/webauthn", webauthnRoutes);
 app.use("/api/v1/logs", logRoutes);
+app.use("/api/v1/system", systemRoutes);
 
-// Health check for Railway/CloudRun
-app.get("/health", (_req, res) => {
-  res.status(200).json({ status: "ok", timestamp: new Date().toISOString(), version: "1.0.1-pro" });
-});
+// Health check ya registrado arriba (L118)
 
 // GDPR Routes (RGPD compliance)
 app.get(
@@ -174,15 +179,18 @@ app.get(
   GdprController.exportData,
 );
 
-// Me endpoint (protegido)
+// Me endpoint (protegido, type-safe)
 app.get(
   "/api/v1/me",
   firebaseAuthMiddleware,
+  appUserContextMiddleware,
   async (req: Request, res: Response) => {
+    const auth = getAuthContext(req);
     res.json({
-      uid: (req as any).firebaseUser.uid,
-      email: (req as any).firebaseUser.email,
-      message: "Autenticado correctamente",
+      uid: auth.uid,
+      email: auth.email,
+      role: auth.role,
+      companyId: auth.companyId,
     });
   },
 );
@@ -196,8 +204,8 @@ AppDataSource.initialize()
   .then(async () => {
     console.log("✅ Base de datos conectada");
 
-    app.listen(PORT, async () => {
-      console.log(`🚀 Servidor escuchando en puerto ${PORT}`);
+    app.listen(Number(PORT), "0.0.0.0", async () => {
+      console.log(`🚀 Servidor escuchando en puerto ${PORT} (0.0.0.0)`);
 
       // Seed dev user en desarrollo (después de arrancar para no trabar la conexión)
       if (process.env.NODE_ENV !== "production") {

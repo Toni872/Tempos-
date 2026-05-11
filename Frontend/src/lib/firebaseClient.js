@@ -1,4 +1,6 @@
 import { initializeApp, getApps } from 'firebase/app';
+import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
+import { Capacitor } from '@capacitor/core';
 import { 
   getAuth, 
   GoogleAuthProvider, 
@@ -36,31 +38,34 @@ export async function signInAndGetIdToken(email, password) {
 }
 
 export const signInWithGoogleAndGetIdToken = async (mode = 'redirect') => {
+  // ESTRATEGIA NATIVA (Android/iOS)
+  if (Capacitor.isNativePlatform()) {
+    try {
+      console.log('⚡ [AUTH] Usando flujo NATIVO de Google para producción');
+      const result = await FirebaseAuthentication.signInWithGoogle();
+      return result.user.idToken;
+    } catch (error) {
+      console.error('❌ [AUTH] Error en login NATIVO:', error);
+      // Fallback a web si el plugin falla (raro, pero preventivo)
+    }
+  }
+
+  // ESTRATEGIA WEB (Fallback / Dev)
   const provider = new GoogleAuthProvider();
   provider.setCustomParameters({ 
-    prompt: 'select_account',
-    auth_type: 'reauthenticate' 
+    prompt: 'select_account'
   });
 
   try {
-    console.log(`⚡ [AUTH] Iniciando proceso de Google (${mode})...`);
-
+    console.log(`⚡ [AUTH] Iniciando Google Web (${mode})`);
     if (mode === 'redirect') {
       await signInWithRedirect(auth, provider);
       return null;
     }
-
     const result = await signInWithPopup(auth, provider);
-    console.log('✅ [AUTH] Login con popup exitoso!');
     return await result.user.getIdToken();
   } catch (error) {
-    console.error('❌ [AUTH] Error en login Google:', error);
-    
-    // Si falla cualquier cosa, el último recurso siempre es redirect
-    if (mode !== 'redirect') {
-      console.warn('⚠️ [AUTH] Falló popup, reintentando con redirect...');
-      await signInWithRedirect(auth, provider);
-    }
+    console.error('❌ [AUTH] Error detallado Web:', error);
     return null;
   }
 };

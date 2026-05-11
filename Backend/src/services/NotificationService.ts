@@ -9,10 +9,12 @@ export class NotificationService {
    */
   static async sendErrorToSlack(errorData: any) {
     const url = process.env.SLACK_WEBHOOK_URL || '';
-    console.log('📡 [DEBUG_SLACK] Intentando enviar a URL:', url ? (url.substring(0, 20) + '...') : 'VACÍA');
-
     if (!url) {
-      console.warn('⚠️ [NOTIF] SLACK_WEBHOOK_URL no configurada en .env');
+      if (process.env.NODE_ENV === 'production') {
+        console.warn('⚠️ [NOTIF] SLACK_WEBHOOK_URL no configurada.');
+      } else {
+        console.log('📡 [DEBUG] Notificaciones Slack desactivadas (URL vacía).');
+      }
       return;
     }
 

@@ -7,6 +7,7 @@ import {
   JoinColumn,
 } from "typeorm";
 import { User } from "./User.js";
+import { Document } from "./Document.js";
 
 @Entity("absences")
 export class Absence {
@@ -40,6 +41,13 @@ export class Absence {
 
   @Column({ type: "text", nullable: true })
   adminComment?: string;
+
+  @Column({ type: "uuid", nullable: true })
+  documentId?: string;
+
+  @ManyToOne(() => Document, { nullable: true })
+  @JoinColumn({ name: "documentId" })
+  document?: Document;
 
   @CreateDateColumn()
   createdAt!: Date;

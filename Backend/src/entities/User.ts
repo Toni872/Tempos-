@@ -44,6 +44,9 @@ export class User {
     companyName?: string;
   };
 
+  @Column({ type: "boolean", default: false })
+  hasAutoClock!: boolean;
+
   @CreateDateColumn()
   createdAt!: Date;
 

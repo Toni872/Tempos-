@@ -27,21 +27,39 @@ export default function HorariosTab({ schedules = [], onAdd, onEdit, onDelete })
   const [viewMode, setViewMode] = useState('calendar'); // 'calendar' o 'list'
 
   const calendarEvents = useMemo(() => {
-    return schedules.map(s => {
-      const mappedDays = (s.days || []).map(d => d === 7 ? 0 : d);
-      const isNight = parseInt(s.startTime?.split(':')[0]) > 18 || parseInt(s.startTime?.split(':')[0]) < 6;
-      return {
-        id: s.id,
-        title: s.name,
+    const events = [];
+    schedules.forEach(s => {
+      const mappedDays = (s.days || s.daysOfWeek || []).map(d => d === 7 ? 0 : d);
+      
+      // Evento Turno 1
+      events.push({
+        id: `${s.id}-t1`,
+        title: `${s.name} (T1)`,
         startTime: s.startTime,
         endTime: s.endTime,
         daysOfWeek: mappedDays,
-        backgroundColor: isNight ? 'rgba(99, 102, 241, 0.1)' : 'rgba(245, 158, 11, 0.1)',
-        borderColor: isNight ? 'rgba(99, 102, 241, 0.3)' : 'rgba(245, 158, 11, 0.3)',
-        textColor: isNight ? '#a5b4fc' : '#fbbf24',
+        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+        borderColor: 'rgba(59, 130, 246, 0.3)',
+        textColor: '#60a5fa',
         extendedProps: { originalData: s }
-      };
+      });
+
+      // Evento Turno 2 (si existe)
+      if (s.startTime2 && s.endTime2) {
+        events.push({
+          id: `${s.id}-t2`,
+          title: `${s.name} (T2)`,
+          startTime: s.startTime2,
+          endTime: s.endTime2,
+          daysOfWeek: mappedDays,
+          backgroundColor: 'rgba(99, 102, 241, 0.1)',
+          borderColor: 'rgba(99, 102, 241, 0.3)',
+          textColor: '#a5b4fc',
+          extendedProps: { originalData: s }
+        });
+      }
     });
+    return events;
   }, [schedules]);
 
   return (
@@ -49,8 +67,8 @@ export default function HorariosTab({ schedules = [], onAdd, onEdit, onDelete })
       <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-6">
         <SectionHeader 
           icon={CalendarIcon}
-          title="Planificación de Escuadrones"
-          subtitle="Diseña el motor horario de tu empresa con plantillas de alto rendimiento."
+          title="Gestión de Jornadas"
+          subtitle="Configura jornadas continuas o partidas para tu equipo con precisión quirúrgica."
           actionLabel="Nueva Plantilla"
           actionIcon={Plus}
           onAction={onAdd}
@@ -75,7 +93,7 @@ export default function HorariosTab({ schedules = [], onAdd, onEdit, onDelete })
             )}
           >
             <List size={16} weight="fill" />
-            Plantillas
+            Listado
           </button>
         </div>
       </div>
@@ -94,14 +112,14 @@ export default function HorariosTab({ schedules = [], onAdd, onEdit, onDelete })
                 <thead>
                   <tr className="bg-white/[0.03] border-b border-white/5">
                     <th className="px-8 py-6 text-[10px] font-black text-white/20 uppercase tracking-[0.3em]">Plantilla</th>
-                    <th className="px-8 py-6 text-[10px] font-black text-white/20 uppercase tracking-[0.3em]">Configuración Horaria</th>
-                    <th className="px-8 py-6 text-[10px] font-black text-white/20 uppercase tracking-[0.3em]">Calendario</th>
+                    <th className="px-8 py-6 text-[10px] font-black text-white/20 uppercase tracking-[0.3em]">Jornada</th>
+                    <th className="px-8 py-6 text-[10px] font-black text-white/20 uppercase tracking-[0.3em]">Días</th>
                     <th className="px-8 py-6 text-[10px] font-black text-white/20 uppercase tracking-[0.3em] text-right">Acciones</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5">
                   {schedules.length ? schedules.map((row) => {
-                    const isNight = parseInt(row.startTime?.split(':')[0]) > 18 || parseInt(row.startTime?.split(':')[0]) < 6;
+                    const isSplit = !!(row.startTime2 && row.endTime2);
                     return (
                       <tr key={row.id} className="hover:bg-white/[0.03] transition-all group">
                         <td className="px-8 py-5">
@@ -111,29 +129,39 @@ export default function HorariosTab({ schedules = [], onAdd, onEdit, onDelete })
                             </div>
                             <div className="min-w-0">
                                <div className="font-black text-white text-xs tracking-tight uppercase italic">{row.name}</div>
-                               <div className="text-[9px] text-white/20 font-bold uppercase tracking-widest">{row.isTemplate ? 'Global' : 'Personalizado'}</div>
+                               <Badge color={isSplit ? 'indigo' : 'blue'}>{isSplit ? 'PARTIDA' : 'CONTINUA'}</Badge>
                             </div>
                           </div>
                         </td>
                         <td className="px-8 py-5">
-                           <div className="flex items-center gap-4">
-                              <div className={cn(
-                                "w-8 h-8 rounded-full flex items-center justify-center border shadow-inner",
-                                isNight ? "bg-indigo-500/10 border-indigo-500/20 text-indigo-400" : "bg-orange-500/10 border-orange-500/20 text-orange-400"
-                              )}>
-                                {isNight ? <Moon size={14} weight="fill" /> : <Sun size={14} weight="fill" />}
+                           <div className="space-y-2">
+                              {/* T1 */}
+                              <div className="flex items-center gap-3">
+                                 <div className="w-6 h-6 rounded-lg bg-orange-500/10 flex items-center justify-center text-orange-500 text-[8px] font-black border border-orange-500/20">T1</div>
+                                 <div className="flex items-center gap-2 font-mono text-[11px] font-black text-white">
+                                    <span>{row.startTime}</span>
+                                    <ArrowRight size={10} className="text-white/20" />
+                                    <span>{row.endTime}</span>
+                                 </div>
                               </div>
-                              <div className="flex items-center gap-2 font-mono text-xs font-black text-white/60 uppercase">
-                                 <span className="text-white">{row.startTime}</span>
-                                 <ArrowRight size={10} className="text-white/10" />
-                                 <span className="text-white">{row.endTime}</span>
-                              </div>
+                              {/* T2 */}
+                              {isSplit && (
+                                <div className="flex items-center gap-3">
+                                   <div className="w-6 h-6 rounded-lg bg-indigo-500/10 flex items-center justify-center text-indigo-500 text-[8px] font-black border border-indigo-500/20">T2</div>
+                                   <div className="flex items-center gap-2 font-mono text-[11px] font-black text-white">
+                                      <span>{row.startTime2}</span>
+                                      <ArrowRight size={10} className="text-white/20" />
+                                      <span>{row.endTime2}</span>
+                                   </div>
+                                </div>
+                              )}
                            </div>
                         </td>
                         <td className="px-8 py-5">
                           <div className="flex gap-1.5">
                             {['L', 'M', 'X', 'J', 'V', 'S', 'D'].map((dia, idx) => {
-                              const isSelected = row.days?.includes(idx + 1);
+                              const daysArray = row.days || row.daysOfWeek || [];
+                              const isSelected = daysArray.includes(idx + 1);
                               return (
                                 <div 
                                   key={idx} 
@@ -161,7 +189,7 @@ export default function HorariosTab({ schedules = [], onAdd, onEdit, onDelete })
                       <td colSpan={4} className="py-24 text-center">
                         <div className="flex flex-col items-center gap-4 opacity-10">
                           <Warning size={64} weight="duotone" />
-                          <p className="text-xs font-black uppercase tracking-[0.4em]">Sin plantillas configuradas</p>
+                          <p className="text-xs font-black uppercase tracking-[0.4em]">Sin jornadas configuradas</p>
                         </div>
                       </td>
                     </tr>

@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "898534343258",
+    "project_id": "tempos-project-f1e77",
+    "storage_bucket": "tempos-project-f1e77.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:898534343258:android:4aee77ea3b6d477b2a4e63",
+        "android_client_info": {
+          "package_name": "es.tempos.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "898534343258-0ju2e1d04pinbcbs2lbdk21abvtodc4e.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "es.tempos.app",
+            "certificate_hash": "467ddcc9c4044826c5a5d5a321d84fd373b52730"
+          }
+        },
+        {
+          "client_id": "898534343258-ebk5amiu99gqbm900q8p5duiqg186mfh.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCK2gjZJFXG-24OSylfns5uckDjK5LuDuM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "898534343258-ebk5amiu99gqbm900q8p5duiqg186mfh.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

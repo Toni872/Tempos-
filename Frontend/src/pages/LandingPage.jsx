@@ -511,9 +511,14 @@ export default function LandingPage() {
           ))}
         </nav>
 
-        <div className="tp-nav-actions">
+        <div className="tp-nav-actions hide-mob">
           <Link to="/login" className="tp-btn tp-btn-ghost" {...bindPrefetch('/login')}>Entrar</Link>
           <Link to="/trial" className="tp-btn tp-btn-primary" {...bindPrefetch('/trial')}>{ctaCopy.navTrial}</Link>
+        </div>
+
+        <div className="tp-nav-actions-mob show-mob">
+          <Link to="/login" className="tp-btn tp-btn-ghost tp-btn-sm" {...bindPrefetch('/login')}>Entrar</Link>
+          <Link to="/trial" className="tp-btn tp-btn-primary tp-btn-sm" {...bindPrefetch('/trial')}>Prueba gratis</Link>
         </div>
 
         <button className="tp-nav-ham" onClick={() => setNavOpen(true)} aria-label="Abrir menú móvil">
@@ -549,7 +554,7 @@ export default function LandingPage() {
 
         <div className="tp-mob-nav-actions">
           <Link to="/login" className="tp-btn tp-btn-ghost" onClick={() => setNavOpen(false)} {...bindPrefetch('/login')}>Entrar</Link>
-          <Link to="/trial" className="tp-btn tp-btn-primary" onClick={() => setNavOpen(false)} {...bindPrefetch('/trial')}>{ctaCopy.navTrial}</Link>
+          <Link to="/trial" className="tp-btn tp-btn-primary" onClick={() => setNavOpen(false)} {...bindPrefetch('/trial')}>Prueba gratis</Link>
         </div>
       </div>
 
@@ -559,7 +564,7 @@ export default function LandingPage() {
       <section id="inicio" aria-label="Software de control horario legal para empresas y autónomos en España" style={{
         minHeight: '100vh',
         display: 'flex', alignItems: 'center',
-        paddingTop: 84, position: 'relative', overflow: 'hidden',
+        paddingTop: 160, position: 'relative', overflow: 'hidden',
       }}>
         <div className="tp-orb" style={{ width: 700, height: 700, top: '-15%', left: '-18%', background: 'radial-gradient(circle, rgba(37,99,235,0.11) 0%, transparent 70%)' }}/>
         <div className="tp-orb" style={{ width: 500, height: 500, bottom: '-10%', right: '-12%', background: 'radial-gradient(circle, rgba(37,99,235,0.07) 0%, transparent 70%)' }}/>

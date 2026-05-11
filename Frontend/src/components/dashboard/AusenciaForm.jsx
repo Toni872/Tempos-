@@ -1,14 +1,14 @@
 import React, { useState } from 'react';
 import { 
-  CalendarX, 
   AirplaneTilt, 
   ThermometerHot, 
   Suitcase, 
   Calendar,
   Note,
-  FloppyDisk,
   CheckCircle,
-  Clock
+  Clock,
+  CloudArrowUp,
+  XCircle
 } from '@phosphor-icons/react';
 import { cn } from '@/lib/utils';
 
@@ -104,7 +104,39 @@ export default function AusenciaForm({ initialValues, onSubmit, onCancel }) {
         </div>
 
         <div className="space-y-2">
-          <label className="text-[10px] font-black text-zinc-600 uppercase tracking-widest ml-1">Justificante / Notas</label>
+          <label className="text-[10px] font-black text-zinc-600 uppercase tracking-widest ml-1">Documento Justificante</label>
+          <div className="relative group">
+            <input 
+              type="file" 
+              id="justificante"
+              accept=".pdf,.jpg,.jpeg,.png"
+              className="hidden" 
+              onChange={(e) => {
+                const file = e.target.files[0];
+                if (file) setFormData(p => ({ ...p, file }));
+              }}
+            />
+            <label 
+              htmlFor="justificante"
+              className="flex items-center gap-4 w-full bg-white/[0.03] border border-dashed border-white/[0.06] rounded-2xl py-4 px-11 text-sm font-semibold text-zinc-300 cursor-pointer hover:border-blue-500/40 hover:bg-white/[0.05] transition-all"
+            >
+              <CloudArrowUp size={20} className="text-zinc-600" weight="bold" />
+              <span className="truncate">{formData.file ? formData.file.name : 'Subir justificante (PDF, JPG, PNG)'}</span>
+            </label>
+            {formData.file && (
+              <button 
+                type="button"
+                onClick={() => setFormData(p => ({ ...p, file: null }))}
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-black text-rose-500 uppercase tracking-widest"
+              >
+                Quitar
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <label className="text-[10px] font-black text-zinc-600 uppercase tracking-widest ml-1">Notas Adicionales</label>
           <div className="relative group">
             <Note className="absolute left-4 top-4 w-4 h-4 text-zinc-600 group-focus-within:text-blue-500 transition-colors" weight="bold" />
             <textarea 

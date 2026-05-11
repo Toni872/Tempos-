@@ -103,9 +103,10 @@
 /* ── Navbar ── */
 .tp-nav {
   position: fixed; top: 0; left: 0; right: 0; z-index: 200;
-  height: 78px;
+  height: auto;
+  min-height: 78px;
   display: flex; align-items: center; justify-content: space-between;
-  padding: 0 clamp(18px, 4vw, 48px);
+  padding: env(safe-area-inset-top, 0px) clamp(18px, 4vw, 48px) 0;
   background: linear-gradient(180deg, rgba(16,16,16,0.94), rgba(16,16,16,0.82));
   -webkit-backdrop-filter: blur(24px) saturate(1.4);
   backdrop-filter: blur(24px) saturate(1.4);
@@ -115,7 +116,8 @@
   transition: height 0.24s ease, background 0.24s ease, box-shadow 0.24s ease;
 }
 .tp-nav.tp-compact {
-  height: 64px;
+  height: auto;
+  min-height: 64px;
   background: linear-gradient(180deg, rgba(14,14,14,0.97), rgba(14,14,14,0.9));
   box-shadow: 0 12px 28px rgba(0,0,0,0.38);
 }
@@ -765,7 +767,12 @@
 
 /* ── ≤960px (tablets y móviles grandes) ── */
 @media (max-width: 960px) {
-  .tp-nav { height: 70px; padding: 0 20px; }
+  .tp-nav { 
+    top: 60px;
+    height: auto; 
+    min-height: 74px; 
+    padding: 12px 20px 0; 
+  }
   .tp-brand-mark { width: 40px; height: 40px; }
   .tp-brand-name { font-size: 18px; }
   .tp-brand-tag { font-size: 11px; }
@@ -779,7 +786,12 @@
 
 /* ── ≤620px (móviles estándar) ── */
 @media (max-width: 620px) {
-  .tp-nav { height: 68px; padding: 0 16px; }
+  .tp-nav { 
+    top: 60px;
+    height: auto; 
+    min-height: 72px; 
+    padding: 12px 16px 0; 
+  }
   .tp-brand-wrap { gap: 10px; }
   .tp-brand-mark { width: 36px; height: 36px; border-radius: 12px; }
   .tp-brand-name { font-size: 17px; }
@@ -792,4 +804,21 @@
 
   .tp-hero-wrap { gap: 24px; }
   .tp-hero-right { display: flex; justify-content: center; }
+
+  .show-mob { display: flex !important; }
+  .hide-mob { display: none !important; }
+  .tp-nav-actions-mob {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-right: 8px;
+  }
+  .tp-btn-sm {
+    padding: 7px 12px !important;
+    font-size: 11px !important;
+    border-radius: 10px !important;
+  }
 }
+
+.show-mob { display: none; }
+.hide-mob { display: flex; }
