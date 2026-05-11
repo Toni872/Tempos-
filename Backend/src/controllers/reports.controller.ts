@@ -15,14 +15,31 @@ import {
 import { hasPermission } from "../security/authorization.js";
 import { PdfService } from "../services/pdf.service.js";
 import { AiAnalysisService } from "../services/AiAnalysisService.js";
+import { AnomalyService } from "../services/AnomalyService.js";
 
 const router = Router();
 
 // --- HELPERS PARA EXPORTACIÓN ---
 
+function sanitizeCSVField(val: any) {
+  const str = String(val);
+  if (str.startsWith("=") || str.startsWith("+") || str.startsWith("-") || str.startsWith("@")) {
+    return `'${str}`;
+  }
+  return str;
+}
+
 function auditLogsToCSV(rows: any[]): string {
   const header = "Fecha,Usuario,Acción,Metadatos\n";
-  const body = rows.map(r => `${r.createdAt},${r.userName},${r.action},"${JSON.stringify(r.metadata).replace(/"/g, '""')}"`).join("\n");
+  const body = rows.map(r => {
+    const fields = [
+      r.createdAt,
+      r.userName,
+      r.action,
+      JSON.stringify(r.metadata).replace(/"/g, '""')
+    ].map(f => `"${sanitizeCSVField(f)}"`).join(",");
+    return fields;
+  }).join("\n");
   return header + body;
 }
 
@@ -45,6 +62,26 @@ router.get(
 
     const insights = await AiAnalysisService.generatePredictiveAnalysis(auth.companyId);
     res.json({ insights });
+  })
+);
+
+/**
+ * GET /api/v1/reports/anomalies
+ * Obtiene anomalías detectadas en tiempo real (fichajes fuera de rango, faltas, etc.)
+ */
+router.get(
+  "/anomalies",
+  firebaseAuthMiddleware,
+  appUserContextMiddleware,
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const auth = getAuthContext(req);
+    if (!hasPermission(auth, "view_employees")) {
+      res.status(403).json({ error: "Acceso denegado." });
+      return;
+    }
+
+    const anomalies = await AnomalyService.getDailyAnomalies(auth.companyId);
+    res.json({ data: anomalies });
   })
 );
 
@@ -197,7 +234,7 @@ router.get(
         f.endTime || "--:--",
         f.hoursWorked?.toFixed(2) || "0.00",
         f.status
-      ].map(field => `"${field}"`).join(",");
+      ].map(field => `"${sanitizeCSVField(field)}"`).join(",");
       csv += row + "\n";
     });
 
@@ -223,14 +260,16 @@ router.get(
 
     const fichas = await AppDataSource.getRepository(Ficha).find({
       where: { user: { companyId: auth.companyId } },
+      relations: ["user"],
       order: { date: "DESC" },
       take: 100
     });
 
+    const firstUser = fichas[0]?.user;
     const pdfData = {
-      employeeName: `Empresa ${auth.companyId}`,
-      employeeEmail: "admin@tempos.es",
-      companyName: "TEMPOS CLOUD",
+      employeeName: firstUser?.displayName || `Empresa ${auth.companyId}`,
+      employeeEmail: firstUser?.email || "admin@tempos.es",
+      companyName: auth.companyId,
       period: new Date().toLocaleDateString('es-ES', { month: 'long', year: 'numeric' }),
       totalHours: fichas.reduce((acc, f) => acc + Number(f.hoursWorked || 0), 0),
       records: fichas.map(f => ({
@@ -238,7 +277,8 @@ router.get(
         clockIn: f.startTime,
         clockOut: f.endTime || "--:--",
         total: `${Number(f.hoursWorked || 0).toFixed(2)}h`,
-        status: f.status
+        status: f.status,
+        location: f.metadata?.location || undefined,
       }))
     };
 
@@ -281,9 +321,9 @@ router.get(
     const fichas = await qb.orderBy("ficha.date", "DESC").getMany();
 
     const pdfData = {
-      employeeName: userId ? (fichas[0] as any)?.user?.displayName : "Reporte Agregado",
-      employeeEmail: userId ? (fichas[0] as any)?.user?.email : "multi-usuario@tempos.es",
-      companyName: "TEMPOS CLOUD CLIENTE",
+      employeeName: userId ? (fichas[0] as any)?.user?.displayName || "Empleado" : "Reporte Agregado",
+      employeeEmail: userId ? (fichas[0] as any)?.user?.email || "—" : "multi-usuario",
+      companyName: auth.companyId,
       period: startDate && endDate ? `${startDate} a ${endDate}` : "Periodo Actual",
       totalHours: fichas.reduce((acc, f) => acc + Number(f.hoursWorked || 0), 0),
       records: fichas.map(f => ({
@@ -291,7 +331,8 @@ router.get(
         clockIn: f.startTime,
         clockOut: f.endTime || "--:--",
         total: `${Number(f.hoursWorked || 0).toFixed(2)}h`,
-        status: f.status
+        status: f.status,
+        location: (f as any).metadata?.location || undefined,
       }))
     };
 

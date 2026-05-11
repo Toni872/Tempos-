@@ -86,14 +86,19 @@ router.post(
       companyId = `${slug}-${randomUUID().slice(0, 8)}`;
     }
 
+    // Vincular dispositivo si viene en el body (primer login nativo)
+    const deviceId = typeof bodyParams.deviceId === "string" ? bodyParams.deviceId.trim() : undefined;
+
     // Crear nuevo usuario
     user = userRepository.create({
       uid: firebaseUser.uid,
       email: firebaseUser.email,
       displayName: firebaseUser.name || firebaseUser.email,
+      photoURL: firebaseUser.picture || undefined,
       emailVerified: firebaseUser.email_verified,
       companyId: companyId,
       role: requestedRole,
+      authorizedDeviceId: deviceId,
       metadata: {
         createdAt: new Date().toISOString(),
         companyName: bodyParams.companyName || "",
@@ -144,6 +149,8 @@ router.get(
       status: user.status,
       photoURL: user.photoURL,
       createdAt: user.createdAt,
+      hasDeviceBound: !!user.authorizedDeviceId,
+      requiresGeolocation: user.requiresGeolocation,
     });
   }),
 );
@@ -224,6 +231,93 @@ router.post(
       message: "Términos legales aceptados correctamente",
       acceptedAt: user.acceptedTermsAt,
     });
+  }),
+);
+
+/**
+ * POST /api/v1/auth/bind-device
+ * Vincula un dispositivo físico al usuario (una sola vez).
+ * Si ya tiene uno vinculado, verifica que coincida.
+ */
+router.post(
+  "/bind-device",
+  firebaseAuthMiddleware,
+  appUserContextMiddleware,
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const auth = getAuthContext(req);
+    const { deviceId } = req.body;
+
+    if (!deviceId || typeof deviceId !== "string" || deviceId.trim().length < 8) {
+      res.status(400).json({ error: "ID de dispositivo inválido." });
+      return;
+    }
+
+    const userRepository = AppDataSource.getRepository(User);
+    const user = await userRepository.findOne({ where: { uid: auth.uid } });
+
+    if (!user) {
+      res.status(404).json({ error: "Usuario no encontrado" });
+      return;
+    }
+
+    // Si ya tiene un dispositivo vinculado
+    if (user.authorizedDeviceId) {
+      if (user.authorizedDeviceId === deviceId.trim()) {
+        res.json({ status: "already_bound", message: "Este dispositivo ya está vinculado." });
+      } else {
+        res.status(403).json({
+          error: "DEVICE_MISMATCH",
+          message: "Tu cuenta ya está vinculada a otro dispositivo. Contacta con tu administrador.",
+        });
+      }
+      return;
+    }
+
+    // Primer vínculo
+    user.authorizedDeviceId = deviceId.trim();
+    await userRepository.save(user);
+
+    res.json({
+      status: "bound",
+      message: "Dispositivo vinculado correctamente. Solo podrás fichar desde este móvil.",
+    });
+  }),
+);
+
+/**
+ * POST /api/v1/auth/unbind-device
+ * Solo administradores pueden desvincular el dispositivo de un empleado.
+ */
+router.post(
+  "/unbind-device",
+  firebaseAuthMiddleware,
+  appUserContextMiddleware,
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const auth = getAuthContext(req);
+
+    if (!auth.isPrivileged) {
+      res.status(403).json({ error: "Solo administradores pueden desvincular dispositivos." });
+      return;
+    }
+
+    const { targetUid } = req.body;
+    if (!targetUid) {
+      res.status(400).json({ error: "Debes especificar el UID del empleado (targetUid)." });
+      return;
+    }
+
+    const userRepository = AppDataSource.getRepository(User);
+    const targetUser = await userRepository.findOne({ where: { uid: targetUid, companyId: auth.companyId } });
+
+    if (!targetUser) {
+      res.status(404).json({ error: "Empleado no encontrado en tu empresa." });
+      return;
+    }
+
+    targetUser.authorizedDeviceId = undefined;
+    await userRepository.save(targetUser);
+
+    res.json({ message: `Dispositivo desvinculado para ${targetUser.displayName || targetUser.email}.` });
   }),
 );
 

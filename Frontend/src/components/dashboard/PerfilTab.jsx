@@ -352,6 +352,59 @@ export default function PerfilTab({ profile, onUpdate }) {
              <div className="h-px flex-1 bg-gradient-to-l from-transparent to-white/10" />
           </div>
 
+          {/* MÓDULO DE VERIFICACIÓN LEGAL (NUEVO) */}
+          <Card className="bg-gradient-to-br from-blue-600/10 to-indigo-600/5 border-blue-500/20 p-12 rounded-[3rem] shadow-2xl relative overflow-hidden group">
+             <div className="absolute top-0 right-0 p-12 opacity-10 pointer-events-none group-hover:scale-110 transition-transform duration-1000">
+                <ShieldCheck size={160} weight="thin" />
+             </div>
+             
+             <div className="relative z-10 space-y-8">
+                <div>
+                   <Badge color="blue" className="italic font-black tracking-widest mb-6 shadow-lg shadow-blue-500/20">CUMPLIMIENTO NORMATIVO</Badge>
+                   <h3 className="text-3xl font-black text-white italic uppercase tracking-tighter leading-none">Validación de Jornada Mensual</h3>
+                   <p className="text-white/40 text-[11px] font-medium mt-4 max-w-md italic leading-relaxed uppercase tracking-wider">
+                      Según el Art. 34.9 del ET, el trabajador debe validar sus registros mensuales. Al confirmar, los datos se vuelven inalterables.
+                   </p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                   <div className="p-8 rounded-[2rem] bg-white/5 border border-white/5 backdrop-blur-md">
+                      <p className="text-[10px] font-black text-white/20 uppercase tracking-[0.3em] mb-2">Periodo Actual</p>
+                      <p className="text-xl font-black text-white italic uppercase tracking-tighter">
+                         {new Intl.DateTimeFormat('es-ES', { month: 'long', year: 'numeric' }).format(new Date())}
+                      </p>
+                   </div>
+                   <div className="p-8 rounded-[2rem] bg-white/5 border border-white/5 backdrop-blur-md">
+                      <p className="text-[10px] font-black text-white/20 uppercase tracking-[0.3em] mb-2">Horas Registradas</p>
+                      <p className="text-xl font-black text-blue-500 italic uppercase tracking-tighter">
+                         --.-- h
+                      </p>
+                   </div>
+                </div>
+
+                <button 
+                  onClick={async () => {
+                    if (!confirm("Al validar, confirmas que todos los fichajes del mes son correctos. Los registros se bloquearán por seguridad legal. ¿Deseas continuar?")) return;
+                    try {
+                      const session = getClientSession();
+                      const now = new Date();
+                      const start = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+                      const end = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+                      
+                      await verifyPeriod(session.token, { startDate: start, endDate: end });
+                      alert("¡Mes verificado y bloqueado correctamente! Se ha generado tu firma digital SHA-256.");
+                    } catch (err) {
+                      alert("Error en la verificación: " + err.message);
+                    }
+                  }}
+                  className="w-full py-6 rounded-[2rem] bg-white text-black hover:bg-blue-500 hover:text-white text-[11px] font-black uppercase tracking-[0.4em] flex items-center justify-center gap-4 transition-all shadow-2xl active:scale-[0.98]"
+                >
+                   <ShieldCheck size={24} weight="fill" />
+                   FIRMAR Y BLOQUEAR MES
+                </button>
+             </div>
+          </Card>
+
           {/* BOTÓN DE GUARDADO GLOBAL */}
           <div className="mt-12 pt-8 border-t border-white/5 flex flex-col gap-4">
              {validationError && (

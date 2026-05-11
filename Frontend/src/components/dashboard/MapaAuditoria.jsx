@@ -21,7 +21,7 @@ import {
 } from '@phosphor-icons/react';
 import Badge from '@/components/ui/Badge';
 import { cn } from '@/lib/utils';
-import { exportAuditPDF, getClientSession } from '@/lib/api'; // Importamos funciones específicas
+import { exportAuditPDF, exportInspectionPDF, getClientSession } from '@/lib/api'; // Importamos funciones específicas
 
 const DEFAULT_CENTER = [40.4168, -3.7038];
 const MIN_ZOOM = 3;

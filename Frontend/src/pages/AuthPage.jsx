@@ -2,6 +2,9 @@ import { useState, useEffect } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { bootstrapLocalSession, getClientSession, registerMe, getMe, setClientSession } from '@/lib/api';
 import { signInAndGetIdToken, signInWithGoogleAndGetIdToken, handleGoogleRedirectResult } from '@/lib/firebaseClient';
+import { getDeviceUniqueId } from '@/lib/nativeServices';
+import { Capacitor } from '@capacitor/core';
+import api from '@/lib/api';
 import Logo from '@/components/ui/Logo';
 
 const MIN_PASSWORD_LENGTH = 8;
@@ -233,20 +236,48 @@ export default function AuthPage({ mode }) {
     setIsSubmitting(true);
 
     try {
+      console.log('⚡ [AUTH-PAGE] Solicitando token a Google...');
       const idToken = await signInWithGoogleAndGetIdToken();
+      console.log('⚡ [AUTH-PAGE] Token recibido:', idToken ? 'SÍ' : 'NO');
+      
       if (!idToken) {
+        console.warn('⚠️ [AUTH-PAGE] No se recibió token de Google');
         setIsSubmitting(false);
         return;
       }
+
+      // Obtener Device ID para vinculación antifraude
+      let deviceId = undefined;
+      if (Capacitor.isNativePlatform()) {
+        deviceId = await getDeviceUniqueId();
+        console.log('📱 [AUTH-PAGE] Device ID capturado:', deviceId?.substring(0, 8) + '...');
+      }
       
-      // Intentar registro rápido (si ya existe, el backend devolverá 409 y seguimos)
+      // Registrar/verificar en backend (enviando deviceId si es nativo)
+      console.log('⚡ [AUTH-PAGE] Registrando en backend...');
       try {
-        await registerMe(idToken, { role, companyName: role === 'admin' ? 'Google Company' : undefined });
-      } catch {
-        // Ignorar conflictos de usuario ya existente
+        await registerMe(idToken, {
+          role,
+          companyName: role === 'admin' ? 'Mi Empresa' : undefined,
+          deviceId,
+        });
+      } catch (regErr) {
+        console.warn('ℹ️ [AUTH-PAGE] Registro backend (puede que ya exista):', regErr?.message);
       }
 
+      // Vincular dispositivo explícitamente si es nativo
+      if (deviceId) {
+        try {
+          const bindRes = await api.post('/api/v1/auth/bind-device', JSON.stringify({ deviceId }), { token: idToken });
+          console.log('🔗 [AUTH-PAGE] Dispositivo vinculado:', bindRes?.status || bindRes?.message);
+        } catch (bindErr) {
+          console.warn('⚠️ [AUTH-PAGE] Aviso vinculación dispositivo:', bindErr?.message);
+        }
+      }
+
+      console.log('⚡ [AUTH-PAGE] Obteniendo perfil...');
       const profile = await getMe(idToken);
+
       const session = { 
         token: idToken, 
         isAdmin: profile.role === 'admin' || profile.role === 'manager', 
@@ -254,12 +285,12 @@ export default function AuthPage({ mode }) {
         profile 
       };
       setClientSession(session);
+      console.log('🚀 [AUTH-PAGE] Sesión OK → Dashboard');
       navigate('/dashboard');
     } catch (err) {
+      console.error('❌ [AUTH-PAGE] Error login Google:', err);
       const msg = err instanceof Error ? err.message : 'Error en acceso con Google';
-      if (!msg.includes('auth/popup-closed-by-user')) {
-        setFormError(msg);
-      }
+      setFormError(msg);
       setIsSubmitting(false);
     }
   };

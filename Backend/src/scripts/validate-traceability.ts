@@ -119,7 +119,7 @@ async function validateTraceability() {
 
     // 6. Verificar Audit Trail
     console.log("🔍 Verificando Audit Trail...");
-    const events = await teService.getsFichaEvents(ficha.id);
+    const events = await teService.getFichaEvents(ficha.id);
     console.log(`Total eventos registrados: ${events.length} (esperado 4)`);
 
     if (events.length === 4) {

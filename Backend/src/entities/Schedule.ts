@@ -20,6 +20,12 @@ export class Schedule {
   @Column({ type: "varchar", length: 5 })
   endTime!: string; // HH:MM
 
+  @Column({ type: "varchar", length: 5, nullable: true })
+  startTime2?: string; // HH:MM (Segundo turno)
+
+  @Column({ type: "varchar", length: 5, nullable: true })
+  endTime2?: string; // HH:MM (Segundo turno)
+
   @Column({ type: "json" })
   daysOfWeek!: number[]; // [1, 2, 3, 4, 5] para Lun-Vie (ISO: 1=Mon, 7=Sun)
 

@@ -25,6 +25,7 @@ import {
 } from '@tanstack/react-table';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
+import { getClientSession } from '@/lib/api';
 
 export default function AusenciasTab({ absences = [], onAdd, onEdit, onDelete, onActOnAbsence, profile = {} }) {
   const pendingCount = absences.filter(a => a.status?.toLowerCase() === 'pending').length;
@@ -93,6 +94,30 @@ export default function AusenciasTab({ absences = [], onAdd, onEdit, onDelete, o
             </div>
           </div>
         )
+      }
+    },
+    {
+      accessorKey: 'documentId',
+      header: 'Justificante',
+      cell: ({ row }) => {
+        const data = row.original;
+        if (!data.documentId) return <span className="text-[10px] text-white/10 font-bold uppercase tracking-widest">Sin adjunto</span>;
+        return (
+          <button 
+            onClick={(e) => {
+              e.stopPropagation();
+              // Abrir documento en nueva pestaña
+              const session = getClientSession();
+              if (session?.token) {
+                window.open(`${import.meta.env.VITE_API_URL}/api/v1/documents/${data.documentId}/view?token=${session.token}`, '_blank');
+              }
+            }}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-500/10 text-blue-500 hover:bg-blue-500 hover:text-white transition-all border border-blue-500/20"
+          >
+            <Suitcase size={14} weight="fill" />
+            <span className="text-[9px] font-black uppercase tracking-widest">VER DOC</span>
+          </button>
+        );
       }
     },
     {

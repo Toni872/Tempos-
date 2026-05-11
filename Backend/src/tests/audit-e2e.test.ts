@@ -85,7 +85,7 @@ test("E2E Audit Simulation: Inspección de Trabajo LifeCycle", async () => {
   );
 
   // 3. Inspección exige el trazo atómico de esta Ficha:
-  const inspectionEvents = await service.getsFichaEvents(ficha.id);
+  const inspectionEvents = await service.getFichaEvents(ficha.id);
   assert.equal(
     inspectionEvents.length,
     2,

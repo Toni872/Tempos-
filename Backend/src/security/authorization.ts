@@ -14,7 +14,8 @@ export type Permission =
   | "view_work_centers"
   | "manage_work_centers"
   | "view_settings"
-  | "manage_settings";
+  | "manage_settings"
+  | "manage_system";
 
 const PERMISSIONS_BY_ROLE: Record<AuthContext["role"], Permission[]> = {
   admin: [
@@ -32,6 +33,7 @@ const PERMISSIONS_BY_ROLE: Record<AuthContext["role"], Permission[]> = {
     "manage_work_centers",
     "view_settings",
     "manage_settings",
+    "manage_system",
   ],
   manager: [
     "view_company_absences",

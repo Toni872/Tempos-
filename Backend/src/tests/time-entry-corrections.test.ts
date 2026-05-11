@@ -40,7 +40,7 @@ test("TimeEntry Service: requestCorrections creates pending logs", async () => {
   const service = new TimeEntryService(mockTimeEntryRepo, mockChangeLogRepo);
 
   // Mock dependencies (private methods)
-  (service as any).getsFichaEvents = async () => [{ id: randomUUID() }];
+  (service as any).getFichaEvents = async () => [{ id: randomUUID() }];
 
   await service.requestCorrections({
     fichaId: randomUUID(),
@@ -72,7 +72,7 @@ test("TimeEntry Service: reviewCorrections updates pending logs to approved", as
   });
 
   // Setup mocks
-  (service as any).getsFichaEvents = async () => [{ id: entryId }];
+  (service as any).getFichaEvents = async () => [{ id: entryId }];
   (service as any).getChangeHistory = async () => mockChangeLogRepo.data;
 
   // 2. Act: Approve

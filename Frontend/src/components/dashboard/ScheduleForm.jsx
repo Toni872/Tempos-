@@ -6,19 +6,25 @@ import {
   Sun, 
   Moon,
   FloppyDisk,
-  Timer
+  Timer,
+  Clock,
+  ArrowRight
 } from '@phosphor-icons/react';
 import Toggle from '@/components/ui/Toggle';
 import { cn } from '@/lib/utils';
 
 export default function ScheduleForm({ initialData, onSubmit, onCancel }) {
-  const [formData, setFormData] = useState(initialData ?? {
-    name: '',
-    startTime: '09:00',
-    endTime: '18:00',
-    days: [1, 2, 3, 4, 5],
-    flexible: false,
-    isTemplate: true
+  const [isSplitShift, setIsSplitShift] = useState(!!(initialData?.startTime2 && initialData?.endTime2));
+  
+  const [formData, setFormData] = useState({
+    name: initialData?.name ?? '',
+    startTime: initialData?.startTime ?? '09:00',
+    endTime: initialData?.endTime ?? '14:00',
+    startTime2: initialData?.startTime2 ?? '16:00',
+    endTime2: initialData?.endTime2 ?? '19:00',
+    days: initialData?.days ?? [1, 2, 3, 4, 5],
+    flexible: initialData?.flexible ?? false,
+    isTemplate: initialData?.isTemplate ?? true
   });
 
   const handleChange = (e) => {
@@ -37,7 +43,13 @@ export default function ScheduleForm({ initialData, onSubmit, onCancel }) {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    onSubmit(formData);
+    // Si no es jornada partida, limpiamos los campos del segundo turno antes de enviar
+    const submissionData = { ...formData };
+    if (!isSplitShift) {
+      delete submissionData.startTime2;
+      delete submissionData.endTime2;
+    }
+    onSubmit(submissionData);
   };
 
   const weekDays = [
@@ -49,31 +61,95 @@ export default function ScheduleForm({ initialData, onSubmit, onCancel }) {
     <form onSubmit={handleSubmit} className="space-y-8">
       <div className="space-y-6">
         <FormInput 
-          label="Nombre del Horario" 
+          label="Nombre de la Plantilla" 
           name="name" 
           value={formData.name} 
           onChange={handleChange} 
           icon={CalendarBlank} 
-          placeholder="Ej. Turno Mañana" 
+          placeholder="Ej. Jornada de Oficina" 
         />
 
-        <div className="grid grid-cols-2 gap-4">
-          <FormInput 
-            label="Hora Entrada" 
-            name="startTime" 
-            value={formData.startTime} 
-            onChange={handleChange} 
-            icon={Sun} 
-            type="time" 
-          />
-          <FormInput 
-            label="Hora Salida" 
-            name="endTime" 
-            value={formData.endTime} 
-            onChange={handleChange} 
-            icon={Moon} 
-            type="time" 
-          />
+        {/* CONTENEDOR DE TURNOS */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between px-1">
+            <label className="text-[10px] font-black text-zinc-600 uppercase tracking-[0.2em]">Configuración de Turnos</label>
+            <button 
+              type="button" 
+              onClick={() => setIsSplitShift(!isSplitShift)}
+              className={cn(
+                "text-[9px] font-black uppercase tracking-widest px-3 py-1.5 rounded-lg transition-all",
+                isSplitShift ? "bg-blue-600/10 text-blue-500" : "bg-white/5 text-zinc-500 hover:text-white"
+              )}
+            >
+              {isSplitShift ? "Cambiar a Jornada Continua" : "Activar Jornada Partida"}
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4">
+            {/* TURNO 1 */}
+            <div className="p-6 rounded-[2rem] bg-white/[0.02] border border-white/[0.06] relative overflow-hidden group">
+              <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
+                <Sun size={40} weight="fill" />
+              </div>
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-8 h-8 rounded-xl bg-orange-500/10 flex items-center justify-center text-orange-500 border border-orange-500/20">
+                  <span className="text-[10px] font-black">T1</span>
+                </div>
+                <h4 className="text-[10px] font-black text-white uppercase tracking-widest">Mañana / Primer Turno</h4>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <FormInput 
+                  label="Entrada" 
+                  name="startTime" 
+                  value={formData.startTime} 
+                  onChange={handleChange} 
+                  icon={Clock} 
+                  type="time" 
+                />
+                <FormInput 
+                  label="Salida" 
+                  name="endTime" 
+                  value={formData.endTime} 
+                  onChange={handleChange} 
+                  icon={ArrowRight} 
+                  type="time" 
+                />
+              </div>
+            </div>
+
+            {/* TURNO 2 (Condicional) */}
+            {isSplitShift && (
+              <div className="p-6 rounded-[2rem] bg-white/[0.02] border border-white/[0.06] relative overflow-hidden group animate-in fade-in slide-in-from-top-4 duration-500">
+                <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
+                  <Moon size={40} weight="fill" />
+                </div>
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-8 h-8 rounded-xl bg-indigo-500/10 flex items-center justify-center text-indigo-500 border border-indigo-500/20">
+                    <span className="text-[10px] font-black">T2</span>
+                  </div>
+                  <h4 className="text-[10px] font-black text-white uppercase tracking-widest">Tarde / Segundo Turno</h4>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <FormInput 
+                    label="Entrada" 
+                    name="startTime2" 
+                    value={formData.startTime2} 
+                    onChange={handleChange} 
+                    icon={Clock} 
+                    type="time" 
+                  />
+                  <FormInput 
+                    label="Salida" 
+                    name="endTime2" 
+                    value={formData.endTime2} 
+                    onChange={handleChange} 
+                    icon={ArrowRight} 
+                    type="time" 
+                  />
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="space-y-3">
