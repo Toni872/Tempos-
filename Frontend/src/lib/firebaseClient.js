@@ -31,7 +31,7 @@ export async function signInAndGetIdToken(email, password) {
   return userCredential.user.getIdToken();
 }
 
-export const signInWithGoogleAndGetIdToken = async (mode = 'popup') => {
+export const signInWithGoogleAndGetIdToken = async () => {
   // ESTRATEGIA NATIVA (Android/iOS)
   if (Capacitor.isNativePlatform()) {
     try {

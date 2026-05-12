@@ -528,20 +528,7 @@ export default function AuthPage({ mode }) {
                 Continuar con Google
               </button>
 
-              <button
-                type="button"
-                onClick={async () => {
-                  try {
-                    const res = await fetch('https://discerning-emotion-production-4044.up.railway.app/api/v1/health');
-                    alert('Conexión OK con el servidor: ' + res.status);
-                  } catch (e) {
-                    alert('Fallo de conexión: ' + e.message);
-                  }
-                }}
-                style={{ fontSize: 11, color: 'var(--t2)', background: 'none', border: 'none', marginTop: 10, cursor: 'pointer' }}
-              >
-                ¿No entra? Probar conexión con el servidor
-              </button>
+
             </form>
 
             <div style={{ marginTop: 32, textAlign: 'center', fontSize: 14, color: 'var(--t1)' }}>
