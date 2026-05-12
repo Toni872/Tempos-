@@ -13,7 +13,7 @@ import {
 import { Capacitor, CapacitorHttp } from '@capacitor/core';
 
 const DEFAULT_LOCAL_API = 'http://localhost:8081';
-const MOBILE_DEV_API = 'http://10.0.2.2:8081'; // URL para emulador Android
+const PROD_API = 'https://tempos-production.up.railway.app';
 const SESSION_STORAGE_KEY = 'tempos.session';
 const OFFLINE_QUEUE_KEY = 'tempos.offline_queue';
 
@@ -26,8 +26,8 @@ function getApiBaseUrl() {
   }
   
   if (Capacitor.isNativePlatform()) {
-    console.log('⚡ [API] Modo Nativo detectado. Usando IP de emulador:', MOBILE_DEV_API);
-    return MOBILE_DEV_API;
+    console.log('⚡ [API] Modo Nativo detectado. Usando Producción:', PROD_API);
+    return PROD_API;
   }
   
   console.log('🌐 [API] Modo Web detectado. Usando:', DEFAULT_LOCAL_API);

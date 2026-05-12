@@ -7,6 +7,7 @@
     "install:all": "npm install && cd Backend && npm install && cd ../Frontend && npm install",
     "dev:backend": "cd Backend && npm run dev",
     "dev:frontend": "cd Frontend && npm run dev",
+    "dev:clean": "powershell -Command \"Stop-Process -Id (Get-NetTCPConnection -LocalPort 5173,8081 -ErrorAction SilentlyContinue).OwningProcess -Force -ErrorAction SilentlyContinue; npm run dev\"",
     "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
     "build:all": "cd Backend && npm run build && cd ../Frontend && npm run build"
   },

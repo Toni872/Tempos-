@@ -229,6 +229,8 @@ export default function AuthPage({ mode }) {
     }
   };
 
+
+
   const handleGoogleSignIn = async () => {
     if (isSubmitting) return;
     
@@ -238,59 +240,46 @@ export default function AuthPage({ mode }) {
     try {
       console.log('⚡ [AUTH-PAGE] Solicitando token a Google...');
       const idToken = await signInWithGoogleAndGetIdToken();
-      console.log('⚡ [AUTH-PAGE] Token recibido:', idToken ? 'SÍ' : 'NO');
       
       if (!idToken) {
-        console.warn('⚠️ [AUTH-PAGE] No se recibió token de Google');
         setIsSubmitting(false);
         return;
       }
 
-      // Obtener Device ID para vinculación antifraude
+      const effectiveRole = Capacitor.isNativePlatform() ? 'employee' : role;
       let deviceId = undefined;
       if (Capacitor.isNativePlatform()) {
-        deviceId = await getDeviceUniqueId();
-        console.log('📱 [AUTH-PAGE] Device ID capturado:', deviceId?.substring(0, 8) + '...');
+        try {
+          deviceId = await getDeviceUniqueId();
+        } catch (e) { console.warn('No se pudo obtener Device ID'); }
       }
       
-      // Registrar/verificar en backend (enviando deviceId si es nativo)
-      console.log('⚡ [AUTH-PAGE] Registrando en backend...');
       try {
         await registerMe(idToken, {
-          role,
-          companyName: role === 'admin' ? 'Mi Empresa' : undefined,
+          role: effectiveRole,
+          companyName: effectiveRole === 'admin' ? 'Mi Empresa' : undefined,
           deviceId,
         });
-      } catch (regErr) {
-        console.warn('ℹ️ [AUTH-PAGE] Registro backend (puede que ya exista):', regErr?.message);
-      }
+      } catch (regErr) { }
 
-      // Vincular dispositivo explícitamente si es nativo
       if (deviceId) {
         try {
-          const bindRes = await api.post('/api/v1/auth/bind-device', JSON.stringify({ deviceId }), { token: idToken });
-          console.log('🔗 [AUTH-PAGE] Dispositivo vinculado:', bindRes?.status || bindRes?.message);
-        } catch (bindErr) {
-          console.warn('⚠️ [AUTH-PAGE] Aviso vinculación dispositivo:', bindErr?.message);
-        }
+          await api.post('/api/v1/auth/bind-device', JSON.stringify({ deviceId }), { token: idToken });
+        } catch (bindErr) { }
       }
 
-      console.log('⚡ [AUTH-PAGE] Obteniendo perfil...');
       const profile = await getMe(idToken);
-
-      const session = { 
+      setClientSession({ 
         token: idToken, 
         isAdmin: profile.role === 'admin' || profile.role === 'manager', 
         localMode: false, 
         profile 
-      };
-      setClientSession(session);
-      console.log('🚀 [AUTH-PAGE] Sesión OK → Dashboard');
-      navigate('/dashboard');
+      });
+      
+      navigate('/dashboard', { replace: true });
     } catch (err) {
-      console.error('❌ [AUTH-PAGE] Error login Google:', err);
-      const msg = err instanceof Error ? err.message : 'Error en acceso con Google';
-      setFormError(msg);
+      console.error('❌ Error login Google:', err);
+      setFormError(err.message || 'Error en acceso con Google');
       setIsSubmitting(false);
     }
   };
@@ -537,6 +526,21 @@ export default function AuthPage({ mode }) {
                   <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
                 </svg>
                 Continuar con Google
+              </button>
+
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    const res = await fetch('https://discerning-emotion-production-4044.up.railway.app/api/v1/health');
+                    alert('Conexión OK con el servidor: ' + res.status);
+                  } catch (e) {
+                    alert('Fallo de conexión: ' + e.message);
+                  }
+                }}
+                style={{ fontSize: 11, color: 'var(--t2)', background: 'none', border: 'none', marginTop: 10, cursor: 'pointer' }}
+              >
+                ¿No entra? Probar conexión con el servidor
               </button>
             </form>
 

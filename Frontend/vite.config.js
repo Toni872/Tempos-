@@ -75,6 +75,7 @@ export default defineConfig({
   },
   server: {
     port: 5173,
+    strictPort: true,
     host: true,
     headers: {
       'X-Content-Type-Options': 'nosniff',
