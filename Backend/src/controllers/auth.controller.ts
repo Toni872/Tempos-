@@ -43,6 +43,12 @@ router.post(
         // Vincular el UID de Firebase al registro existente
         user.uid = firebaseUser.uid;
         user.emailVerified = firebaseUser.email_verified;
+        
+        // Mejorar el nombre si venía por defecto o era un email
+        if (firebaseUser.name && (!user.displayName || user.displayName === "Usuario" || user.displayName.includes("@"))) {
+          user.displayName = firebaseUser.name;
+        }
+        
         await userRepository.save(user);
 
         res.status(200).json({
@@ -88,12 +94,13 @@ router.post(
 
     // Vincular dispositivo si viene en el body (primer login nativo)
     const deviceId = typeof bodyParams.deviceId === "string" ? bodyParams.deviceId.trim() : undefined;
+    const finalDisplayName = bodyParams.name || firebaseUser.name || firebaseUser.email || "Usuario";
 
     // Crear nuevo usuario
     user = userRepository.create({
       uid: firebaseUser.uid,
       email: firebaseUser.email,
-      displayName: firebaseUser.name || firebaseUser.email,
+      displayName: finalDisplayName,
       photoURL: firebaseUser.picture || undefined,
       emailVerified: firebaseUser.email_verified,
       companyId: companyId,
