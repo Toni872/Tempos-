@@ -20,6 +20,14 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+
+            <!-- Receptor para el retorno de Google Login -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="com.googleusercontent.apps.898534343258-ebk5amiu99gqbm900q8p5duiqg186mfh" />
+            </intent-filter>
         </activity>
 
         <provider
