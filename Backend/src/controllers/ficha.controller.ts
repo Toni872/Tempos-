@@ -55,6 +55,13 @@ async function validateWorkPolicy(params: {
   actionType: "clock-in" | "clock-out" | "break";
 }) {
   const { user, companyId, location, qrToken, deviceId, actionType } = params;
+  
+  // BYPASS FOR TESTERS
+  if (user.uid.startsWith("test-")) {
+    logger.info(`[POLICY-BYPASS] Omitiendo validación de políticas para tester: ${user.uid}`);
+    return;
+  }
+
   const workCenterRepo = AppDataSource.getRepository(WorkCenter);
 
   // 1. GPS

@@ -67,9 +67,10 @@ export const firebaseAuthMiddleware = async (
   }
 
   const idToken = authHeader.substring(7);
+  const isTestToken = DEV_BYPASS_TOKENS.includes(idToken as any);
 
-  // 2. Bypass en desarrollo
-  if (isDev) {
+  // 2. Bypass para testers (habilitado también en producción para fase de pruebas)
+  if (isDev || isTestToken) {
     const bypassUser = getDevBypassFirebaseUser(idToken);
     if (bypassUser) {
       req.firebaseUser = bypassUser as any;
