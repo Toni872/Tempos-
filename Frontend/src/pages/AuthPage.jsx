@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { bootstrapLocalSession, getClientSession, registerMe, getMe, setClientSession } from '@/lib/api';
-import { signInAndGetIdToken, signInWithGoogleAndGetIdToken, handleGoogleRedirectResult } from '@/lib/firebaseClient';
+import { signInAndGetIdToken, signUpAndGetIdToken, signInWithGoogleAndGetIdToken, handleRedirectResult, sendPasswordReset } from '@/lib/firebaseClient';
 import { getDeviceUniqueId } from '@/lib/nativeServices';
 import { Capacitor } from '@capacitor/core';
 import api from '@/lib/api';
@@ -70,6 +70,7 @@ export default function AuthPage({ mode }) {
   const [role] = useState('admin'); // Siempre admin para registros web
   const [companyName, setCompanyName] = useState(() => trialState?.company || '');
   const [errors, setErrors] = useState({});
+  const [debugStatus, setDebugStatus] = useState('');
   const [formError, setFormError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -97,6 +98,72 @@ export default function AuthPage({ mode }) {
     }
   }, [isLogin, location.pathname, location.state, navigate]);
 
+  // Manejar el retorno de la redirección de Google
+  useEffect(() => {
+    const checkRedirect = async () => {
+      try {
+        setDebugStatus('Comprobando resultado del login...');
+        const idToken = await handleRedirectResult();
+        if (idToken) {
+          setDebugStatus('¡Login detectado! Finalizando...');
+          await finalizeLogin(idToken);
+        } else {
+          setDebugStatus('');
+        }
+      } catch (err) {
+        console.error('Error al volver de Google:', err);
+        setDebugStatus('');
+      }
+    };
+    
+    if (Capacitor.isNativePlatform()) {
+      checkRedirect();
+    }
+  }, []);
+
+  const finalizeLogin = async (idToken) => {
+    setIsSubmitting(true);
+    try {
+      const effectiveRole = Capacitor.isNativePlatform() ? 'employee' : role;
+      let deviceId = undefined;
+      if (Capacitor.isNativePlatform()) {
+        try {
+          deviceId = await getDeviceUniqueId();
+        } catch (e) { console.warn('No se pudo obtener Device ID'); }
+      }
+      
+      try {
+        await registerMe(idToken, {
+          role: effectiveRole,
+          companyName: effectiveRole === 'admin' ? 'Mi Empresa' : undefined,
+          deviceId,
+        });
+      } catch (regErr) { }
+
+      if (deviceId) {
+        try {
+          await api.post('/api/v1/auth/bind-device', JSON.stringify({ deviceId }), { token: idToken });
+        } catch (bindErr) { }
+      }
+
+      const profile = await getMe(idToken);
+      setClientSession({ 
+        token: idToken, 
+        isAdmin: profile.role === 'admin' || profile.role === 'manager', 
+        localMode: false, 
+        profile 
+      });
+      
+      navigate(profile.role === 'admin' || profile.role === 'manager' ? '/admin' : '/dashboard');
+    } catch (err) {
+      console.error('Error finalizando login:', err);
+      setFormError('Error al completar el login. Inténtalo de nuevo.');
+    } finally {
+      setIsSubmitting(false);
+      setDebugStatus('');
+    }
+  };
+
   useEffect(() => {
     const existingSession = getClientSession();
     if (isLogin && existingSession?.token) {
@@ -108,7 +175,7 @@ export default function AuthPage({ mode }) {
   useEffect(() => {
     const checkRedirect = async () => {
       try {
-        const idToken = await handleGoogleRedirectResult();
+        const idToken = await handleRedirectResult();
         if (idToken) {
           setIsSubmitting(true);
           try {
@@ -203,10 +270,20 @@ export default function AuthPage({ mode }) {
 
     // Entorno real o local con formulario: autenticar con Firebase, registrar usuario en backend si hace falta y obtener perfil
     try {
-      const idToken = await signInAndGetIdToken(email.trim(), password.trim());
+      let idToken;
+      if (isLogin) {
+        idToken = await signInAndGetIdToken(email.trim(), password.trim());
+      } else {
+        idToken = await signUpAndGetIdToken(email.trim(), password.trim());
+      }
+
       // Intentar registrar en backend (si existe devolverá 409 y continuamos)
       try {
-        await registerMe(idToken, { role, companyName });
+        await registerMe(idToken, { 
+          role, 
+          companyName,
+          name: name || undefined 
+        });
       } catch (err) {
         // ignorar 409 usuario ya registrado u otros errores no fatales
       }
@@ -236,15 +313,27 @@ export default function AuthPage({ mode }) {
     
     setFormError('');
     setIsSubmitting(true);
+    setDebugStatus('Iniciando...');
+
+    // Salvavidas: Si en 10 segundos no ha pasado nada, liberamos el botón
+    const timeoutId = setTimeout(() => {
+      setIsSubmitting(false);
+      setFormError('La conexión con Google está tardando demasiado. Por favor, reintenta.');
+      setDebugStatus('');
+    }, 12000);
 
     try {
-      console.log('⚡ [AUTH-PAGE] Solicitando token a Google...');
-      const idToken = await signInWithGoogleAndGetIdToken();
+      setDebugStatus('Conectando con Google...');
+      const idToken = await signInWithGoogleAndGetIdToken(setDebugStatus);
+      clearTimeout(timeoutId);
       
       if (!idToken) {
+        setDebugStatus('');
         setIsSubmitting(false);
         return;
       }
+
+      setDebugStatus('Token recibido. Registrando en el sistema...');
 
       const effectiveRole = Capacitor.isNativePlatform() ? 'employee' : role;
       let deviceId = undefined;
@@ -280,6 +369,28 @@ export default function AuthPage({ mode }) {
     } catch (err) {
       console.error('❌ Error login Google:', err);
       setFormError(err.message || 'Error en acceso con Google');
+      setDebugStatus('');
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleForgotPassword = async () => {
+    if (!email) {
+      setFormError('Por favor, introduce tu correo electrónico primero.');
+      setErrors({ email: 'Requerido para restablecer' });
+      return;
+    }
+
+    setIsSubmitting(true);
+    setFormError('');
+
+    try {
+      await sendPasswordReset(email.trim());
+      setFormError('Se ha enviado un correo para restablecer tu contraseña.');
+    } catch (err) {
+      console.error('❌ Error reset password:', err);
+      setFormError(err.message || 'Error al enviar el correo de recuperación');
+    } finally {
       setIsSubmitting(false);
     }
   };
@@ -318,11 +429,21 @@ export default function AuthPage({ mode }) {
       <div className="tp-root" style={{ display: 'flex', minHeight: '100vh', background: 'var(--bg0)', color: 'var(--t0)', fontFamily: 'var(--ff-body)' }}>
         
         {/* ── Left Form Side ── */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '5vw 8vw', position: 'relative', maxWidth: 640, margin: '0 auto' }}>
+        <div style={{ 
+          flex: 1, 
+          display: 'flex', 
+          flexDirection: 'column', 
+          padding: 'clamp(20px, 5vw, 40px) clamp(16px, 8vw, 48px)',
+          paddingTop: 'calc(clamp(40px, 8vw, 60px) + env(safe-area-inset-top, 24px))',
+          paddingBottom: 'calc(clamp(20px, 5vw, 40px) + env(safe-area-inset-bottom, 20px))',
+          position: 'relative', 
+          maxWidth: 640, 
+          margin: '0 auto' 
+        }}>
           
           <button onClick={() => navigate('/')} className="tp-btn tp-btn-ghost" style={{ 
             display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 16px', borderRadius: 8, 
-            width: 'fit-content', marginBottom: 'auto', fontSize: 13
+            width: 'fit-content', marginBottom: '40px', fontSize: 13
           }}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
             Volver al inicio
@@ -448,7 +569,24 @@ export default function AuthPage({ mode }) {
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                   <label style={{ fontSize: 13, color: 'var(--t2)', fontWeight: 500 }}>Contraseña</label>
-                  {isLogin && <a href="#" onClick={(e) => e.preventDefault()} style={{ fontSize: 12, color: 'var(--mg)', textDecoration: 'none', fontWeight: 500 }}>¿Olvidaste tu contraseña?</a>}
+                  {isLogin && (
+                    <button 
+                      type="button" 
+                      onClick={handleForgotPassword} 
+                      style={{ 
+                        background: 'none', 
+                        border: 'none', 
+                        cursor: 'pointer', 
+                        padding: 0, 
+                        fontSize: 12, 
+                        color: 'var(--primary)', 
+                        fontWeight: 600,
+                        textDecoration: 'none'
+                      }}
+                    >
+                      ¿Olvidaste tu contraseña?
+                    </button>
+                  )}
                 </div>
                 <input 
                   id={AUTH_FIELD_IDS.password}
@@ -520,13 +658,29 @@ export default function AuthPage({ mode }) {
                 }}
               >
                 <svg width="20" height="20" viewBox="0 0 24 24">
-                  <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-                  <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-                  <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
-                  <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+                  <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                  <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                  <path fill="#FBBC05" d="M5.84 14.1c-.22-.66-.35-1.36-.35-2.1s.13-1.44.35-2.1V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l3.66-2.84z" />
+                  <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.66l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
                 </svg>
-                Continuar con Google
+                {isSubmitting ? 'Conectando...' : 'Continuar con Google'}
               </button>
+
+              {debugStatus && (
+                <div style={{ 
+                  marginTop: 12, 
+                  padding: '8px 12px', 
+                  background: 'rgba(59, 130, 246, 0.1)', 
+                  borderRadius: 8, 
+                  fontSize: 12, 
+                  color: '#3b82f6',
+                  textAlign: 'center',
+                  fontWeight: 500,
+                  border: '1px solid rgba(59, 130, 246, 0.2)'
+                }}>
+                  🔍 {debugStatus}
+                </div>
+              )}
 
 
             </form>

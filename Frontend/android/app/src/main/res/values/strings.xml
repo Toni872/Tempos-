@@ -4,4 +4,5 @@
     <string name="title_activity_main">Tempos</string>
     <string name="package_name">es.tempos.app</string>
     <string name="custom_url_scheme">es.tempos.app</string>
+    <string name="default_web_client_id">898534343258-ebk5amiu99gqbm900q8p5duiqg186mfh.apps.googleusercontent.com</string>
 </resources>

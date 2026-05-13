@@ -1,8 +1,11 @@
 import React from 'react';
 import { DeviceMobileCamera, DownloadSimple } from '@phosphor-icons/react';
 import { motion } from 'framer-motion';
+import { Capacitor } from '@capacitor/core';
 
 export default function FloatingDownloadBtn() {
+  if (Capacitor.isNativePlatform()) return null;
+
   return (
     <motion.button
       initial={{ opacity: 0, scale: 0.8, y: 20 }}

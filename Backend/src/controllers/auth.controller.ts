@@ -34,6 +34,14 @@ router.post(
       where: { uid: firebaseUser.uid },
     });
 
+    // DEBUG: Ver qué recibimos de Firebase
+    console.log("DEBUG [AUTH]: Firebase User Data ->", {
+      uid: firebaseUser.uid,
+      email: firebaseUser.email,
+      name: firebaseUser.name,
+      picture: firebaseUser.picture
+    });
+
     if (!user && firebaseUser.email) {
       // Comprobar si existe por Email (fue creado por un admin previamente)
       user = await userRepository.findOne({
@@ -48,6 +56,11 @@ router.post(
         if (firebaseUser.name && (!user.displayName || user.displayName === "Usuario" || user.displayName.includes("@"))) {
           user.displayName = firebaseUser.name;
         }
+
+        // Sincronizar siempre la foto de perfil más reciente de Google
+        if (firebaseUser.picture) {
+          user.photoURL = firebaseUser.picture;
+        }
         
         await userRepository.save(user);
 
@@ -57,6 +70,7 @@ router.post(
             uid: user.uid,
             email: user.email,
             displayName: user.displayName,
+            photoURL: user.photoURL,
           },
         });
         return;
@@ -120,6 +134,7 @@ router.post(
         uid: user.uid,
         email: user.email,
         displayName: user.displayName,
+        photoURL: user.photoURL,
       },
     });
   }),
@@ -145,6 +160,27 @@ router.get(
       res.status(404).json({ error: "Usuario no encontrado" });
       return;
     }
+
+    // --- AUTO-SYNC GOOGLE METADATA ---
+    // Si el usuario tiene el nombre genérico o no tiene foto, y el token de Firebase nos da mejores datos, actualizamos.
+    const firebaseUser = (req as any).firebaseUser;
+    let needsUpdate = false;
+
+    if (firebaseUser?.name && (!user.displayName || user.displayName === "Usuario" || user.displayName.includes("@"))) {
+      user.displayName = firebaseUser.name;
+      needsUpdate = true;
+    }
+
+    if (firebaseUser?.picture && (!user.photoURL || user.photoURL.includes("default-avatar"))) {
+      user.photoURL = firebaseUser.picture;
+      needsUpdate = true;
+    }
+
+    if (needsUpdate) {
+      await userRepository.save(user);
+      console.log(`✅ [AUTH] Perfil sincronizado para ${user.email} (${user.displayName})`);
+    }
+    // ---------------------------------
 
     res.json({
       uid: user.uid,

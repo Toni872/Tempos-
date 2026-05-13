@@ -772,14 +772,13 @@ export default function LandingPage() {
             style={{ textAlign: 'center', marginBottom: 34, marginTop: 100 }}
           >
             <span className="tp-label">Funcionalidades clave</span>
-            <h2 style={{ fontFamily: 'var(--ff-head)', fontSize: 42, fontWeight: 600, color: 'var(--t0)', marginBottom: 14, lineHeight: 1.15 }}>
+            <h2 style={{ fontFamily: 'var(--ff-head)', fontSize: 'clamp(28px, 5vw, 42px)', fontWeight: 600, color: 'var(--t0)', marginBottom: 14, lineHeight: 1.15 }}>
               Todo lo necesario para controlar la jornada
             </h2>
-            <p style={{ fontSize: 15.5, color: 'var(--t1)', lineHeight: 1.7, maxWidth: 760, margin: '0 auto', fontWeight: 300 }}>
+            <p style={{ fontSize: 'clamp(14px, 2vw, 15.5px)', color: 'var(--t1)', lineHeight: 1.7, maxWidth: 760, margin: '0 auto', fontWeight: 300 }}>
               Tempos combina software de control horario, gestión de equipo y cumplimiento legal en tres módulos conectados para que no dependas de hojas de cálculo ni procesos manuales.
             </p>
           </motion.div>
-
           <motion.div 
             style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}
             initial="hidden"
@@ -823,7 +822,7 @@ export default function LandingPage() {
       </section>
 
       {/* ── Target profiles ── */}
-      <section className="tp-section-surface" aria-label="Para quién es Tempos" style={{ padding: '0 48px 96px', position: 'relative', zIndex: 1 }}>
+      <section className="tp-section-surface" aria-label="Para quién es Tempos" style={{ padding: '0 clamp(18px,4vw,48px) clamp(56px,7vw,96px)', position: 'relative', zIndex: 1 }}>
         <div style={{ maxWidth: 1180, margin: '0 auto' }}>
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
@@ -832,10 +831,10 @@ export default function LandingPage() {
             style={{ textAlign: 'center', marginBottom: 34 }}
           >
             <span className="tp-label">Tipos de empresa</span>
-            <h2 style={{ fontFamily: 'var(--ff-head)', fontSize: 40, fontWeight: 600, color: 'var(--t0)', marginBottom: 12 }}>
+            <h2 style={{ fontFamily: 'var(--ff-head)', fontSize: 'clamp(26px, 4.5vw, 40px)', fontWeight: 600, color: 'var(--t0)', marginBottom: 12 }}>
               Adaptado a distintas formas de trabajo
             </h2>
-            <p style={{ fontSize: 15, color: 'var(--t1)', lineHeight: 1.7, maxWidth: 760, margin: '0 auto', fontWeight: 300 }}>
+            <p style={{ fontSize: 'clamp(14px, 2vw, 15px)', color: 'var(--t1)', lineHeight: 1.7, maxWidth: 760, margin: '0 auto', fontWeight: 300 }}>
               Desde autónomos hasta pymes con varios turnos o centros: Tempos se adapta a la operativa real y reduce el tiempo dedicado al control de jornada.
             </p>
           </motion.div>

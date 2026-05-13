@@ -16,6 +16,13 @@ Sentry.init({
   replaysOnErrorSampleRate: 1.0,
 });
 
+import { SplashScreen } from '@capacitor/splash-screen';
+
+// Ocultar Splash Screen lo antes posible
+if (typeof window !== 'undefined') {
+  SplashScreen.hide().catch(() => {});
+}
+
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <BrowserRouter future={{ v7_relativeSplatPath: true, v7_startTransition: true }}>
