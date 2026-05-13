@@ -26,8 +26,15 @@ function getApiBaseUrl() {
   }
   
   if (Capacitor.isNativePlatform()) {
-    console.log('⚡ [API] Modo Nativo detectado. Usando Producción:', PROD_API);
-    return PROD_API;
+    // En desarrollo, usamos la IP local de tu PC para que el móvil pueda conectar
+    const LOCAL_IP = '192.168.1.14'; 
+    const isDev = !PROD_API.includes('railway.app'); // Simplificado para detectar entorno
+    
+    // Si estamos en desarrollo (o queremos probar local en el móvil), usamos la IP
+    const target = (process.env.NODE_ENV === 'production') ? PROD_API : `http://${LOCAL_IP}:8081`;
+    
+    console.log(`⚡ [API] Modo Nativo detectado. Conectando a: ${target}`);
+    return target;
   }
   
   console.log('🌐 [API] Modo Web detectado. Usando:', DEFAULT_LOCAL_API);

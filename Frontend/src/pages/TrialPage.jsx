@@ -155,12 +155,32 @@ export default function TrialPage() {
         </Link>
       </header>
 
-      <div style={{ display: 'flex', minHeight: '100vh', paddingTop: 100 }}>
+      <div style={{ 
+        display: 'flex', 
+        flexDirection: window.innerWidth < 1024 ? 'column' : 'row',
+        minHeight: '100vh', 
+        paddingTop: 100 
+      }}>
         {/* Lado Izquierdo: Formulario */}
-        <div style={{ flex: 1, padding: '60px 8%', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-          <div style={{ maxWidth: 500 }}>
-            <h1 style={{ fontFamily: 'var(--ff-head)', fontSize: 44, fontWeight: 600, letterSpacing: -1, marginBottom: 20 }}>Solicita tu prueba gratis de 14 días</h1>
-            <p style={{ color: 'var(--t1)', fontSize: 16, lineHeight: 1.6, marginBottom: 40 }}>
+        <div style={{ 
+          flex: 1, 
+          padding: 'clamp(32px, 6vw, 60px) clamp(18px, 5vw, 8%)', 
+          display: 'flex', 
+          flexDirection: 'column', 
+          justifyContent: 'center' 
+        }}>
+          <div style={{ maxWidth: 500, margin: window.innerWidth < 1024 ? '0 auto' : '0' }}>
+            <h1 style={{ 
+              fontFamily: 'var(--ff-head)', 
+              fontSize: 'clamp(32px, 5vw, 44px)', 
+              fontWeight: 600, 
+              letterSpacing: -1, 
+              marginBottom: 20,
+              lineHeight: 1.1
+            }}>
+              Solicita tu prueba gratis de 14 días
+            </h1>
+            <p style={{ color: 'var(--t1)', fontSize: 'clamp(14.5px, 2vw, 16px)', lineHeight: 1.6, marginBottom: 40 }}>
               Experimenta el futuro del control horario sin compromiso. Únete a la élite empresarial que ya optimiza su gestión de personal con Tempos. 14 días de acceso total para transformar tu cumplimiento legal en una ventaja competitiva de alto rendimiento.
             </p>
 
@@ -171,7 +191,11 @@ export default function TrialPage() {
                 </div>
               )}
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+              <div style={{ 
+                display: 'grid', 
+                gridTemplateColumns: window.innerWidth < 640 ? '1fr' : '1fr 1fr', 
+                gap: 20 
+              }}>
                 <div>
                   <label style={{ display: 'block', fontSize: 13, color: 'var(--t2)', marginBottom: 8 }}>Empresa*</label>
                   <input id={TRIAL_FIELD_IDS.company} name="company" value={formData.company} onChange={handleChange} type="text" autoComplete="organization" aria-invalid={!!errors.company} aria-describedby={errors.company ? 'trial-company-error' : undefined} style={getTrialInputStyle(!!errors.company)} placeholder="Tu empresa S.L." />
@@ -184,7 +208,11 @@ export default function TrialPage() {
                 </div>
               </div>
               
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+              <div style={{ 
+                display: 'grid', 
+                gridTemplateColumns: window.innerWidth < 640 ? '1fr' : '1fr 1fr', 
+                gap: 20 
+              }}>
                 <div>
                   <label style={{ display: 'block', fontSize: 13, color: 'var(--t2)', marginBottom: 8 }}>Nombre*</label>
                   <input id={TRIAL_FIELD_IDS.firstName} name="firstName" value={formData.firstName} onChange={handleChange} type="text" autoComplete="given-name" aria-invalid={!!errors.firstName} aria-describedby={errors.firstName ? 'trial-firstName-error' : undefined} style={getTrialInputStyle(!!errors.firstName)} placeholder="Jane" />
@@ -205,7 +233,7 @@ export default function TrialPage() {
 
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 10 }}>
                 <input id={TRIAL_FIELD_IDS.acceptedPrivacy} type="checkbox" name="acceptedPrivacy" checked={formData.acceptedPrivacy} onChange={handleChange} aria-invalid={!!errors.acceptedPrivacy} aria-describedby={errors.acceptedPrivacy ? 'trial-privacy-error' : undefined} style={{ width: 18, height: 18, accentColor: 'var(--mg)', cursor: 'pointer' }} />
-                <label htmlFor="privacy" style={{ fontSize: 13, color: 'var(--t2)', cursor: 'pointer' }}>
+                <label htmlFor={TRIAL_FIELD_IDS.acceptedPrivacy} style={{ fontSize: 13, color: 'var(--t2)', cursor: 'pointer' }}>
                   He leído y acepto la <a href="#" onClick={(e) => e.preventDefault()} style={{ color: 'var(--mg)', textDecoration: 'none' }}>Política de Privacidad</a>
                 </label>
               </div>
@@ -224,9 +252,18 @@ export default function TrialPage() {
         </div>
 
         {/* Lado Derecho: Contenido Persuasivo */}
-        <div style={{ flex: 1, background: 'var(--bg1)', padding: '60px 8%', display: 'flex', flexDirection: 'column', justifyContent: 'center', borderLeft: '1px solid var(--border)' }}>
-          <div style={{ maxWidth: 500 }}>
-            <h2 style={{ fontFamily: 'var(--ff-head)', fontSize: 24, fontWeight: 600, marginBottom: 24 }}>¿Por qué elegir Tempos?</h2>
+        <div style={{ 
+          flex: 1, 
+          background: 'var(--bg1)', 
+          padding: 'clamp(32px, 6vw, 60px) clamp(18px, 5vw, 8%)', 
+          display: 'flex', 
+          flexDirection: 'column', 
+          justifyContent: 'center', 
+          borderLeft: window.innerWidth < 1024 ? 'none' : '1px solid var(--border)',
+          borderTop: window.innerWidth < 1024 ? '1px solid var(--border)' : 'none'
+        }}>
+          <div style={{ maxWidth: 500, margin: window.innerWidth < 1024 ? '0 auto' : '0' }}>
+            <h2 style={{ fontFamily: 'var(--ff-head)', fontSize: 'clamp(20px, 4vw, 24px)', fontWeight: 600, marginBottom: 24 }}>¿Por qué elegir Tempos?</h2>
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
               <FeatureItem title="Fichaje sin fricciones" desc="Facilita el fichaje a tus empleados desde app móvil o QR, eliminando errores y pérdidas de tiempo." />
@@ -235,7 +272,7 @@ export default function TrialPage() {
               <FeatureItem title="Gestión Centralizada" desc="Controla horarios, ausencias y proyectos desde una intranet potente e intuitiva." />
             </div>
 
-            <div style={{ marginTop: 60, padding: 24, borderRadius: 20, background: 'rgba(232,0,125,0.05)', border: '1px solid rgba(232,0,125,0.2)' }}>
+            <div style={{ marginTop: 60, padding: 24, borderRadius: 20, background: 'rgba(37,99,235,0.05)', border: '1px solid rgba(37,99,235,0.2)' }}>
               <p style={{ fontSize: 14, color: 'var(--t1)', lineHeight: 1.6, fontStyle: 'italic' }}>
                 "Si no te convence Tempos, podrás dejar de utilizar la herramienta en cualquier momento, sin compromiso ni costes ocultos. Estamos aquí para ayudarte a crecer."
               </p>

@@ -168,9 +168,9 @@ body { background: var(--bg0); }
 /* ── Navbar ── */
 .tp-nav {
   position: fixed; top: 0; left: 0; right: 0; z-index: 200;
-  height: 58px;
+  height: calc(58px + env(safe-area-inset-top, 0px));
   display: flex; align-items: center; justify-content: space-between;
-  padding: 0 48px;
+  padding: env(safe-area-inset-top, 0px) max(48px, env(safe-area-inset-right, 48px)) 0 max(48px, env(safe-area-inset-left, 48px));
   background: rgba(20,20,20,0.82);
   -webkit-backdrop-filter: blur(24px) saturate(1.4);
   backdrop-filter: blur(24px) saturate(1.4);

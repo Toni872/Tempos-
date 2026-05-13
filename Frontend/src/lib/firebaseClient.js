@@ -8,6 +8,8 @@ import {
   signInWithRedirect,
   getRedirectResult,
   signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  sendPasswordResetEmail,
   signOut,
   browserPopupRedirectResolver,
   indexedDBLocalPersistence,
@@ -31,45 +33,64 @@ export async function signInAndGetIdToken(email, password) {
   return userCredential.user.getIdToken();
 }
 
-export const signInWithGoogleAndGetIdToken = async () => {
-  // ESTRATEGIA NATIVA (Android/iOS)
-  if (Capacitor.isNativePlatform()) {
+export async function signUpAndGetIdToken(email, password) {
+  const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+  return userCredential.user.getIdToken();
+}
+
+export const signInWithGoogleAndGetIdToken = async (onStatusUpdate) => {
+  // VOLVEMOS A NATIVO (Es lo único que no pierde la memoria en móvil)
+  const forceWeb = false; 
+  
+  if (Capacitor.isNativePlatform() && !forceWeb) {
     try {
-      console.log('⚡ [AUTH] Iniciando Google NATIVO...');
+      if (onStatusUpdate) onStatusUpdate('Despertando a Google...');
       
-      // La librería capawesome usa CredentialManager en Android. No necesita parámetros webClientId aquí.
-      const result = await FirebaseAuthentication.signInWithGoogle();
+      // Intentamos el login nativo con un tiempo de espera interno
+      const nativePromise = FirebaseAuthentication.signInWithGoogle({
+        webClientId: '898534343258-ebk5amiu99gqbm900q8p5duiqg186mfh.apps.googleusercontent.com'
+      });
+
+      const result = await nativePromise;
       
-      // Si el login es exitoso, la librería sincroniza automáticamente con Firebase.
-      // Obtenemos el token directamente de la sesión autenticada.
+      if (onStatusUpdate) onStatusUpdate('Token recibido. Finalizando...');
       const tokenResult = await FirebaseAuthentication.getIdToken();
       return tokenResult.token;
       
     } catch (error) {
-      console.error('❌ [AUTH] Error Nativo CRÍTICO:', error);
-      
-      // Mostramos el error exacto para saber qué falta en la consola de Google.
-      alert(`ERROR NATIVO DE GOOGLE:\n${error.message || JSON.stringify(error)}`);
-      return null;
+      console.error('❌ [AUTH] Error Nativo:', error);
+      if (onStatusUpdate) onStatusUpdate('Modo nativo falló. Probando modo web...');
+      // Si falla lo nativo, dejamos que siga al bloque WEB de abajo
     }
   }
 
-  // ESTRATEGIA WEB (Navegador Desktop)
-  console.log('⚡ [AUTH] Iniciando Google WEB');
+  // ESTRATEGIA WEB (Navegador Desktop o Fallback forzado)
+  if (onStatusUpdate) onStatusUpdate('Abriendo Google en navegador...');
+  console.log('⚡ [AUTH] Iniciando Google REDIRECT (Fail-safe)');
+  
   const provider = new GoogleAuthProvider();
   provider.setCustomParameters({ prompt: 'select_account' });
 
   try {
-    const result = await signInWithPopup(auth, provider);
-    return await result.user.getIdToken();
+    // En móvil, la redirección es mucho más fiable que el popup
+    if (Capacitor.isNativePlatform()) {
+      await signInWithRedirect(auth, provider);
+      // El código se detiene aquí porque la app se redirige. 
+      // Al volver, el token se recupera en el observador de estado.
+      return null; 
+    } else {
+      const result = await signInWithPopup(auth, provider);
+      return await result.user.getIdToken();
+    }
   } catch (error) {
-    console.error('❌ [AUTH] Error Web:', error);
-    alert('Error al entrar con Google: ' + error.message);
+    console.error('❌ [AUTH] Error Google Redirect/Popup:', error);
+    if (onStatusUpdate) onStatusUpdate('Error: ' + (error.message || 'Desconocido'));
     return null;
   }
 };
 
-export const handleGoogleRedirectResult = async () => {
+// Función para recuperar el resultado después de una redirección (útil para móvil)
+export const handleRedirectResult = async () => {
   try {
     const result = await getRedirectResult(auth);
     if (result) {
@@ -77,13 +98,27 @@ export const handleGoogleRedirectResult = async () => {
     }
     return null;
   } catch (error) {
-    console.error('❌ [AUTH] Error en retorno:', error);
+    console.error('Error recuperando resultado de redirección:', error);
     return null;
   }
 };
 
+
 export async function logout() {
   await signOut(auth);
 }
+
+/**
+ * Envía un correo de restablecimiento de contraseña
+ */
+export const sendPasswordReset = async (email) => {
+  try {
+    await sendPasswordResetEmail(auth, email);
+    return true;
+  } catch (error) {
+    console.error('❌ [AUTH] Error al enviar reset:', error);
+    throw error;
+  }
+};
 
 export { auth };

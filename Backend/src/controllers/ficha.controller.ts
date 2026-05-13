@@ -79,6 +79,8 @@ async function validateWorkPolicy(params: {
   }
 
   // 3. Antifraude Dispositivo — Siempre activo
+  const isDev = process.env.NODE_ENV === "development";
+  
   if (deviceId) {
     if (!user.authorizedDeviceId && actionType === "clock-in") {
       // Primer fichaje: vincular dispositivo automáticamente
@@ -86,8 +88,15 @@ async function validateWorkPolicy(params: {
       await AppDataSource.getRepository(User).save(user);
       logger.info(`[DEVICE-BIND] Dispositivo vinculado automáticamente para ${user.uid}: ${deviceId.substring(0, 8)}...`);
     } else if (user.authorizedDeviceId && user.authorizedDeviceId !== deviceId) {
-      logger.warn(`[DEVICE-FRAUD] Intento de fichaje desde dispositivo no autorizado. User: ${user.uid}, esperado: ${user.authorizedDeviceId.substring(0, 8)}..., recibido: ${deviceId.substring(0, 8)}...`);
-      throw new Error("Dispositivo no autorizado. Solo puedes fichar desde tu móvil vinculado.");
+      if (isDev) {
+        // En desarrollo, permitimos actualizar el dispositivo para no bloquear al usuario en sus pruebas
+        logger.info(`[DEVICE-REBIND-DEV] Actualizando dispositivo en modo desarrollo para ${user.uid}: ${deviceId.substring(0, 8)}...`);
+        user.authorizedDeviceId = deviceId;
+        await AppDataSource.getRepository(User).save(user);
+      } else {
+        logger.warn(`[DEVICE-FRAUD] Intento de fichaje desde dispositivo no autorizado. User: ${user.uid}, esperado: ${user.authorizedDeviceId.substring(0, 8)}..., recibido: ${deviceId.substring(0, 8)}...`);
+        throw new Error("Dispositivo no autorizado. Solo puedes fichar desde tu móvil vinculado.");
+      }
     }
   }
 }
