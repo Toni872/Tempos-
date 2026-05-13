@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  ArrowLeft,
+  X,
   House, 
   NavigationArrow, 
   UsersThree, 
@@ -349,79 +348,98 @@ const MANUAL_SECTIONS = [
   }
 ];
 
-export default function ManualPage() {
-  const navigate = useNavigate();
+export default function ManualUsuarioModal({ isOpen, onClose }) {
   const [activeSectionId, setActiveSectionId] = useState('inicio');
 
-  // Encontrar la sección activa para renderizarla
+  if (!isOpen) return null;
+
   const activeContent = MANUAL_SECTIONS.flatMap(c => c.items).find(i => i.id === activeSectionId)?.content;
 
   return (
-    <div className="min-h-screen bg-[#0a0a0c] text-white flex flex-col font-sans">
-      {/* Navbar Superior */}
-      <header className="h-[80px] border-b border-white/[0.05] bg-[#0d0d0f]/90 backdrop-blur-xl flex items-center justify-between px-8 sticky top-0 z-50">
-        <div className="flex items-center gap-6">
-          <button 
-            onClick={() => navigate('/dashboard')}
-            className="flex items-center gap-2 px-4 py-2.5 bg-white/5 hover:bg-white/10 rounded-xl transition-all font-semibold text-sm text-zinc-300 hover:text-white"
-          >
-            <ArrowLeft weight="bold" />
-            Volver a la Intranet
-          </button>
-          <div className="h-6 w-px bg-white/10 hidden sm:block" />
-          <Logo className="hidden sm:flex" />
-        </div>
-        <h1 className="text-xl font-black uppercase tracking-widest text-zinc-400">Manual de Instrucciones</h1>
-      </header>
+    <AnimatePresence>
+      <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 lg:p-8">
+        {/* Backdrop */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          onClick={onClose}
+          className="absolute inset-0 bg-black/60 backdrop-blur-md"
+        />
 
-      <div className="flex flex-1 overflow-hidden">
-        {/* Sidebar del Índice */}
-        <aside className="w-[320px] bg-[#0d0d0f] border-r border-white/[0.05] overflow-y-auto hidden lg:block p-6">
-          {MANUAL_SECTIONS.map((category, idx) => (
-            <div key={idx} className="mb-10">
-              <h4 className="text-xs font-black uppercase tracking-[0.2em] text-zinc-500 mb-4 px-2">
-                {category.category}
-              </h4>
-              <nav className="space-y-1">
-                {category.items.map((item) => {
-                  const Icon = item.icon;
-                  const isActive = activeSectionId === item.id;
-                  return (
-                    <button
-                      key={item.id}
-                      onClick={() => setActiveSectionId(item.id)}
-                      className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-left transition-all ${
-                        isActive 
-                          ? 'bg-blue-600/10 text-blue-400 border border-blue-500/20 shadow-inner' 
-                          : 'text-zinc-400 hover:bg-white/[0.02] hover:text-zinc-200 border border-transparent'
-                      }`}
-                    >
-                      <Icon size={20} weight={isActive ? "fill" : "regular"} />
-                      <span className="font-bold text-[15px]">{item.title}</span>
-                    </button>
-                  );
-                })}
-              </nav>
+        {/* Modal Window */}
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95, y: 20 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.95, y: 20 }}
+          transition={{ type: "spring", damping: 25, stiffness: 300 }}
+          className="relative w-full max-w-6xl h-[90vh] bg-[#0a0a0c] border border-white/10 rounded-2xl overflow-hidden shadow-2xl flex flex-col font-sans"
+        >
+          {/* Header */}
+          <header className="h-[70px] border-b border-white/[0.05] bg-[#0d0d0f]/90 flex items-center justify-between px-6 shrink-0">
+            <div className="flex items-center gap-4">
+              <Logo size="sm" />
+              <div className="h-6 w-px bg-white/10" />
+              <h1 className="text-sm font-black uppercase tracking-widest text-zinc-400">Manual de Instrucciones</h1>
             </div>
-          ))}
-        </aside>
-
-        {/* Contenido Principal */}
-        <main className="flex-1 bg-[#0a0a0c] overflow-y-auto p-8 lg:p-16 relative">
-          <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-blue-600/[0.03] blur-[150px] pointer-events-none rounded-full" />
-          
-          <div className="max-w-4xl mx-auto relative z-10">
-            <motion.div
-              key={activeSectionId}
-              initial={{ opacity: 0, y: 15 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4, ease: "easeOut" }}
+            <button
+              onClick={onClose}
+              className="w-10 h-10 rounded-xl bg-white/5 hover:bg-white/10 flex items-center justify-center text-zinc-400 hover:text-white transition-all"
             >
-              {activeContent}
-            </motion.div>
+              <X size={20} weight="bold" />
+            </button>
+          </header>
+
+          <div className="flex flex-1 overflow-hidden">
+            {/* Sidebar del Índice */}
+            <aside className="w-[300px] bg-[#0d0d0f] border-r border-white/[0.05] overflow-y-auto hidden lg:block p-6 shrink-0">
+              {MANUAL_SECTIONS.map((category, idx) => (
+                <div key={idx} className="mb-10">
+                  <h4 className="text-xs font-black uppercase tracking-[0.2em] text-zinc-500 mb-4 px-2">
+                    {category.category}
+                  </h4>
+                  <nav className="space-y-1">
+                    {category.items.map((item) => {
+                      const Icon = item.icon;
+                      const isActive = activeSectionId === item.id;
+                      return (
+                        <button
+                          key={item.id}
+                          onClick={() => setActiveSectionId(item.id)}
+                          className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-left transition-all ${
+                            isActive 
+                              ? 'bg-blue-600/10 text-blue-400 border border-blue-500/20 shadow-inner' 
+                              : 'text-zinc-400 hover:bg-white/[0.02] hover:text-zinc-200 border border-transparent'
+                          }`}
+                        >
+                          <Icon size={20} weight={isActive ? "fill" : "regular"} />
+                          <span className="font-bold text-[14px]">{item.title}</span>
+                        </button>
+                      );
+                    })}
+                  </nav>
+                </div>
+              ))}
+            </aside>
+
+            {/* Contenido Principal */}
+            <main className="flex-1 bg-[#0a0a0c] overflow-y-auto p-8 lg:p-16 relative">
+              <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-blue-600/[0.03] blur-[150px] pointer-events-none rounded-full" />
+              
+              <div className="max-w-4xl mx-auto relative z-10">
+                <motion.div
+                  key={activeSectionId}
+                  initial={{ opacity: 0, y: 15 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3, ease: "easeOut" }}
+                >
+                  {activeContent}
+                </motion.div>
+              </div>
+            </main>
           </div>
-        </main>
+        </motion.div>
       </div>
-    </div>
+    </AnimatePresence>
   );
 }

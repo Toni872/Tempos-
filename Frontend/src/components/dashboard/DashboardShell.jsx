@@ -24,6 +24,7 @@ import {
 import UserMenu from '@/components/UserMenu';
 import Logo from '@/components/ui/Logo';
 import { cn } from '@/lib/utils';
+import ManualUsuarioModal from '@/components/dashboard/ManualUsuarioModal';
 
 const sidebarItems = [
   { group: 'General', items: [
@@ -57,6 +58,7 @@ export default function DashboardShell({
   children 
 }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isManualOpen, setIsManualOpen] = useState(false);
 
   const SidebarContent = ({ isMobile = false }) => (
     <>
@@ -106,7 +108,7 @@ export default function DashboardShell({
         })}
         <div className={cn("px-4 mt-2", isMobile ? "mb-6" : "mb-8")}>
           <button
-            onClick={() => window.open('/manual', '_blank')}
+            onClick={() => setIsManualOpen(true)}
             className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-[12px] uppercase tracking-wider transition-all shadow-[0_0_15px_rgba(37,99,235,0.3)] hover:shadow-[0_0_20px_rgba(37,99,235,0.5)] border border-blue-400/20"
           >
             <FileDoc className="w-[18px] h-[18px]" weight="bold" />
@@ -235,6 +237,11 @@ export default function DashboardShell({
           </>
         )}
       </AnimatePresence>
+
+      <ManualUsuarioModal 
+        isOpen={isManualOpen} 
+        onClose={() => setIsManualOpen(false)} 
+      />
     </div>
   );
 }

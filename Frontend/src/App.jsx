@@ -10,7 +10,6 @@ const TrialPage = lazy(() => import('@/pages/TrialPage'))
 const MarketingPage = lazy(() => import('@/pages/MarketingPage'))
 const PrivacyPolicy = lazy(() => import('@/pages/PrivacyPolicy'))
 const TermsOfService = lazy(() => import('@/pages/TermsOfService'))
-const ManualPage = lazy(() => import('@/pages/ManualPage'))
 import FloatingDownloadBtn from '@/components/ui/FloatingDownloadBtn'
 
 function App() {
@@ -80,7 +79,6 @@ function App() {
             <Route path="/trial" element={<PageWrapper><TrialPage /></PageWrapper>} />
             <Route path="/legal/privacidad" element={<PageWrapper><PrivacyPolicy /></PageWrapper>} />
             <Route path="/legal/terminos" element={<PageWrapper><TermsOfService /></PageWrapper>} />
-            <Route path="/manual" element={<PageWrapper><ManualPage /></PageWrapper>} />
           </Routes>
         </AnimatePresence>
       </Suspense>
