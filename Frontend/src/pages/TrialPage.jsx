@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import Logo from '@/components/ui/Logo';
+import { signUpAndGetIdToken } from '@/lib/firebaseClient';
+import { registerMe, getMe, setClientSession } from '@/lib/api';
 
 const PHONE_REGEX = /^[+]?[(]?[0-9\s-]{6,20}$/;
 const TRIAL_FIELD_IDS = {
@@ -9,6 +11,7 @@ const TRIAL_FIELD_IDS = {
   firstName: 'trial-firstName',
   lastName: 'trial-lastName',
   email: 'trial-email',
+  password: 'trial-password',
   acceptedPrivacy: 'trial-acceptedPrivacy'
 };
 
@@ -52,6 +55,7 @@ export default function TrialPage() {
     firstName: '',
     lastName: '',
     email: '',
+    password: '',
     phone: '',
     acceptedPrivacy: false
   });
@@ -108,6 +112,11 @@ export default function TrialPage() {
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailValue)) {
       nextErrors.email = 'Introduce un email profesional válido.';
     }
+    if (!formData.password) {
+      nextErrors.password = 'La contraseña es obligatoria.';
+    } else if (formData.password.length < 8) {
+      nextErrors.password = 'Debe tener al menos 8 caracteres.';
+    }
     if (!formData.acceptedPrivacy) {
       nextErrors.acceptedPrivacy = 'Debes aceptar la política de privacidad para continuar.';
     }
@@ -115,7 +124,7 @@ export default function TrialPage() {
     return nextErrors;
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
     if (isSubmitting) {
@@ -143,7 +152,31 @@ export default function TrialPage() {
     setFormError('');
     setIsSubmitting(true);
 
-    navigate('/register', { state: { trial: true, email: formData.email.trim(), company: formData.company.trim() } });
+    try {
+      const idToken = await signUpAndGetIdToken(formData.email.trim(), formData.password);
+      if (!idToken) throw new Error('Error de validación o usuario ya existente.');
+
+      await registerMe(idToken, {
+        role: 'admin',
+        companyName: formData.company.trim(),
+        name: `${formData.firstName.trim()} ${formData.lastName.trim()}`,
+      });
+
+      const profile = await getMe(idToken);
+      setClientSession({
+        token: idToken,
+        isAdmin: true,
+        localMode: false,
+        profile
+      });
+
+      navigate('/dashboard', { replace: true });
+    } catch (err) {
+      console.error(err);
+      setFormError(err.message?.includes('already-in-use') ? 'Este email ya está registrado. Inicia sesión.' : (err.message || 'Hubo un error en el registro.'));
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -225,10 +258,21 @@ export default function TrialPage() {
                 </div>
               </div>
 
-              <div>
-                <label style={{ display: 'block', fontSize: 13, color: 'var(--t2)', marginBottom: 8 }}>Email profesional*</label>
-                <input id={TRIAL_FIELD_IDS.email} name="email" value={formData.email} onChange={handleChange} type="email" autoComplete="email" aria-invalid={!!errors.email} aria-describedby={errors.email ? 'trial-email-error' : undefined} style={getTrialInputStyle(!!errors.email)} placeholder="nombre@empresa.com" />
-                <ErrorText id="trial-email-error" message={errors.email} />
+              <div style={{ 
+                display: 'grid', 
+                gridTemplateColumns: window.innerWidth < 640 ? '1fr' : '1fr 1fr', 
+                gap: 20 
+              }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: 13, color: 'var(--t2)', marginBottom: 8 }}>Email profesional*</label>
+                  <input id={TRIAL_FIELD_IDS.email} name="email" value={formData.email} onChange={handleChange} type="email" autoComplete="email" aria-invalid={!!errors.email} aria-describedby={errors.email ? 'trial-email-error' : undefined} style={getTrialInputStyle(!!errors.email)} placeholder="nombre@empresa.com" />
+                  <ErrorText id="trial-email-error" message={errors.email} />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: 13, color: 'var(--t2)', marginBottom: 8 }}>Contraseña*</label>
+                  <input id={TRIAL_FIELD_IDS.password} name="password" value={formData.password} onChange={handleChange} type="password" aria-invalid={!!errors.password} aria-describedby={errors.password ? 'trial-password-error' : undefined} style={getTrialInputStyle(!!errors.password)} placeholder="Mín. 8 caracteres" />
+                  <ErrorText id="trial-password-error" message={errors.password} />
+                </div>
               </div>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 10 }}>

@@ -105,7 +105,9 @@
   position: fixed; top: 0; left: 0; right: 0; z-index: 200;
   height: auto;
   min-height: 78px;
-  display: flex; align-items: center; justify-content: space-between;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
   padding: env(safe-area-inset-top, 0px) clamp(18px, 4vw, 48px) 0;
   background: linear-gradient(180deg, rgba(16,16,16,0.94), rgba(16,16,16,0.82));
   -webkit-backdrop-filter: blur(24px) saturate(1.4);
@@ -682,7 +684,18 @@
    ═══════════════════════════════════════════════════════════ */
 
 /* ── Nav hamburger ── */
-.tp-nav-links  { display: flex; gap: 26px; align-items: center; }
+.tp-nav-links  { 
+  grid-column: 2;
+  display: flex; 
+  gap: 26px; 
+  align-items: center; 
+  justify-self: center;
+}
+.tp-nav-actions-placeholder {
+  grid-column: 3;
+  display: flex;
+  justify-content: flex-end;
+}
 .tp-nav-actions { display: flex; gap: 12px; align-items: center; }
 .tp-nav-actions .tp-btn {
   padding: 11px 16px;
@@ -768,8 +781,8 @@
 /* ── ≤960px (tablets y móviles grandes) ── */
 @media (max-width: 960px) {
   .tp-nav { 
-    top: 60px;
-    height: auto; 
+    display: flex;
+    justify-content: space-between;
     min-height: 74px; 
     padding: 12px 20px 0; 
   }
@@ -777,7 +790,7 @@
   .tp-brand-name { font-size: 18px; }
   .tp-brand-tag { font-size: 11px; }
   .tp-brand-proof { display: none; }
-  .tp-nav-links, .tp-nav-actions { display: none !important; }
+  .tp-nav-links { display: none !important; }
   .tp-nav-ham { display: flex !important; }
   .tp-grid-5 { grid-template-columns: repeat(2, 1fr); }
   .tp-grid-4 { grid-template-columns: repeat(2, 1fr); }

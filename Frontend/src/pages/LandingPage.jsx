@@ -349,12 +349,8 @@ export default function LandingPage() {
   };
 
   const scrollToSection = (id) => {
-    const el = document.getElementById(id);
-    if (el) {
-      withViewTransition(() => {
-        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      });
-    }
+    setActiveSection(id);
+    window.scrollTo({ top: 0, behavior: 'instant' });
     setNavOpen(false);
   };
 
@@ -395,30 +391,6 @@ export default function LandingPage() {
   }, []);
 
   useEffect(() => {
-    const sections = navItems
-      .map((item) => document.getElementById(item.id))
-      .filter(Boolean);
-
-    if (!sections.length) return undefined;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const visible = entries
-          .filter((entry) => entry.isIntersecting)
-          .sort((a, b) => b.intersectionRatio - a.intersectionRatio);
-
-        if (visible.length) {
-          setActiveSection(visible[0].target.id);
-        }
-      },
-      { root: null, rootMargin: '-36% 0px -48% 0px', threshold: [0.2, 0.4, 0.65] },
-    );
-
-    sections.forEach((section) => observer.observe(section));
-    return () => observer.disconnect();
-  }, []);
-
-  useEffect(() => {
     const onScroll = () => {
       const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
       const next = maxScroll > 0 ? (window.scrollY / maxScroll) * 100 : 0;
@@ -447,7 +419,7 @@ export default function LandingPage() {
     }
     : {
       navTrial: 'Prueba gratis',
-      heroPrimary: 'Solicitar prueba 14 días',
+      heroPrimary: 'PRUEBA GRATIS LA HERRAMIENTA',
       heroSecondary: 'Ver planes',
       midPrimary: 'Solicitar prueba',
       pricingPrimary: 'Empezar ahora',
@@ -467,7 +439,7 @@ export default function LandingPage() {
             <Logo />
           </button>
 
-          <span className="tp-brand-proof">Cumplimiento laboral verificado</span>
+          
         </div>
 
         <nav className="tp-nav-links" aria-label="Secciones" onMouseLeave={() => setHoveredSection(null)}>
@@ -511,14 +483,10 @@ export default function LandingPage() {
           ))}
         </nav>
 
-        <div className="tp-nav-actions hide-mob">
-          <Link to="/login" className="tp-btn tp-btn-ghost" {...bindPrefetch('/login')}>Entrar</Link>
-          <Link to="/trial" className="tp-btn tp-btn-primary" {...bindPrefetch('/trial')}>{ctaCopy.navTrial}</Link>
-        </div>
+        <div className="tp-nav-actions-placeholder" />
 
-        <div className="tp-nav-actions-mob show-mob">
-          <Link to="/login" className="tp-btn tp-btn-ghost tp-btn-sm" {...bindPrefetch('/login')}>Entrar</Link>
-          <Link to="/trial" className="tp-btn tp-btn-primary tp-btn-sm" {...bindPrefetch('/trial')}>Prueba gratis</Link>
+        <div className="tp-nav-actions hide-mob">
+          <Link to="/login" className="tp-btn tp-btn-primary" {...bindPrefetch('/login')}>ACCESO EMPRESA</Link>
         </div>
 
         <button className="tp-nav-ham" onClick={() => setNavOpen(true)} aria-label="Abrir menú móvil">
@@ -553,12 +521,15 @@ export default function LandingPage() {
         ))}
 
         <div className="tp-mob-nav-actions">
-          <Link to="/login" className="tp-btn tp-btn-ghost" onClick={() => setNavOpen(false)} {...bindPrefetch('/login')}>Entrar</Link>
-          <Link to="/trial" className="tp-btn tp-btn-primary" onClick={() => setNavOpen(false)} {...bindPrefetch('/trial')}>Prueba gratis</Link>
+          <Link to="/login" className="tp-btn tp-btn-primary" onClick={() => setNavOpen(false)} {...bindPrefetch('/login')}>ACCESO EMPRESA</Link>
         </div>
       </div>
 
-      <main id="contenido-principal">
+      <main id="contenido-principal" style={{ position: 'relative', overflow: 'hidden', minHeight: '100vh' }}>
+        <AnimatePresence mode="wait">
+          {activeSection === 'inicio' && (
+            <motion.div key="inicio" initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -15 }} transition={{ duration: 0.25 }}>
+
 
       {/* ── Hero ── */}
       <section id="inicio" aria-label="Software de control horario legal para empresas y autónomos en España" style={{
@@ -642,6 +613,11 @@ export default function LandingPage() {
         </div>
       </section>
 
+            </motion.div>
+          )}
+
+          {activeSection === 'producto' && (
+            <motion.div key="producto" initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -15 }} transition={{ duration: 0.25 }}>
       {/* ── Benefits ── */}
       <section className="tp-section-surface" id="producto" aria-label="Beneficios del software de control horario Tempos" style={{ padding: 'clamp(60px,8vw,110px) clamp(18px,4vw,48px)', position: 'relative', zIndex: 1 }}>
         <div style={{ maxWidth: 1180, margin: '0 auto' }}>
@@ -699,66 +675,6 @@ export default function LandingPage() {
               </motion.div>
             ))}
           </motion.div>
-        </div>
-      </section>
-
-      {/* ── Feature Showcase ── */}
-      <section className="tp-section-surface" id="proceso" aria-label="Imágenes del software de control horario Tempos en uso" style={{ padding: '0 clamp(18px,4vw,48px) clamp(56px,7vw,96px)', position: 'relative', zIndex: 1, borderTop: '1px solid var(--border)' }}>
-        <div style={{ maxWidth: 1180, margin: '0 auto' }}>
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.95 }}
-            whileInView={{ opacity: 1, scale: 1 }}
-            viewport={{ once: true }}
-            style={{ textAlign: 'center', marginBottom: 72, marginTop: 100 }}
-          >
-            <span className="tp-label">Software en acción</span>
-            <h2 style={{ fontFamily: 'var(--ff-head)', fontSize: 44, fontWeight: 600, color: 'var(--t0)', marginBottom: 14, lineHeight: 1.12 }}>
-              Diseñado para el trabajo real
-            </h2>
-            <p style={{ fontSize: 15.5, color: 'var(--t1)', maxWidth: 520, margin: '0 auto', lineHeight: 1.65, fontWeight: 300 }}>
-              Desde el fichaje diario hasta los informes de fin de mes: Tempos cubre cada punto del ciclo de gestión horaria.
-            </p>
-          </motion.div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'clamp(52px,7vw,88px)' }}>
-            {showcase.map((item, i) => (
-              <motion.div
-                key={item.title}
-                initial={{ opacity: 0, x: i % 2 === 0 ? -40 : 40 }}
-                whileInView={{ opacity: 1, x: 0 }}
-                viewport={{ once: true, margin: "-100px" }}
-                transition={{ duration: 0.8, ease: "easeOut" }}
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-                  gap: 'clamp(28px,5vw,64px)',
-                  alignItems: 'center',
-                }}
-              >
-                <div
-                  style={{
-                    order: i % 2 === 0 ? 0 : 1,
-                    borderRadius: 20, overflow: 'hidden',
-                    border: '1px solid var(--border)',
-                    position: 'relative', flexShrink: 0,
-                  }}
-                >
-                  <img
-                    src={item.img}
-                    alt={item.alt}
-                    style={{ width: '100%', height: 'clamp(220px,28vw,360px)', objectFit: 'cover', display: 'block' }}
-                    loading="lazy"
-                  />
-                  <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(10,10,10,0.32) 0%, transparent 55%)' }} aria-hidden="true" />
-                </div>
-                <div style={{ order: i % 2 === 0 ? 1 : 0 }}>
-                  <span className="tp-label" style={{ marginBottom: 16, display: 'inline-block' }}>{item.label}</span>
-                  <h3 style={{ fontFamily: 'var(--ff-head)', fontSize: 'clamp(22px,3vw,30px)', fontWeight: 600, color: 'var(--t0)', marginBottom: 16, lineHeight: 1.22, letterSpacing: -0.4 }}>{item.title}</h3>
-                  <p style={{ fontSize: 15, color: 'var(--t1)', lineHeight: 1.72, fontWeight: 300 }}>{item.desc}</p>
-                </div>
-              </motion.div>
-            ))}
-          </div>
         </div>
       </section>
 
@@ -867,6 +783,71 @@ export default function LandingPage() {
               </motion.div>
             ))}
           </motion.div>
+        </div>
+      </section>
+
+            </motion.div>
+          )}
+
+          {activeSection === 'proceso' && (
+            <motion.div key="proceso" initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -15 }} transition={{ duration: 0.25 }}>
+      {/* ── Feature Showcase ── */}
+      <section className="tp-section-surface" id="proceso" aria-label="Imágenes del software de control horario Tempos en uso" style={{ padding: '0 clamp(18px,4vw,48px) clamp(56px,7vw,96px)', position: 'relative', zIndex: 1, borderTop: '1px solid var(--border)' }}>
+        <div style={{ maxWidth: 1180, margin: '0 auto' }}>
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            whileInView={{ opacity: 1, scale: 1 }}
+            viewport={{ once: true }}
+            style={{ textAlign: 'center', marginBottom: 72, marginTop: 100 }}
+          >
+            <span className="tp-label">Software en acción</span>
+            <h2 style={{ fontFamily: 'var(--ff-head)', fontSize: 44, fontWeight: 600, color: 'var(--t0)', marginBottom: 14, lineHeight: 1.12 }}>
+              Diseñado para el trabajo real
+            </h2>
+            <p style={{ fontSize: 15.5, color: 'var(--t1)', maxWidth: 520, margin: '0 auto', lineHeight: 1.65, fontWeight: 300 }}>
+              Desde el fichaje diario hasta los informes de fin de mes: Tempos cubre cada punto del ciclo de gestión horaria.
+            </p>
+          </motion.div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'clamp(52px,7vw,88px)' }}>
+            {showcase.map((item, i) => (
+              <motion.div
+                key={item.title}
+                initial={{ opacity: 0, x: i % 2 === 0 ? -40 : 40 }}
+                whileInView={{ opacity: 1, x: 0 }}
+                viewport={{ once: true, margin: "-100px" }}
+                transition={{ duration: 0.8, ease: "easeOut" }}
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+                  gap: 'clamp(28px,5vw,64px)',
+                  alignItems: 'center',
+                }}
+              >
+                <div
+                  style={{
+                    order: i % 2 === 0 ? 0 : 1,
+                    borderRadius: 20, overflow: 'hidden',
+                    border: '1px solid var(--border)',
+                    position: 'relative', flexShrink: 0,
+                  }}
+                >
+                  <img
+                    src={item.img}
+                    alt={item.alt}
+                    style={{ width: '100%', height: 'clamp(220px,28vw,360px)', objectFit: 'cover', display: 'block' }}
+                    loading="lazy"
+                  />
+                  <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(10,10,10,0.32) 0%, transparent 55%)' }} aria-hidden="true" />
+                </div>
+                <div style={{ order: i % 2 === 0 ? 1 : 0 }}>
+                  <span className="tp-label" style={{ marginBottom: 16, display: 'inline-block' }}>{item.label}</span>
+                  <h3 style={{ fontFamily: 'var(--ff-head)', fontSize: 'clamp(22px,3vw,30px)', fontWeight: 600, color: 'var(--t0)', marginBottom: 16, lineHeight: 1.22, letterSpacing: -0.4 }}>{item.title}</h3>
+                  <p style={{ fontSize: 15, color: 'var(--t1)', lineHeight: 1.72, fontWeight: 300 }}>{item.desc}</p>
+                </div>
+              </motion.div>
+            ))}
+          </div>
         </div>
       </section>
 
@@ -1020,6 +1001,11 @@ export default function LandingPage() {
         </div>
       </section>
 
+            </motion.div>
+          )}
+
+          {activeSection === 'faqs' && (
+            <motion.div key="faqs" initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -15 }} transition={{ duration: 0.25 }}>
       {/* ── FAQs ── */}
       <section className="tp-section-surface" id="faqs" aria-label="Preguntas frecuentes sobre el software de control horario" style={{ padding: '0 clamp(18px,4vw,48px) clamp(56px,7vw,100px)', position: 'relative', zIndex: 1 }}>
         <div style={{ maxWidth: 980, margin: '0 auto' }}>
@@ -1124,6 +1110,11 @@ export default function LandingPage() {
         </motion.div>
       </section>
 
+            </motion.div>
+          )}
+
+          {activeSection === 'precios' && (
+            <motion.div key="precios" initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -15 }} transition={{ duration: 0.25 }}>
       {/* ── Pricing ── */}
       <section className="tp-section-surface" id="precios" aria-label="Precios de Tempos — Planes para autónomos y empresas" style={{
         padding: 'clamp(60px,8vw,120px) clamp(18px,4vw,48px) clamp(70px,9vw,140px)', borderTop: '1px solid var(--border)', overflow: 'hidden',
@@ -1282,6 +1273,9 @@ export default function LandingPage() {
         </motion.div>
       </section>
 
+            </motion.div>
+          )}
+        </AnimatePresence>
       </main>
 
       <footer role="contentinfo" style={{
