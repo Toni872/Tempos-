@@ -63,7 +63,7 @@ export class AnomalyService {
     const shiftByUser = new Map<string, (typeof allShifts)[0]>();
     for (const s of allShifts) shiftByUser.set(s.userId, s);
 
-    const fichasByUser = new Map<string, (typeof todayFichas)>();
+    const fichasByUser = new Map<string, typeof todayFichas>();
     for (const f of todayFichas) {
       const arr = fichasByUser.get(f.userId) ?? [];
       arr.push(f);

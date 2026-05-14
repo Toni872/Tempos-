@@ -391,7 +391,8 @@ export const scheduleSchema = z
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["endTime"],
-        message: "La hora de salida del Turno 1 debe ser posterior a la entrada.",
+        message:
+          "La hora de salida del Turno 1 debe ser posterior a la entrada.",
       });
     }
 
@@ -401,7 +402,8 @@ export const scheduleSchema = z
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["startTime2"],
-          message: "Para jornada partida, debes definir entrada y salida del Turno 2.",
+          message:
+            "Para jornada partida, debes definir entrada y salida del Turno 2.",
         });
         return;
       }
@@ -410,7 +412,8 @@ export const scheduleSchema = z
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["startTime2"],
-          message: "La entrada del Turno 2 debe ser posterior a la salida del Turno 1.",
+          message:
+            "La entrada del Turno 2 debe ser posterior a la salida del Turno 1.",
         });
       }
 
@@ -431,13 +434,15 @@ export const assignShiftSchema = z.object({
   endDate: dateStringSchema.optional(),
 });
 
-export const verifyPeriodSchema = z.object({
-  startDate: dateStringSchema,
-  endDate: dateStringSchema,
-}).refine(data => new Date(data.startDate) <= new Date(data.endDate), {
-  message: "startDate debe ser anterior o igual a endDate",
-  path: ["endDate"],
-});
+export const verifyPeriodSchema = z
+  .object({
+    startDate: dateStringSchema,
+    endDate: dateStringSchema,
+  })
+  .refine((data) => new Date(data.startDate) <= new Date(data.endDate), {
+    message: "startDate debe ser anterior o igual a endDate",
+    path: ["endDate"],
+  });
 
 export function buildValidationError(error: z.ZodError): {
   error: string;

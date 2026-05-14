@@ -11,14 +11,16 @@ import { Credential } from "../entities/Credential.js";
 
 const rpName = "Tempos HR";
 const rpID = process.env.RP_ID || "localhost";
-const origin = process.env.WEBAUTHN_ORIGIN ? process.env.WEBAUTHN_ORIGIN.split(',') : [
-  `http://localhost:5173`,
-  `http://localhost:5174`,
-  `http://127.0.0.1:5173`,
-  `http://127.0.0.1:5174`,
-  `http://${rpID}:5173`,
-  `http://${rpID}:5174`
-];
+const origin = process.env.WEBAUTHN_ORIGIN
+  ? process.env.WEBAUTHN_ORIGIN.split(",")
+  : [
+      `http://localhost:5173`,
+      `http://localhost:5174`,
+      `http://127.0.0.1:5173`,
+      `http://127.0.0.1:5174`,
+      `http://${rpID}:5173`,
+      `http://${rpID}:5174`,
+    ];
 
 export const getRegistrationOptions = async (
   req: Request,

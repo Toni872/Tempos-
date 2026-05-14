@@ -19,7 +19,7 @@ async function seedWorkCenter() {
     longitude: -3.7038,
     radiusMeters: 500,
     companyId: "tempos-demo",
-    status: "active"
+    status: "active",
   });
 
   await repo.save(center);
@@ -27,7 +27,7 @@ async function seedWorkCenter() {
   process.exit(0);
 }
 
-seedWorkCenter().catch(err => {
+seedWorkCenter().catch((err) => {
   console.error("❌ Error seeding work center:", err);
   process.exit(1);
 });

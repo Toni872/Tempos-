@@ -43,10 +43,7 @@ export class PdfService {
   // ─────────────────────────────────────────────────
   //  INFORME DE AUDITORÍA GPS
   // ─────────────────────────────────────────────────
-  static async generateAuditPDF(
-    res: Response,
-    data: AuditData,
-  ): Promise<void> {
+  static async generateAuditPDF(res: Response, data: AuditData): Promise<void> {
     const doc = new PDFDocument({
       margin: MARGIN,
       size: "A4",
@@ -89,11 +86,7 @@ export class PdfService {
 
     doc.pipe(res);
 
-    this.drawHeader(
-      doc,
-      data.companyName,
-      "REGISTRO DIARIO DE JORNADA",
-    );
+    this.drawHeader(doc, data.companyName, "REGISTRO DIARIO DE JORNADA");
 
     // Badge oficial
     const badgeY = doc.y - 5;
@@ -162,11 +155,7 @@ export class PdfService {
     const r = 16;
 
     // Círculo exterior
-    doc
-      .lineWidth(2)
-      .strokeColor(BRAND.primary)
-      .circle(cx, cy, r)
-      .stroke();
+    doc.lineWidth(2).strokeColor(BRAND.primary).circle(cx, cy, r).stroke();
 
     // Puntos cardinales (12, 3, 6, 9)
     const dots: [number, number][] = [
@@ -265,13 +254,13 @@ export class PdfService {
   /**
    * Bloque de información del empleado + resumen del periodo
    */
-  private static drawEmployeeInfo(
-    doc: PDFKit.PDFDocument,
-    data: AuditData,
-  ) {
+  private static drawEmployeeInfo(doc: PDFKit.PDFDocument, data: AuditData) {
     const y = doc.y;
 
-    doc.fillColor("#f9fafb").roundedRect(MARGIN, y, CONTENT_WIDTH, 60, 8).fill();
+    doc
+      .fillColor("#f9fafb")
+      .roundedRect(MARGIN, y, CONTENT_WIDTH, 60, 8)
+      .fill();
 
     // Columna izquierda: Empleado
     doc
@@ -390,8 +379,7 @@ export class PdfService {
       doc.text(row.total || "0.00h", cols[3].x, y, { width: cols[3].w });
 
       // Estado con color semántico
-      const statusText =
-        row.status === "confirmed" ? "VALIDADO" : "PENDIENTE";
+      const statusText = row.status === "confirmed" ? "VALIDADO" : "PENDIENTE";
       const statusColor =
         row.status === "confirmed" ? BRAND.success : BRAND.warning;
 
@@ -423,11 +411,7 @@ export class PdfService {
       .fillColor(BRAND.text)
       .fontSize(8)
       .font("Helvetica-Bold")
-      .text(
-        `${records.length} registros`,
-        MARGIN + 8,
-        y + 6,
-      );
+      .text(`${records.length} registros`, MARGIN + 8, y + 6);
 
     doc.y = y + 24;
   }
@@ -435,10 +419,7 @@ export class PdfService {
   /**
    * Bloque de firma del empleado
    */
-  private static drawSignatureBlock(
-    doc: PDFKit.PDFDocument,
-    data: AuditData,
-  ) {
+  private static drawSignatureBlock(doc: PDFKit.PDFDocument, data: AuditData) {
     // Asegurar que hay espacio suficiente, si no, nueva página
     if (doc.y > doc.page.height - 180) {
       doc.addPage();
@@ -513,8 +494,7 @@ export class PdfService {
       });
 
     const hash =
-      data.auditHash ||
-      `TX-${Date.now().toString(36).toUpperCase().slice(-8)}`;
+      data.auditHash || `TX-${Date.now().toString(36).toUpperCase().slice(-8)}`;
 
     doc
       .fillColor(BRAND.textMuted)

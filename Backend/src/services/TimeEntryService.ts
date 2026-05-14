@@ -100,19 +100,21 @@ export class TimeEntryService {
     userAgent?: string;
   }): Promise<Ficha> {
     const fichaRepo = AppDataSource.getRepository(Ficha);
-    
+
     const openFicha = await fichaRepo.findOne({
-      where: { userId: params.userId, endTime: IsNull() }
+      where: { userId: params.userId, endTime: IsNull() },
     });
-    
+
     // INGENIERÍA SENIOR: Idempotencia. Si ya hay una ficha abierta, no fallamos, la devolvemos.
     if (openFicha) {
-      logger.info(`[CLOCK-IN] El usuario ${params.userId} ya tenía una ficha activa. Devolviendo existente.`);
+      logger.info(
+        `[CLOCK-IN] El usuario ${params.userId} ya tenía una ficha activa. Devolviendo existente.`,
+      );
       return openFicha;
     }
 
-    const dateStr = params.timestamp.toISOString().split('T')[0];
-    const timeStr = params.timestamp.toTimeString().split(' ')[0].slice(0, 5);
+    const dateStr = params.timestamp.toISOString().split("T")[0];
+    const timeStr = params.timestamp.toTimeString().split(" ")[0].slice(0, 5);
 
     const ficha = fichaRepo.create({
       userId: params.userId,
@@ -121,8 +123,10 @@ export class TimeEntryService {
       status: "draft",
       projectCode: params.projectCode,
       metadata: {
-        location: params.location ? `${params.location.lat},${params.location.lng}` : undefined,
-      }
+        location: params.location
+          ? `${params.location.lat},${params.location.lng}`
+          : undefined,
+      },
     });
     await fichaRepo.save(ficha);
 
@@ -152,9 +156,10 @@ export class TimeEntryService {
   }): Promise<TimeEntry> {
     const fichaRepo = AppDataSource.getRepository(Ficha);
     const openFicha = await fichaRepo.findOne({
-      where: { userId: params.userId, endTime: IsNull() }
+      where: { userId: params.userId, endTime: IsNull() },
     });
-    if (!openFicha) throw new Error("No hay ninguna jornada activa para pausar.");
+    if (!openFicha)
+      throw new Error("No hay ninguna jornada activa para pausar.");
 
     return this.recordClockEvent({
       fichaId: openFicha.id,
@@ -179,9 +184,10 @@ export class TimeEntryService {
   }): Promise<TimeEntry> {
     const fichaRepo = AppDataSource.getRepository(Ficha);
     const openFicha = await fichaRepo.findOne({
-      where: { userId: params.userId, endTime: IsNull() }
+      where: { userId: params.userId, endTime: IsNull() },
     });
-    if (!openFicha) throw new Error("No hay ninguna jornada activa para reanudar.");
+    if (!openFicha)
+      throw new Error("No hay ninguna jornada activa para reanudar.");
 
     return this.recordClockEvent({
       fichaId: openFicha.id,
@@ -207,11 +213,12 @@ export class TimeEntryService {
     const fichaRepo = AppDataSource.getRepository(Ficha);
 
     const openFicha = await fichaRepo.findOne({
-      where: { userId: params.userId, endTime: IsNull() }
+      where: { userId: params.userId, endTime: IsNull() },
     });
-    if (!openFicha) throw new Error("No hay ninguna jornada activa para cerrar.");
+    if (!openFicha)
+      throw new Error("No hay ninguna jornada activa para cerrar.");
 
-    const timeStr = params.timestamp.toTimeString().split(' ')[0].slice(0, 5);
+    const timeStr = params.timestamp.toTimeString().split(" ")[0].slice(0, 5);
     openFicha.endTime = timeStr;
     openFicha.status = "confirmed";
 

@@ -8,7 +8,6 @@ import {
   Index,
 } from "typeorm";
 
-
 export type UserRole = "admin" | "manager" | "employee" | "auditor";
 
 @Entity("users")

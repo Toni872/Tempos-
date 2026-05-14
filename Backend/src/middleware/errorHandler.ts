@@ -13,7 +13,7 @@ export const errorHandler = (
   _next: NextFunction,
 ): void => {
   const isDev = process.env.NODE_ENV === "development";
-  
+
   // Log detallado solo en desarrollo
   if (isDev) {
     console.error("❌ [API ERROR]:", err);
@@ -28,7 +28,10 @@ export const errorHandler = (
     status = 400;
     message = "Error en la operación de base de datos.";
     code = "DB_QUERY_FAILED";
-    if (err.message.includes("duplicate key") || err.message.includes("UNIQUE constraint")) {
+    if (
+      err.message.includes("duplicate key") ||
+      err.message.includes("UNIQUE constraint")
+    ) {
       status = 409;
       message = "Ya existe un registro con esos datos.";
       code = "DUPLICATE_ENTRY";
@@ -41,7 +44,7 @@ export const errorHandler = (
     message = "Datos de entrada inválidos.";
     code = "VALIDATION_ERROR";
     res.status(status).json({
-      error: { message, code, details: err.issues || err.errors }
+      error: { message, code, details: err.issues || err.errors },
     });
     return;
   }
@@ -57,12 +60,12 @@ export const errorHandler = (
 };
 
 export const notFoundHandler = (req: Request, res: Response) => {
-  res.status(404).json({ 
+  res.status(404).json({
     error: {
       status: 404,
       code: "NOT_FOUND",
-      message: `Ruta no encontrada: ${req.method} ${req.url}`
-    }
+      message: `Ruta no encontrada: ${req.method} ${req.url}`,
+    },
   });
 };
 

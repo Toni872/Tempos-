@@ -15,7 +15,7 @@ import {
   listFichasQuerySchema,
   clockInSchema,
   clockOutSchema,
-  verifyPeriodSchema
+  verifyPeriodSchema,
 } from "../utils/validation.js";
 import { LocationService } from "../services/LocationService.js";
 import { getTimeEntryService } from "../services/TimeEntryService.js";
@@ -35,7 +35,11 @@ function resolveEffectiveNow(offlineTimestamp?: string) {
   if (offlineTimestamp) {
     const parsed = new Date(offlineTimestamp);
     const diffMs = Date.now() - parsed.getTime();
-    if (!isNaN(parsed.getTime()) && diffMs >= 0 && diffMs <= 48 * 60 * 60 * 1000) {
+    if (
+      !isNaN(parsed.getTime()) &&
+      diffMs >= 0 &&
+      diffMs <= 48 * 60 * 60 * 1000
+    ) {
       effectiveDate = parsed;
       isOffline = true;
     }
@@ -55,54 +59,87 @@ async function validateWorkPolicy(params: {
   actionType: "clock-in" | "clock-out" | "break";
 }) {
   const { user, companyId, location, qrToken, deviceId, actionType } = params;
-  
+
   // BYPASS FOR TESTERS
   if (user.uid.startsWith("test-")) {
-    logger.info(`[POLICY-BYPASS] Omitiendo validación de políticas para tester: ${user.uid}`);
+    logger.info(
+      `[POLICY-BYPASS] Omitiendo validación de políticas para tester: ${user.uid}`,
+    );
     return;
   }
 
   const workCenterRepo = AppDataSource.getRepository(WorkCenter);
 
   // 1. GPS
-  if (user.requiresGeolocation && (actionType === "clock-in" || actionType === "clock-out")) {
-    if (!location) throw new Error(`Ubicación GPS obligatoria para ${actionType}`);
-    const centers = await workCenterRepo.findBy({ companyId, status: "active" });
-    const isInside = centers.some((c: WorkCenter) => 
-      c.latitude && c.longitude && LocationService.isWithinRadius(
-        location, 
-        { lat: Number(c.latitude), lng: Number(c.longitude) }, 
-        c.radiusMeters
-      )
+  if (
+    user.requiresGeolocation &&
+    (actionType === "clock-in" || actionType === "clock-out")
+  ) {
+    if (!location)
+      throw new Error(`Ubicación GPS obligatoria para ${actionType}`);
+    const centers = await workCenterRepo.findBy({
+      companyId,
+      status: "active",
+    });
+    const isInside = centers.some(
+      (c: WorkCenter) =>
+        c.latitude &&
+        c.longitude &&
+        LocationService.isWithinRadius(
+          location,
+          { lat: Number(c.latitude), lng: Number(c.longitude) },
+          c.radiusMeters,
+        ),
     );
-    if (!isInside) throw new Error("Estás fuera del radio de un centro de trabajo autorizado.");
+    if (!isInside)
+      throw new Error(
+        "Estás fuera del radio de un centro de trabajo autorizado.",
+      );
   }
 
   // 2. QR
-  if (user.requiresQR && (actionType === "clock-in" || actionType === "clock-out")) {
+  if (
+    user.requiresQR &&
+    (actionType === "clock-in" || actionType === "clock-out")
+  ) {
     if (!qrToken) throw new Error("El escaneo de código QR es obligatorio.");
-    const wc = await workCenterRepo.findOneBy({ companyId, qrToken, status: "active" });
+    const wc = await workCenterRepo.findOneBy({
+      companyId,
+      qrToken,
+      status: "active",
+    });
     if (!wc) throw new Error("El código QR no es válido.");
   }
 
   // 3. Antifraude Dispositivo — Siempre activo
   const isDev = process.env.NODE_ENV === "development";
-  
+
   if (deviceId) {
     if (!user.authorizedDeviceId && actionType === "clock-in") {
       // Primer fichaje: vincular dispositivo automáticamente
       user.authorizedDeviceId = deviceId;
       await AppDataSource.getRepository(User).save(user);
-      logger.info(`[DEVICE-BIND] Dispositivo vinculado automáticamente para ${user.uid}: ${deviceId.substring(0, 8)}...`);
-    } else if (user.authorizedDeviceId && user.authorizedDeviceId !== deviceId) {
+      logger.info(
+        `[DEVICE-BIND] Dispositivo vinculado automáticamente para ${user.uid}: ${deviceId.substring(0, 8)}...`,
+      );
+    } else if (
+      user.authorizedDeviceId &&
+      user.authorizedDeviceId !== deviceId
+    ) {
       if (isDev) {
         // En desarrollo, permitimos actualizar el dispositivo para no bloquear al usuario en sus pruebas
-        logger.info(`[DEVICE-REBIND-DEV] Actualizando dispositivo en modo desarrollo para ${user.uid}: ${deviceId.substring(0, 8)}...`);
+        logger.info(
+          `[DEVICE-REBIND-DEV] Actualizando dispositivo en modo desarrollo para ${user.uid}: ${deviceId.substring(0, 8)}...`,
+        );
         user.authorizedDeviceId = deviceId;
         await AppDataSource.getRepository(User).save(user);
       } else {
-        logger.warn(`[DEVICE-FRAUD] Intento de fichaje desde dispositivo no autorizado. User: ${user.uid}, esperado: ${user.authorizedDeviceId.substring(0, 8)}..., recibido: ${deviceId.substring(0, 8)}...`);
-        throw new Error("Dispositivo no autorizado. Solo puedes fichar desde tu móvil vinculado.");
+        logger.warn(
+          `[DEVICE-FRAUD] Intento de fichaje desde dispositivo no autorizado. User: ${user.uid}, esperado: ${user.authorizedDeviceId.substring(0, 8)}..., recibido: ${deviceId.substring(0, 8)}...`,
+        );
+        throw new Error(
+          "Dispositivo no autorizado. Solo puedes fichar desde tu móvil vinculado.",
+        );
       }
     }
   }
@@ -125,7 +162,9 @@ router.post(
       return;
     }
 
-    const user = await AppDataSource.getRepository(User).findOneBy({ uid: auth.uid });
+    const user = await AppDataSource.getRepository(User).findOneBy({
+      uid: auth.uid,
+    });
     if (!user) {
       res.status(404).json({ error: "Usuario no encontrado" });
       return;
@@ -138,11 +177,13 @@ router.post(
         location: parsed.data.location,
         qrToken: parsed.data.qrToken,
         deviceId: parsed.data.deviceId,
-        actionType: "clock-in"
+        actionType: "clock-in",
       });
 
-      const { effectiveDate } = resolveEffectiveNow(parsed.data.offlineTimestamp);
-      
+      const { effectiveDate } = resolveEffectiveNow(
+        parsed.data.offlineTimestamp,
+      );
+
       // Intentamos usar el servicio de entradas
       const teService = getTimeEntryService();
       const ficha = await teService.clockIn({
@@ -152,19 +193,22 @@ router.post(
         location: parsed.data.location,
         projectCode: parsed.data.projectCode,
         ip: req.ip,
-        userAgent: req.headers["user-agent"]
+        userAgent: req.headers["user-agent"],
       });
 
       res.status(201).json({ message: "Entrada registrada", data: ficha });
     } catch (err: any) {
-      logger.error(`[CLOCK-IN ERROR]: ${err.message}`, { uid: auth.uid, companyId: auth.companyId });
-      res.status(err.message.includes("no encontrado") ? 404 : 403).json({ 
-        error: "Error al fichar", 
+      logger.error(`[CLOCK-IN ERROR]: ${err.message}`, {
+        uid: auth.uid,
+        companyId: auth.companyId,
+      });
+      res.status(err.message.includes("no encontrado") ? 404 : 403).json({
+        error: "Error al fichar",
         detail: err.message,
-        code: "POLICY_VIOLATION" 
+        code: "POLICY_VIOLATION",
       });
     }
-  })
+  }),
 );
 
 /**
@@ -182,7 +226,9 @@ router.post(
       return;
     }
 
-    const user = await AppDataSource.getRepository(User).findOneBy({ uid: auth.uid });
+    const user = await AppDataSource.getRepository(User).findOneBy({
+      uid: auth.uid,
+    });
     if (!user) {
       res.status(404).json({ error: "Usuario no encontrado" });
       return;
@@ -193,25 +239,29 @@ router.post(
         user,
         companyId: auth.companyId,
         location: parsed.data.location,
-        actionType: "clock-out"
+        actionType: "clock-out",
       });
 
-      const { effectiveDate } = resolveEffectiveNow(parsed.data.offlineTimestamp);
-      
+      const { effectiveDate } = resolveEffectiveNow(
+        parsed.data.offlineTimestamp,
+      );
+
       const teService = getTimeEntryService();
       const ficha = await teService.clockOut({
         userId: auth.uid,
         timestamp: effectiveDate,
         location: parsed.data.location,
-        ip: req.ip
+        ip: req.ip,
       });
 
       res.json({ message: "Salida registrada", data: ficha });
     } catch (err: any) {
       logger.error(`[CLOCK-OUT ERROR]: ${err.message}`, { uid: auth.uid });
-      res.status(err.message.includes("No hay ninguna") ? 404 : 403).json({ error: err.message });
+      res
+        .status(err.message.includes("No hay ninguna") ? 404 : 403)
+        .json({ error: err.message });
     }
-  })
+  }),
 );
 
 /**
@@ -224,22 +274,24 @@ router.post(
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const auth = getAuthContext(req);
     const parsed = clockInSchema.safeParse(req.body); // Reutilizamos esquema de clockIn
-    
+
     try {
-      const { effectiveDate } = resolveEffectiveNow(parsed.data?.offlineTimestamp);
+      const { effectiveDate } = resolveEffectiveNow(
+        parsed.data?.offlineTimestamp,
+      );
       const teService = getTimeEntryService();
       const event = await teService.breakStart({
         userId: auth.uid,
         timestamp: effectiveDate,
         location: parsed.data?.location,
-        ip: req.ip
+        ip: req.ip,
       });
 
       res.status(201).json({ message: "Pausa iniciada", data: event });
     } catch (err: any) {
       res.status(403).json({ error: err.message });
     }
-  })
+  }),
 );
 
 /**
@@ -252,22 +304,24 @@ router.post(
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const auth = getAuthContext(req);
     const parsed = clockInSchema.safeParse(req.body);
-    
+
     try {
-      const { effectiveDate } = resolveEffectiveNow(parsed.data?.offlineTimestamp);
+      const { effectiveDate } = resolveEffectiveNow(
+        parsed.data?.offlineTimestamp,
+      );
       const teService = getTimeEntryService();
       const event = await teService.breakEnd({
         userId: auth.uid,
         timestamp: effectiveDate,
         location: parsed.data?.location,
-        ip: req.ip
+        ip: req.ip,
       });
 
       res.status(201).json({ message: "Pausa finalizada", data: event });
     } catch (err: any) {
       res.status(403).json({ error: err.message });
     }
-  })
+  }),
 );
 
 /**
@@ -299,16 +353,23 @@ router.get(
     }
 
     if (startDate && endDate) {
-      qb.andWhere("ficha.date BETWEEN :start AND :end", { start: startDate, end: endDate });
+      qb.andWhere("ficha.date BETWEEN :start AND :end", {
+        start: startDate,
+        end: endDate,
+      });
     }
 
-    const [items, total] = await qb.orderBy("ficha.date", "DESC").take(limit).skip(offset).getManyAndCount();
+    const [items, total] = await qb
+      .orderBy("ficha.date", "DESC")
+      .take(limit)
+      .skip(offset)
+      .getManyAndCount();
 
-    res.json({ 
-      data: items, 
-      pagination: { total, limit, offset } 
+    res.json({
+      data: items,
+      pagination: { total, limit, offset },
     });
-  })
+  }),
 );
 
 /**
@@ -321,7 +382,7 @@ router.get(
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const auth = getAuthContext(req);
     const openFicha = await AppDataSource.getRepository(Ficha).findOne({
-      where: { userId: auth.uid, endTime: IsNull() }
+      where: { userId: auth.uid, endTime: IsNull() },
     });
 
     if (!openFicha) {
@@ -332,7 +393,7 @@ router.get(
     const teService = getTimeEntryService();
     const events = await teService.getFichaEvents(openFicha.id);
     res.json({ data: { ...openFicha, events } });
-  })
+  }),
 );
 
 /**
@@ -362,17 +423,29 @@ router.post(
     const fichasToLock = await fichaRepo
       .createQueryBuilder("ficha")
       .where("ficha.userId = :uid", { uid: auth.uid })
-      .andWhere("ficha.date BETWEEN :start AND :end", { start: startDate, end: endDate })
+      .andWhere("ficha.date BETWEEN :start AND :end", {
+        start: startDate,
+        end: endDate,
+      })
       .getMany();
 
     if (fichasToLock.length === 0) {
-      res.status(404).json({ error: "No se encontraron fichas en el periodo especificado." });
+      res
+        .status(404)
+        .json({
+          error: "No se encontraron fichas en el periodo especificado.",
+        });
       return;
     }
 
-    const hasOpen = fichasToLock.some(f => !f.endTime);
+    const hasOpen = fichasToLock.some((f) => !f.endTime);
     if (hasOpen) {
-      res.status(400).json({ error: "No puedes cerrar el periodo porque hay jornadas sin finalizar." });
+      res
+        .status(400)
+        .json({
+          error:
+            "No puedes cerrar el periodo porque hay jornadas sin finalizar.",
+        });
       return;
     }
 
@@ -383,17 +456,20 @@ router.post(
         ...(ficha.metadata || {}),
         verifiedAt: new Date().toISOString(),
         verifiedBy: auth.uid,
-        legalHash: crypto.createHash("sha256").update(`${ficha.id}-${ficha.hoursWorked}-${ficha.userId}`).digest("hex")
+        legalHash: crypto
+          .createHash("sha256")
+          .update(`${ficha.id}-${ficha.hoursWorked}-${ficha.userId}`)
+          .digest("hex"),
       };
     }
 
     await fichaRepo.save(fichasToLock);
 
-    res.json({ 
-      message: "Periodo verificado y bloqueado correctamente.", 
-      count: fichasToLock.length 
+    res.json({
+      message: "Periodo verificado y bloqueado correctamente.",
+      count: fichasToLock.length,
     });
-  })
+  }),
 );
 
 export default router;
