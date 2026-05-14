@@ -29,6 +29,8 @@ export async function appUserContextMiddleware(
         where: { uid: firebaseUser.uid },
       });
 
+      // INGENIERÍA SENIOR: Auto-registro o Migración de usuario si no existe en la DB local
+      if (!currentUser && firebaseUser.email) {
       // INGENIERÍA SENIOR: Auto-registro de usuario si no existe en la DB local
       if (!currentUser && firebaseUser.email) {
         console.log(
@@ -46,6 +48,7 @@ export async function appUserContextMiddleware(
           companyId: "tempos-demo",
         });
         await userRepo.save(currentUser);
+      }
       }
     }
 

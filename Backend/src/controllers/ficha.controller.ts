@@ -61,7 +61,7 @@ async function validateWorkPolicy(params: {
   const { user, companyId, location, qrToken, deviceId, actionType } = params;
 
   // BYPASS FOR TESTERS
-  if (user.uid.startsWith("test-")) {
+  if (user.uid.startsWith("test-") || user.uid.startsWith("dev-")) {
     logger.info(
       `[POLICY-BYPASS] Omitiendo validación de políticas para tester: ${user.uid}`,
     );
