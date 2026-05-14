@@ -39,7 +39,7 @@ router.post(
       uid: firebaseUser.uid,
       email: firebaseUser.email,
       name: firebaseUser.name,
-      picture: firebaseUser.picture
+      picture: firebaseUser.picture,
     });
 
     if (!user && firebaseUser.email) {
@@ -51,9 +51,14 @@ router.post(
         // Vincular el UID de Firebase al registro existente
         user.uid = firebaseUser.uid;
         user.emailVerified = firebaseUser.email_verified;
-        
+
         // Mejorar el nombre si venía por defecto o era un email
-        if (firebaseUser.name && (!user.displayName || user.displayName === "Usuario" || user.displayName.includes("@"))) {
+        if (
+          firebaseUser.name &&
+          (!user.displayName ||
+            user.displayName === "Usuario" ||
+            user.displayName.includes("@"))
+        ) {
           user.displayName = firebaseUser.name;
         }
 
@@ -61,7 +66,7 @@ router.post(
         if (firebaseUser.picture) {
           user.photoURL = firebaseUser.picture;
         }
-        
+
         await userRepository.save(user);
 
         res.status(200).json({
@@ -107,8 +112,12 @@ router.post(
     }
 
     // Vincular dispositivo si viene en el body (primer login nativo)
-    const deviceId = typeof bodyParams.deviceId === "string" ? bodyParams.deviceId.trim() : undefined;
-    const finalDisplayName = bodyParams.name || firebaseUser.name || firebaseUser.email || "Usuario";
+    const deviceId =
+      typeof bodyParams.deviceId === "string"
+        ? bodyParams.deviceId.trim()
+        : undefined;
+    const finalDisplayName =
+      bodyParams.name || firebaseUser.name || firebaseUser.email || "Usuario";
 
     // Crear nuevo usuario
     user = userRepository.create({
@@ -166,19 +175,29 @@ router.get(
     const firebaseUser = (req as any).firebaseUser;
     let needsUpdate = false;
 
-    if (firebaseUser?.name && (!user.displayName || user.displayName === "Usuario" || user.displayName.includes("@"))) {
+    if (
+      firebaseUser?.name &&
+      (!user.displayName ||
+        user.displayName === "Usuario" ||
+        user.displayName.includes("@"))
+    ) {
       user.displayName = firebaseUser.name;
       needsUpdate = true;
     }
 
-    if (firebaseUser?.picture && (!user.photoURL || user.photoURL.includes("default-avatar"))) {
+    if (
+      firebaseUser?.picture &&
+      (!user.photoURL || user.photoURL.includes("default-avatar"))
+    ) {
       user.photoURL = firebaseUser.picture;
       needsUpdate = true;
     }
 
     if (needsUpdate) {
       await userRepository.save(user);
-      console.log(`✅ [AUTH] Perfil sincronizado para ${user.email} (${user.displayName})`);
+      console.log(
+        `✅ [AUTH] Perfil sincronizado para ${user.email} (${user.displayName})`,
+      );
     }
     // ---------------------------------
 
@@ -290,7 +309,11 @@ router.post(
     const auth = getAuthContext(req);
     const { deviceId } = req.body;
 
-    if (!deviceId || typeof deviceId !== "string" || deviceId.trim().length < 8) {
+    if (
+      !deviceId ||
+      typeof deviceId !== "string" ||
+      deviceId.trim().length < 8
+    ) {
       res.status(400).json({ error: "ID de dispositivo inválido." });
       return;
     }
@@ -306,11 +329,15 @@ router.post(
     // Si ya tiene un dispositivo vinculado
     if (user.authorizedDeviceId) {
       if (user.authorizedDeviceId === deviceId.trim()) {
-        res.json({ status: "already_bound", message: "Este dispositivo ya está vinculado." });
+        res.json({
+          status: "already_bound",
+          message: "Este dispositivo ya está vinculado.",
+        });
       } else {
         res.status(403).json({
           error: "DEVICE_MISMATCH",
-          message: "Tu cuenta ya está vinculada a otro dispositivo. Contacta con tu administrador.",
+          message:
+            "Tu cuenta ya está vinculada a otro dispositivo. Contacta con tu administrador.",
         });
       }
       return;
@@ -322,7 +349,8 @@ router.post(
 
     res.json({
       status: "bound",
-      message: "Dispositivo vinculado correctamente. Solo podrás fichar desde este móvil.",
+      message:
+        "Dispositivo vinculado correctamente. Solo podrás fichar desde este móvil.",
     });
   }),
 );
@@ -339,18 +367,26 @@ router.post(
     const auth = getAuthContext(req);
 
     if (!auth.isPrivileged) {
-      res.status(403).json({ error: "Solo administradores pueden desvincular dispositivos." });
+      res
+        .status(403)
+        .json({
+          error: "Solo administradores pueden desvincular dispositivos.",
+        });
       return;
     }
 
     const { targetUid } = req.body;
     if (!targetUid) {
-      res.status(400).json({ error: "Debes especificar el UID del empleado (targetUid)." });
+      res
+        .status(400)
+        .json({ error: "Debes especificar el UID del empleado (targetUid)." });
       return;
     }
 
     const userRepository = AppDataSource.getRepository(User);
-    const targetUser = await userRepository.findOne({ where: { uid: targetUid, companyId: auth.companyId } });
+    const targetUser = await userRepository.findOne({
+      where: { uid: targetUid, companyId: auth.companyId },
+    });
 
     if (!targetUser) {
       res.status(404).json({ error: "Empleado no encontrado en tu empresa." });
@@ -360,7 +396,9 @@ router.post(
     targetUser.authorizedDeviceId = undefined;
     await userRepository.save(targetUser);
 
-    res.json({ message: `Dispositivo desvinculado para ${targetUser.displayName || targetUser.email}.` });
+    res.json({
+      message: `Dispositivo desvinculado para ${targetUser.displayName || targetUser.email}.`,
+    });
   }),
 );
 

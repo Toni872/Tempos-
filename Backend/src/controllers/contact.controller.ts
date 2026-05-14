@@ -65,12 +65,10 @@ router.post(
       }),
     );
 
-    res
-      .status(200)
-      .json({
-        ok: true,
-        message: "Solicitud recibida. Te responderemos en breve.",
-      });
+    res.status(200).json({
+      ok: true,
+      message: "Solicitud recibida. Te responderemos en breve.",
+    });
   }),
 );
 

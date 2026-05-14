@@ -23,7 +23,12 @@ const router = Router();
 
 function sanitizeCSVField(val: any) {
   const str = String(val);
-  if (str.startsWith("=") || str.startsWith("+") || str.startsWith("-") || str.startsWith("@")) {
+  if (
+    str.startsWith("=") ||
+    str.startsWith("+") ||
+    str.startsWith("-") ||
+    str.startsWith("@")
+  ) {
     return `'${str}`;
   }
   return str;
@@ -31,15 +36,19 @@ function sanitizeCSVField(val: any) {
 
 function auditLogsToCSV(rows: any[]): string {
   const header = "Fecha,Usuario,Acción,Metadatos\n";
-  const body = rows.map(r => {
-    const fields = [
-      r.createdAt,
-      r.userName,
-      r.action,
-      JSON.stringify(r.metadata).replace(/"/g, '""')
-    ].map(f => `"${sanitizeCSVField(f)}"`).join(",");
-    return fields;
-  }).join("\n");
+  const body = rows
+    .map((r) => {
+      const fields = [
+        r.createdAt,
+        r.userName,
+        r.action,
+        JSON.stringify(r.metadata).replace(/"/g, '""'),
+      ]
+        .map((f) => `"${sanitizeCSVField(f)}"`)
+        .join(",");
+      return fields;
+    })
+    .join("\n");
   return header + body;
 }
 
@@ -60,9 +69,11 @@ router.get(
       return;
     }
 
-    const insights = await AiAnalysisService.generatePredictiveAnalysis(auth.companyId);
+    const insights = await AiAnalysisService.generatePredictiveAnalysis(
+      auth.companyId,
+    );
     res.json({ insights });
-  })
+  }),
 );
 
 /**
@@ -82,7 +93,7 @@ router.get(
 
     const anomalies = await AnomalyService.getDailyAnomalies(auth.companyId);
     res.json({ data: anomalies });
-  })
+  }),
 );
 
 /**
@@ -108,27 +119,36 @@ router.get(
       .where("audit.companyId = :companyId", { companyId: auth.companyId });
 
     if (startDate && endDate) {
-      qb.andWhere("audit.createdAt BETWEEN :start AND :end", { start: startDate, end: endDate });
+      qb.andWhere("audit.createdAt BETWEEN :start AND :end", {
+        start: startDate,
+        end: endDate,
+      });
     }
 
-    const logs = await qb.orderBy("audit.createdAt", "DESC").take(100).getMany();
-    const rows = logs.map(l => ({
+    const logs = await qb
+      .orderBy("audit.createdAt", "DESC")
+      .take(100)
+      .getMany();
+    const rows = logs.map((l) => ({
       action: l.action,
       userName: (l as any).user?.displayName || l.userId,
       createdAt: l.createdAt,
-      metadata: l.metadata
+      metadata: l.metadata,
     }));
 
     if (format === "csv") {
       const csv = auditLogsToCSV(rows);
       res.setHeader("Content-Type", "text/csv; charset=utf-8");
-      res.setHeader("Content-Disposition", 'attachment; filename="auditoria.csv"');
+      res.setHeader(
+        "Content-Disposition",
+        'attachment; filename="auditoria.csv"',
+      );
       res.send("\uFEFF" + csv);
       return;
     }
 
     res.json({ data: rows });
-  })
+  }),
 );
 
 /**
@@ -149,46 +169,61 @@ router.get(
     const startOfToday = new Date();
     startOfToday.setHours(0, 0, 0, 0);
 
-    const employees = await AppDataSource.getRepository(User).find({ 
-      where: { companyId: auth.companyId, status: "active" } 
+    const employees = await AppDataSource.getRepository(User).find({
+      where: { companyId: auth.companyId, status: "active" },
     });
 
-    const employeeUids = employees.map(e => e.uid);
+    const employeeUids = employees.map((e) => e.uid);
 
     const [latestEntries, pendingAbsences] = await Promise.all([
-      AppDataSource.getRepository(TimeEntry).createQueryBuilder("te")
+      AppDataSource.getRepository(TimeEntry)
+        .createQueryBuilder("te")
         .innerJoin(User, "u", "u.uid = te.userId")
         .where("u.companyId = :companyId", { companyId: auth.companyId })
         .andWhere("te.timestampUtc >= :startOfToday", { startOfToday })
         .orderBy("te.timestampUtc", "DESC")
         .getMany(),
-      employeeUids.length > 0 ? AppDataSource.getRepository(Absence).count({ 
-        where: { status: "pending", userId: In(employeeUids) } 
-      }) : Promise.resolve(0)
+      employeeUids.length > 0
+        ? AppDataSource.getRepository(Absence).count({
+            where: { status: "pending", userId: In(employeeUids) },
+          })
+        : Promise.resolve(0),
     ]);
 
     const userStatusMap = new Map();
-    latestEntries.forEach(e => {
+    latestEntries.forEach((e) => {
       if (!userStatusMap.has(e.userId)) userStatusMap.set(e.userId, e.type);
     });
 
-    let working = 0, onBreak = 0;
-    const employeeStatusList = employees.map(e => {
+    let working = 0,
+      onBreak = 0;
+    const employeeStatusList = employees.map((e) => {
       const type = userStatusMap.get(e.uid);
-      let status = "Fuera de jornada", color = "zinc";
+      let status = "Fuera de jornada",
+        color = "zinc";
       if (type === TimeEntryType.CLOCK_IN || type === TimeEntryType.BREAK_END) {
-        status = "Trabajando"; color = "blue"; working++;
+        status = "Trabajando";
+        color = "blue";
+        working++;
       } else if (type === TimeEntryType.BREAK_START) {
-        status = "En pausa"; color = "orange"; onBreak++;
+        status = "En pausa";
+        color = "orange";
+        onBreak++;
       }
       return { uid: e.uid, name: e.displayName || e.email, status, color };
     });
 
     res.json({
-      metrics: { working, onBreak, outside: employees.length - working - onBreak, registered: employees.length, pendingAbsences },
-      employeeStatusList
+      metrics: {
+        working,
+        onBreak,
+        outside: employees.length - working - onBreak,
+        registered: employees.length,
+        pendingAbsences,
+      },
+      employeeStatusList,
     });
-  })
+  }),
 );
 
 /**
@@ -214,7 +249,10 @@ router.get(
       .where("user.companyId = :companyId", { companyId: auth.companyId });
 
     if (startDate && endDate) {
-      qb.andWhere("ficha.date BETWEEN :start AND :end", { start: startDate, end: endDate });
+      qb.andWhere("ficha.date BETWEEN :start AND :end", {
+        start: startDate,
+        end: endDate,
+      });
     }
 
     if (userId) {
@@ -225,7 +263,7 @@ router.get(
 
     // Generar CSV
     let csv = "Fecha,Empleado,Email,Entrada,Salida,Horas Totales,Estado\n";
-    fichas.forEach(f => {
+    fichas.forEach((f) => {
       const row = [
         f.date,
         (f as any).user?.displayName || "N/A",
@@ -233,15 +271,20 @@ router.get(
         f.startTime,
         f.endTime || "--:--",
         f.hoursWorked?.toFixed(2) || "0.00",
-        f.status
-      ].map(field => `"${sanitizeCSVField(field)}"`).join(",");
+        f.status,
+      ]
+        .map((field) => `"${sanitizeCSVField(field)}"`)
+        .join(",");
       csv += row + "\n";
     });
 
     res.setHeader("Content-Type", "text/csv; charset=utf-8");
-    res.setHeader("Content-Disposition", 'attachment; filename="registro_jornada.csv"');
+    res.setHeader(
+      "Content-Disposition",
+      'attachment; filename="registro_jornada.csv"',
+    );
     res.send("\uFEFF" + csv); // BOM para que Excel detecte UTF-8
-  })
+  }),
 );
 
 /**
@@ -262,7 +305,7 @@ router.get(
       where: { user: { companyId: auth.companyId } },
       relations: ["user"],
       order: { date: "DESC" },
-      take: 100
+      take: 100,
     });
 
     const firstUser = fichas[0]?.user;
@@ -270,22 +313,31 @@ router.get(
       employeeName: firstUser?.displayName || `Empresa ${auth.companyId}`,
       employeeEmail: firstUser?.email || "admin@tempos.es",
       companyName: auth.companyId,
-      period: new Date().toLocaleDateString('es-ES', { month: 'long', year: 'numeric' }),
-      totalHours: fichas.reduce((acc, f) => acc + Number(f.hoursWorked || 0), 0),
-      records: fichas.map(f => ({
+      period: new Date().toLocaleDateString("es-ES", {
+        month: "long",
+        year: "numeric",
+      }),
+      totalHours: fichas.reduce(
+        (acc, f) => acc + Number(f.hoursWorked || 0),
+        0,
+      ),
+      records: fichas.map((f) => ({
         date: f.date.toString(),
         clockIn: f.startTime,
         clockOut: f.endTime || "--:--",
         total: `${Number(f.hoursWorked || 0).toFixed(2)}h`,
         status: f.status,
         location: f.metadata?.location || undefined,
-      }))
+      })),
     };
 
     res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", 'attachment; filename="auditoria_gps.pdf"');
+    res.setHeader(
+      "Content-Disposition",
+      'attachment; filename="auditoria_gps.pdf"',
+    );
     await PdfService.generateAuditPDF(res, pdfData);
-  })
+  }),
 );
 
 /**
@@ -311,7 +363,10 @@ router.get(
       .where("user.companyId = :companyId", { companyId: auth.companyId });
 
     if (startDate && endDate) {
-      qb.andWhere("ficha.date BETWEEN :start AND :end", { start: startDate, end: endDate });
+      qb.andWhere("ficha.date BETWEEN :start AND :end", {
+        start: startDate,
+        end: endDate,
+      });
     }
 
     if (userId) {
@@ -321,25 +376,36 @@ router.get(
     const fichas = await qb.orderBy("ficha.date", "DESC").getMany();
 
     const pdfData = {
-      employeeName: userId ? (fichas[0] as any)?.user?.displayName || "Empleado" : "Reporte Agregado",
-      employeeEmail: userId ? (fichas[0] as any)?.user?.email || "—" : "multi-usuario",
+      employeeName: userId
+        ? (fichas[0] as any)?.user?.displayName || "Empleado"
+        : "Reporte Agregado",
+      employeeEmail: userId
+        ? (fichas[0] as any)?.user?.email || "—"
+        : "multi-usuario",
       companyName: auth.companyId,
-      period: startDate && endDate ? `${startDate} a ${endDate}` : "Periodo Actual",
-      totalHours: fichas.reduce((acc, f) => acc + Number(f.hoursWorked || 0), 0),
-      records: fichas.map(f => ({
+      period:
+        startDate && endDate ? `${startDate} a ${endDate}` : "Periodo Actual",
+      totalHours: fichas.reduce(
+        (acc, f) => acc + Number(f.hoursWorked || 0),
+        0,
+      ),
+      records: fichas.map((f) => ({
         date: f.date.toString(),
         clockIn: f.startTime,
         clockOut: f.endTime || "--:--",
         total: `${Number(f.hoursWorked || 0).toFixed(2)}h`,
         status: f.status,
         location: (f as any).metadata?.location || undefined,
-      }))
+      })),
     };
 
     res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", 'attachment; filename="registro_legal_jornada.pdf"');
+    res.setHeader(
+      "Content-Disposition",
+      'attachment; filename="registro_legal_jornada.pdf"',
+    );
     await PdfService.generateInspectionPDF(res, pdfData);
-  })
+  }),
 );
 
 export default router;

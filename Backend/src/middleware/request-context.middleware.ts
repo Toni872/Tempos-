@@ -31,7 +31,10 @@ export async function appUserContextMiddleware(
 
       // INGENIERÍA SENIOR: Auto-registro de usuario si no existe en la DB local
       if (!currentUser && firebaseUser.email) {
-        console.log("🆕 [CONTEXT] Auto-registrando usuario:", firebaseUser.email);
+        console.log(
+          "🆕 [CONTEXT] Auto-registrando usuario:",
+          firebaseUser.email,
+        );
         currentUser = userRepo.create({
           uid: firebaseUser.uid,
           email: firebaseUser.email,
@@ -40,7 +43,7 @@ export async function appUserContextMiddleware(
           status: "active",
           requiresGeolocation: false,
           requiresQR: false,
-          companyId: "tempos-demo"
+          companyId: "tempos-demo",
         });
         await userRepo.save(currentUser);
       }

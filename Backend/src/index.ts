@@ -37,20 +37,24 @@ const PORT = process.env.PORT || 8081;
 
 // ─── Middleware ────────────────────────────────────────────────────────────────
 
-app.use(helmet({
-  crossOriginResourcePolicy: { policy: "cross-origin" },
-  crossOriginOpenerPolicy: false, // Necesario para Firebase Auth (Google Login)
-  contentSecurityPolicy: false,
-}));
+app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+    crossOriginOpenerPolicy: false, // Necesario para Firebase Auth (Google Login)
+    contentSecurityPolicy: false,
+  }),
+);
 app.use(hpp());
-app.set("trust proxy", 1); 
+app.set("trust proxy", 1);
 app.disable("x-powered-by");
 
 // Logging de requests gestionado por Morgan (ver abajo)
 // En modo dev, se puede habilitar logging verboso vía env:
 if (process.env.VERBOSE_LOG === "true") {
   app.use((req, _res, next) => {
-    console.log(`[${new Date().toISOString()}] ${req.method} ${req.url} Origin:${req.headers.origin || "direct"}`);
+    console.log(
+      `[${new Date().toISOString()}] ${req.method} ${req.url} Origin:${req.headers.origin || "direct"}`,
+    );
     next();
   });
 }
@@ -62,7 +66,7 @@ const allowedOrigins = [
   "http://127.0.0.1:5173",
   "http://127.0.0.1:5174",
   "https://discerning-emotion-production-4044.up.railway.app",
-  "https://tempos-production.up.railway.app"
+  "https://tempos-production.up.railway.app",
 ];
 
 if (process.env.FRONTEND_URL) {
@@ -79,8 +83,10 @@ app.use(
     origin: (origin, callback) => {
       // Permitir peticiones sin origen (como apps móviles o curl)
       if (!origin) return callback(null, true);
-      
-      const isLocalhost = origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:');
+
+      const isLocalhost =
+        origin.startsWith("http://localhost:") ||
+        origin.startsWith("http://127.0.0.1:");
 
       if (
         allowedOrigins.indexOf(origin) !== -1 ||

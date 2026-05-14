@@ -7,7 +7,6 @@ import {
   JoinColumn,
 } from "typeorm";
 
-
 @Entity("credentials")
 export class Credential {
   @PrimaryColumn({ type: "varchar", length: 255 })

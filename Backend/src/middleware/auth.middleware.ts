@@ -31,7 +31,8 @@ export const DEFAULT_COMPANY_ID = "tempos-demo";
 function initFirebaseAdmin() {
   if (admin.apps.length) return;
 
-  const keyPath = process.env.GOOGLE_APPLICATION_CREDENTIALS || "./firebase-key.json";
+  const keyPath =
+    process.env.GOOGLE_APPLICATION_CREDENTIALS || "./firebase-key.json";
   if (fs.existsSync(keyPath)) {
     admin.initializeApp({
       credential: admin.credential.cert(keyPath),
@@ -40,7 +41,7 @@ function initFirebaseAdmin() {
     console.log("✅ Firebase Admin (Service Account)");
   } else {
     admin.initializeApp({
-      projectId: process.env.FIREBASE_PROJECT_ID || "tempos-project-f1e77"
+      projectId: process.env.FIREBASE_PROJECT_ID || "tempos-project-f1e77",
     });
     console.log("✅ Firebase Admin (ADC/Default)");
   }
@@ -59,8 +60,8 @@ export const firebaseAuthMiddleware = async (
   // 1. Manejo de falta de cabecera
   if (!authHeader?.startsWith("Bearer ")) {
     if (isDev) {
-       req.firebaseUser = getDevBypassFirebaseUser("test-admin") as any;
-       return next();
+      req.firebaseUser = getDevBypassFirebaseUser("test-admin") as any;
+      return next();
     }
     res.status(401).json({ error: "Autorización requerida" });
     return;
@@ -102,22 +103,24 @@ function tryUnsafeDecode(token: string): any {
     const parts = token.split(".");
     if (parts.length !== 3) return null;
     const payload = JSON.parse(Buffer.from(parts[1], "base64").toString());
-    
+
     // Mapeo de compatibilidad con Firebase SDK
     if (payload && !payload.uid && (payload.user_id || payload.sub)) {
       payload.uid = payload.user_id || payload.sub;
     }
-    
+
     return payload;
   } catch {
     return null;
   }
 }
 
-export function getDevBypassFirebaseUser(token: string): Record<string, any> | null {
+export function getDevBypassFirebaseUser(
+  token: string,
+): Record<string, any> | null {
   if (!DEV_BYPASS_TOKENS.includes(token as any)) return null;
   const isAdmin = token === "test-admin" || token === "test";
-  
+
   return {
     uid: isAdmin ? "dev-admin-uid" : "dev-employee-uid",
     email: isAdmin ? "admin@tempos.es" : "user@tempos.es",
@@ -132,16 +135,23 @@ export function getDevBypassFirebaseUser(token: string): Record<string, any> | n
 
 export function buildAuthContext(
   firebaseUser: FirebaseUserLike,
-  currentUser?: Partial<User>
+  currentUser?: Partial<User>,
 ): AuthContext {
-  const role = (currentUser?.role || firebaseUser.role || (firebaseUser.admin ? "admin" : "employee")) as UserRole;
-  const companyId = currentUser?.companyId || firebaseUser.companyId || firebaseUser.company_id || DEFAULT_COMPANY_ID;
-  
+  const role = (currentUser?.role ||
+    firebaseUser.role ||
+    (firebaseUser.admin ? "admin" : "employee")) as UserRole;
+  const companyId =
+    currentUser?.companyId ||
+    firebaseUser.companyId ||
+    firebaseUser.company_id ||
+    DEFAULT_COMPANY_ID;
+
   return {
     uid: firebaseUser.uid,
     email: currentUser?.email || firebaseUser.email || "",
     displayName: currentUser?.displayName || firebaseUser.name || "Usuario",
-    emailVerified: currentUser?.emailVerified || firebaseUser.email_verified || false,
+    emailVerified:
+      currentUser?.emailVerified || firebaseUser.email_verified || false,
     role,
     companyId,
     status: (currentUser?.status as any) || "active",

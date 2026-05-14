@@ -17,12 +17,12 @@ async function seedFichajesGPS() {
       displayName: "Antonio (Prueba GPS)",
       companyId: "tempos-demo",
       role: "admin",
-      status: "active"
+      status: "active",
     });
     await userRepo.save(user);
   }
 
-  const today = new Date().toISOString().split('T')[0];
+  const today = new Date().toISOString().split("T")[0];
 
   const testFichas: Partial<Ficha>[] = [
     {
@@ -31,7 +31,7 @@ async function seedFichajesGPS() {
       startTime: "08:30",
       description: "Entrada Sede Central",
       status: "draft",
-      metadata: { location: "40.4168,-3.7038", deviceId: "iPhone 15 Pro" }
+      metadata: { location: "40.4168,-3.7038", deviceId: "iPhone 15 Pro" },
     },
     {
       userId: user.uid,
@@ -39,7 +39,7 @@ async function seedFichajesGPS() {
       startTime: "10:15",
       description: "Visita Cliente Calle Mayor",
       status: "draft",
-      metadata: { location: "40.4175,-3.7055", deviceId: "iPhone 15 Pro" }
+      metadata: { location: "40.4175,-3.7055", deviceId: "iPhone 15 Pro" },
     },
     {
       userId: user.uid,
@@ -47,8 +47,8 @@ async function seedFichajesGPS() {
       startTime: "12:00",
       description: "Reunión Palacio Real",
       status: "draft",
-      metadata: { location: "40.4182,-3.7100", deviceId: "iPhone 15 Pro" }
-    }
+      metadata: { location: "40.4182,-3.7100", deviceId: "iPhone 15 Pro" },
+    },
   ];
 
   for (const data of testFichas) {
@@ -60,7 +60,7 @@ async function seedFichajesGPS() {
   process.exit(0);
 }
 
-seedFichajesGPS().catch(err => {
+seedFichajesGPS().catch((err) => {
   console.error("❌ Error seeding GPS data:", err);
   process.exit(1);
 });
