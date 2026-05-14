@@ -122,7 +122,7 @@ export function getDevBypassFirebaseUser(
   const isAdmin = token === "test-admin" || token === "test";
 
   return {
-    uid: isAdmin ? "dev-admin-uid" : "dev-employee-uid",
+    uid: isAdmin ? "test-admin-uid" : "test-employee-uid",
     email: isAdmin ? "admin@tempos.es" : "user@tempos.es",
     name: isAdmin ? "Admin Local" : "User Local",
     admin: isAdmin,
