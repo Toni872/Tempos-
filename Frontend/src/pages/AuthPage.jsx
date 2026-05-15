@@ -602,7 +602,9 @@ export default function AuthPage({ mode }) {
                   : (isLogin ? 'Acceder' : 'Empezar prueba gratuita')}
               </button>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '8px 0' }}>
+              {!Capacitor.isNativePlatform() ? null : (
+                <>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '8px 0' }}>
                     <div style={{ flex: 1, height: 1, background: 'var(--border)', opacity: 0.5 }} />
                     <span style={{ fontSize: 13, color: 'var(--t2)', fontWeight: 500 }}>o continúa con</span>
                     <div style={{ flex: 1, height: 1, background: 'var(--border)', opacity: 0.5 }} />
@@ -637,6 +639,8 @@ export default function AuthPage({ mode }) {
                     </svg>
                     Google
                   </button>
+                </>
+              )}
 
               {debugStatus && (
                 <div style={{ 
