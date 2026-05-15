@@ -33,6 +33,7 @@ export function useDashboardData(registrosFilters, isAdmin) {
   const [dashboardStats, setDashboardStats] = useState(null);
   
   const [loading, setLoading] = useState(true);
+  const [isTrialExpired, setIsTrialExpired] = useState(false);
 
   const handleLogout = useCallback(() => {
     clearClientSession();
@@ -53,6 +54,9 @@ export function useDashboardData(registrosFilters, isAdmin) {
         if (user) {
           setProfile(user);
           currentUser = user;
+          if (user.isTrialExpired) {
+            setIsTrialExpired(true);
+          }
         }
         
         const currentFicha = ficha?.data ?? ficha?.ficha ?? (ficha?.id ? ficha : null);
@@ -97,6 +101,9 @@ export function useDashboardData(registrosFilters, isAdmin) {
     } catch (err) {
       console.error('Error loading data:', err);
       if (err.status === 401) handleLogout();
+      if (err.status === 402 || err.message?.includes('TRIAL_EXPIRED')) {
+        setIsTrialExpired(true);
+      }
     }
   }, [isAdmin, registrosFilters, handleLogout]);
 
@@ -136,6 +143,7 @@ export function useDashboardData(registrosFilters, isAdmin) {
     dashboardStats, setDashboardStats,
     loading,
     setLoading,
+    isTrialExpired,
     loadData,
     handleLogout
   };

@@ -91,6 +91,7 @@ import SchedulingGrid from '@/components/dashboard/SchedulingGrid';
 import TabErrorBoundary from '@/components/TabErrorBoundary';
 import ErrorBoundary from "@/components/ui/ErrorBoundary";
 import EmployeeDashboard from '@/components/dashboard/EmployeeDashboard';
+import TrialExpiredOverlay from '@/components/dashboard/TrialExpiredOverlay';
 
 function cn(...classes) {
   return classes.filter(Boolean).join(' ');
@@ -130,6 +131,7 @@ export default function DashboardPage() {
     dashboardStats, setDashboardStats,
     loading,
     setLoading,
+    isTrialExpired,
     loadData,
     handleLogout
   } = useDashboardData(registrosFilters);
@@ -993,6 +995,10 @@ export default function DashboardPage() {
         onClose={() => setAuditModalOpen(false)}
         fichaId={selectedAuditFichaId}
       />
+
+      {isTrialExpired && (
+        <TrialExpiredOverlay trialExpiresAt={profile?.trialExpiresAt} />
+      )}
     </DashboardShell>
   );
 }

@@ -30,6 +30,7 @@ import {
 import {
   appUserContextMiddleware,
   getAuthContext,
+  requireActiveSubscription,
 } from "./middleware/request-context.middleware.js";
 
 const app: Express = express();
@@ -143,14 +144,14 @@ app.get("/status", async (_req: Request, res: Response) => {
 // ─── Routes ────────────────────────────────────────────────────────────────────
 app.use("/api/v1", apiRateLimiter);
 app.use("/api/v1/auth", authRateLimiter, authRoutes);
-app.use("/api/v1/fichas", fichaRoutes);
-app.use("/api/v1/employees", employeesRoutes);
-app.use("/api/v1/documents", documentsRoutes);
-app.use("/api/v1/absences", absencesRoutes);
-app.use("/api/v1/reports", reportsRoutes);
+app.use("/api/v1/fichas", firebaseAuthMiddleware, appUserContextMiddleware, requireActiveSubscription, fichaRoutes);
+app.use("/api/v1/employees", firebaseAuthMiddleware, appUserContextMiddleware, requireActiveSubscription, employeesRoutes);
+app.use("/api/v1/documents", firebaseAuthMiddleware, appUserContextMiddleware, requireActiveSubscription, documentsRoutes);
+app.use("/api/v1/absences", firebaseAuthMiddleware, appUserContextMiddleware, requireActiveSubscription, absencesRoutes);
+app.use("/api/v1/reports", firebaseAuthMiddleware, appUserContextMiddleware, requireActiveSubscription, reportsRoutes);
 app.use("/api/v1/contact", contactRoutes);
-app.use("/api/v1/work-centers", workCenterRoutes);
-app.use("/api/v1/schedules", scheduleController);
+app.use("/api/v1/work-centers", firebaseAuthMiddleware, appUserContextMiddleware, requireActiveSubscription, workCenterRoutes);
+app.use("/api/v1/schedules", firebaseAuthMiddleware, appUserContextMiddleware, requireActiveSubscription, scheduleController);
 app.use("/api/v1/push", pushRoutes);
 app.use("/api/v1/webauthn", webauthnRoutes);
 app.use("/api/v1/logs", logRoutes);
@@ -197,6 +198,9 @@ app.get(
       email: auth.email,
       role: auth.role,
       companyId: auth.companyId,
+      isTrial: auth.isTrial,
+      trialExpiresAt: auth.trialExpiresAt,
+      isTrialExpired: auth.isTrialExpired,
     });
   },
 );
