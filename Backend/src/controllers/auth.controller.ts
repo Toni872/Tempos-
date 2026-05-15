@@ -84,7 +84,38 @@ router.post(
     }
 
     if (user) {
-      res.status(409).json({ error: "Usuario ya registrado o vinculado" });
+      // Si el usuario existe en la BD pero estamos aquí, es que viene de un registro limpio de Firebase.
+      // Vamos a actualizarlo con el nuevo UID para permitir el acceso.
+      user.uid = firebaseUser.uid;
+      user.emailVerified = firebaseUser.email_verified;
+      user.role = requestedRole;
+      user.displayName = bodyParams.name || user.displayName;
+      user.metadata = {
+        ...user.metadata,
+        createdAt: new Date().toISOString(),
+        phone: bodyParams.phone || user.metadata?.phone || "",
+        isTrial: requestedRole === "admin",
+        trialExpiresAt: requestedRole === "admin" ? new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString() : undefined
+      };
+      
+      await userRepository.save(user);
+      
+      if (requestedRole === "admin") {
+        try {
+          await EmailService.sendTrialWelcome(user.email, user.displayName || "Usuario");
+        } catch (emailErr) {
+          console.error("⚠️ Error al enviar email de bienvenida:", emailErr);
+        }
+      }
+
+      res.status(200).json({
+        message: "Usuario reactivado correctamente",
+        user: {
+          uid: user.uid,
+          email: user.email,
+          displayName: user.displayName,
+        },
+      });
       return;
     }
 
