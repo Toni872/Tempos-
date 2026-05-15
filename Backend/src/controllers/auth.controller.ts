@@ -15,6 +15,7 @@ import {
   updateAuthProfileSchema,
 } from "../utils/validation.js";
 import { randomUUID } from "crypto";
+import { EmailService } from "../services/EmailService.js";
 
 const router = Router();
 
@@ -132,10 +133,22 @@ router.post(
       metadata: {
         createdAt: new Date().toISOString(),
         companyName: bodyParams.companyName || "",
+        phone: bodyParams.phone || "",
+        isTrial: requestedRole === "admin",
+        trialExpiresAt: requestedRole === "admin" ? new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString() : undefined
       },
     });
 
     await userRepository.save(user);
+
+    // Si es un administrador nuevo (Trial), enviar email premium de bienvenida
+    if (requestedRole === "admin") {
+      try {
+        await EmailService.sendTrialWelcome(user.email, user.displayName || "Usuario");
+      } catch (emailErr) {
+        console.error("⚠️ Error al enviar email de bienvenida:", emailErr);
+      }
+    }
 
     res.status(201).json({
       message: "Usuario registrado correctamente",

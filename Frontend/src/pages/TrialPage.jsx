@@ -160,6 +160,7 @@ export default function TrialPage() {
         role: 'admin',
         companyName: formData.company.trim(),
         name: `${formData.firstName.trim()} ${formData.lastName.trim()}`,
+        phone: formData.phone.trim(),
       });
 
       const profile = await getMe(idToken);
