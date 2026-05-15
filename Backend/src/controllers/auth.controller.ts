@@ -83,6 +83,18 @@ router.post(
       }
     }
 
+    const bodyParams = req.body || {};
+    // Prioridad: 1. Role en el body | 2. Role en el token de Firebase | 3. Default a employee
+    let requestedRole: UserRole = "employee";
+
+    if (
+      bodyParams.role === "admin" ||
+      firebaseUser.admin === true ||
+      firebaseUser.role === "admin"
+    ) {
+      requestedRole = "admin";
+    }
+
     if (user) {
       // Si el usuario existe en la BD pero estamos aquí, es que viene de un registro limpio de Firebase.
       // Vamos a actualizarlo con el nuevo UID para permitir el acceso.
@@ -117,18 +129,6 @@ router.post(
         },
       });
       return;
-    }
-
-    const bodyParams = req.body || {};
-    // Prioridad: 1. Role en el body | 2. Role en el token de Firebase | 3. Default a employee
-    let requestedRole: UserRole = "employee";
-
-    if (
-      bodyParams.role === "admin" ||
-      firebaseUser.admin === true ||
-      firebaseUser.role === "admin"
-    ) {
-      requestedRole = "admin";
     }
     let companyId = DEFAULT_COMPANY_ID;
 
