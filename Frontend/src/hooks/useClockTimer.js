@@ -12,40 +12,30 @@ export function useClockTimer(activeFicha, clockedIn, isOnBreak) {
 
   /**
    * Calculamos el tiempo acumulado de bloques CERRADOS.
-   * Solo se recalcula cuando cambia la ficha o el estado de pausa.
+   * Usamos una clave de dependencia estable para evitar recálculos innecesarios.
    */
   const baseAccumulatedMs = useMemo(() => {
     let total = 0;
     let currentStart = null;
-
-    // DIAGNÓSTICO SENIOR: Ver qué campos tiene el objeto realmente
-    console.log("🔍 [TIMER_DEBUG] Keys en activeFicha:", activeFicha ? Object.keys(activeFicha) : "null");
     
     if (!activeFicha) return { total, currentStart };
 
-    // INGENIERÍA SENIOR: Buscar la hora de inicio en cualquier propiedad posible
-    const rawStart = activeFicha.startTime || activeFicha.start_time || activeFicha.date || activeFicha.createdAt;
-    console.log("🔍 [TIMER_DEBUG] rawStart detectado:", rawStart);
-
-    if (rawStart && typeof rawStart === 'string') {
-      // Si es un formato HH:mm...
-      if (rawStart.includes(':')) {
+    // Buscamos la hora de inicio (startTime es HH:MM o ISO)
+    const rawStart = activeFicha.startTime || activeFicha.start_time || activeFicha.createdAt;
+    
+    if (rawStart) {
+      if (typeof rawStart === 'string' && rawStart.includes(':')) {
         const [hours, minutes] = rawStart.split(':');
         const start = new Date();
+        // Si el servidor nos da solo HH:MM, asumimos que es de HOY
         start.setHours(parseInt(hours, 10), parseInt(minutes, 10), 0, 0);
         currentStart = start.getTime();
       } else {
-        // Si es un ISO string o timestamp
         currentStart = new Date(rawStart).getTime();
       }
     }
 
-    // EMERGENCIA: Si seguimos sin tener inicio pero estamos fichados, usar "ahora" para que el contador no sea 0
-    if (!currentStart) {
-      console.warn("⚠️ [TIMER] No se detectó hora de inicio, usando fallback 'ahora'");
-      currentStart = Date.now();
-    }
-
+    // Si hay eventos, reconstruimos la línea de tiempo exacta
     if (activeFicha.events && activeFicha.events.length > 0) {
       total = 0;
       currentStart = null;
@@ -68,8 +58,14 @@ export function useClockTimer(activeFicha, clockedIn, isOnBreak) {
       }
     }
     
+    // Si al final no tenemos currentStart pero estamos fichados, fallback SEGURO:
+    // Usamos el createdAt de la ficha como inicio real.
+    if (!currentStart && clockedIn) {
+      currentStart = new Date(activeFicha.createdAt).getTime() || Date.now();
+    }
+
     return { total, currentStart };
-  }, [activeFicha?.id, activeFicha?.startTime, activeFicha?.events?.length]); // Dependencias más específicas para evitar reinicios constantes
+  }, [activeFicha?.id, activeFicha?.startTime, activeFicha?.events?.length, clockedIn]);
 
   useEffect(() => {
     if (!clockedIn || !activeFicha) {
@@ -100,19 +96,15 @@ export function useClockTimer(activeFicha, clockedIn, isOnBreak) {
     updateDisplay();
 
     if (clockedIn && !isOnBreak) {
-      console.log("🚀 [TIMER] Iniciando intervalo de 1s");
       timerRef.current = setInterval(updateDisplay, 1000);
     } else {
       if (timerRef.current) clearInterval(timerRef.current);
     }
 
     return () => {
-      if (timerRef.current) {
-        console.log("⏹️ [TIMER] Limpiando intervalo");
-        clearInterval(timerRef.current);
-      }
+      if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [clockedIn, isOnBreak, baseAccumulatedMs]); // Quitamos activeFicha de dependencias ya que baseAccumulatedMs ya depende de ella
+  }, [clockedIn, isOnBreak, baseAccumulatedMs.total, baseAccumulatedMs.currentStart]);
 
   return elapsedTime;
 }

@@ -28,52 +28,58 @@ export function useGeolocation() {
   }, []);
 
   const requestLocation = useCallback(() => {
-    if (!consentGiven) {
-      setError('Se requiere consentimiento para acceder a la ubicación');
-      return;
-    }
-
-    if (!navigator.geolocation) {
-      setError('La geolocalización no está soportada por este navegador');
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const coords = {
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-          accuracy: position.coords.accuracy,
-          timestamp: position.timestamp,
-        };
-        setLocation(coords);
-        setLoading(false);
-      },
-      (err) => {
-        let errorMessage = 'Error al obtener la ubicación';
-        switch (err.code) {
-          case err.PERMISSION_DENIED:
-            errorMessage = 'Permiso de ubicación denegado por el usuario';
-            break;
-          case err.POSITION_UNAVAILABLE:
-            errorMessage = 'Información de ubicación no disponible';
-            break;
-          case err.TIMEOUT:
-            errorMessage = 'Tiempo de espera agotado para obtener ubicación';
-            break;
-        }
-        setError(errorMessage);
-        setLoading(false);
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 300000, // 5 minutes
+    return new Promise((resolve, reject) => {
+      if (!consentGiven) {
+        const msg = 'Se requiere consentimiento para acceder a la ubicación';
+        setError(msg);
+        return reject(new Error(msg));
       }
-    );
+
+      if (!navigator.geolocation) {
+        const msg = 'La geolocalización no está soportada por este navegador';
+        setError(msg);
+        return reject(new Error(msg));
+      }
+
+      setLoading(true);
+      setError(null);
+
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const coords = {
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+            accuracy: position.coords.accuracy,
+            timestamp: position.timestamp,
+          };
+          setLocation(coords);
+          setLoading(false);
+          resolve(coords);
+        },
+        (err) => {
+          let errorMessage = 'Error al obtener la ubicación';
+          switch (err.code) {
+            case err.PERMISSION_DENIED:
+              errorMessage = 'Permiso de ubicación denegado por el usuario';
+              break;
+            case err.POSITION_UNAVAILABLE:
+              errorMessage = 'Información de ubicación no disponible';
+              break;
+            case err.TIMEOUT:
+              errorMessage = 'Tiempo de espera agotado para obtener ubicación';
+              break;
+          }
+          setError(errorMessage);
+          setLoading(false);
+          reject(new Error(errorMessage));
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 300000, // 5 minutes
+        }
+      );
+    });
   }, [consentGiven]);
 
   const clearLocation = useCallback(() => {

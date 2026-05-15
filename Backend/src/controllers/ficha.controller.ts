@@ -60,8 +60,8 @@ async function validateWorkPolicy(params: {
 }) {
   const { user, companyId, location, qrToken, deviceId, actionType } = params;
 
-  // BYPASS FOR TESTERS
-  if (user.uid.startsWith("test-") || user.uid.startsWith("dev-")) {
+  // BYPASS FOR TESTERS (Only if they don't explicitly require geolocation for a test)
+  if ((user.uid.startsWith("test-") || user.uid.startsWith("dev-")) && !user.requiresGeolocation) {
     logger.info(
       `[POLICY-BYPASS] Omitiendo validación de políticas para tester: ${user.uid}`,
     );

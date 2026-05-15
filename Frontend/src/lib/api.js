@@ -171,8 +171,9 @@ async function request(path, options = {}, retryCount = 0) {
     }
 
     if (!responseOk) {
-      const errorData = responseData?.error || {};
-      throw new ApiError(errorData.message || `Error ${responseStatus}`, responseStatus, errorData.code);
+      const errorData = responseData || {};
+      const errorMessage = errorData.detail || errorData.message || errorData.error || `Error ${responseStatus}`;
+      throw new ApiError(errorMessage, responseStatus, errorData.code);
     }
     return responseData;
   } catch (error) {

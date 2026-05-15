@@ -18,8 +18,9 @@ import {
   ClipboardText,
   CurrencyCircleDollar,
   GearSix,
-  CalendarX,
   ShieldCheck,
+  Clock,
+  CalendarX,
 } from '@phosphor-icons/react';
 import UserMenu from '@/components/UserMenu';
 import Logo from '@/components/ui/Logo';
@@ -55,10 +56,12 @@ export default function DashboardShell({
   setActiveTab, 
   onLogout, 
   profile, 
+  notifications = [],
   children 
 }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isManualOpen, setIsManualOpen] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
 
   const SidebarContent = ({ isMobile = false }) => (
     <>
@@ -180,10 +183,88 @@ export default function DashboardShell({
           </div>
 
           <div className="flex items-center gap-2">
-            <button className="p-2 text-zinc-500 hover:text-white transition-colors relative rounded-xl hover:bg-white/[0.04]">
-              <BellRinging className="w-5 h-5" weight="duotone" />
-              <span className="absolute top-2 right-2 w-2 h-2 bg-blue-500 rounded-full border-2 border-[#0a0a0c] animate-pulse" />
-            </button>
+            <div className="relative">
+              <button 
+                onClick={() => setShowNotifications(!showNotifications)}
+                className={cn(
+                  "p-2 transition-all relative rounded-xl",
+                  showNotifications ? "bg-blue-500/10 text-blue-400" : "text-zinc-500 hover:text-white hover:bg-white/[0.04]"
+                )}
+              >
+                <BellRinging className="w-5 h-5" weight={showNotifications ? "fill" : "duotone"} />
+                {!showNotifications && (
+                  <span className="absolute top-2 right-2 w-2 h-2 bg-blue-500 rounded-full border-2 border-[#0a0a0c] animate-pulse" />
+                )}
+              </button>
+
+              <AnimatePresence>
+                {showNotifications && (
+                  <>
+                    {/* Backdrop for closing */}
+                    <div 
+                      className="fixed inset-0 z-[-1]" 
+                      onClick={() => setShowNotifications(false)} 
+                    />
+                    <motion.div
+                      initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                      transition={{ duration: 0.2, ease: "easeOut" }}
+                      className="absolute right-0 mt-3 w-80 bg-[#121214] border border-white/[0.08] rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden z-[100]"
+                    >
+                      <div className="p-4 border-b border-white/[0.04] flex items-center justify-between">
+                        <span className="text-[11px] font-black uppercase tracking-wider text-zinc-400">Notificaciones</span>
+                        <span className="px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 text-[10px] font-bold">{notifications.length} nuevas</span>
+                      </div>
+                      <div className="max-h-[350px] overflow-y-auto scrollbar-hide">
+                        {notifications.length === 0 ? (
+                          <div className="p-8 text-center">
+                            <p className="text-zinc-500 text-xs">No hay notificaciones pendientes</p>
+                          </div>
+                        ) : (
+                          notifications.map((notif) => (
+                            <div 
+                              key={notif.id}
+                              className="p-4 hover:bg-white/[0.02] border-b border-white/[0.02] cursor-pointer transition-colors group"
+                            >
+                              <div className="flex items-start gap-3">
+                                <div className={cn(
+                                  "mt-1 w-2 h-2 rounded-full",
+                                  notif.type === 'warning' ? "bg-amber-500" : 
+                                  notif.type === 'absence' ? "bg-blue-500" :
+                                  notif.type === 'success' ? "bg-emerald-500" : "bg-zinc-500"
+                                )} />
+                                <div className="flex-1">
+                                  <h4 className="text-[13px] font-bold text-zinc-200 group-hover:text-white transition-colors">
+                                    {notif.title}
+                                  </h4>
+                                  <p className="text-[12px] text-zinc-500 line-clamp-2 mt-0.5 leading-relaxed">
+                                    {notif.desc}
+                                  </p>
+                                  <span className="text-[10px] text-zinc-600 mt-2 block font-medium uppercase tracking-wider">
+                                    {notif.time}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                      <button 
+                        onClick={() => {
+                          setActiveTab('Mensajes');
+                          setShowNotifications(false);
+                        }}
+                        className="w-full p-3 text-center text-[11px] font-bold text-blue-400 hover:text-blue-300 hover:bg-blue-500/5 transition-all border-t border-white/[0.04]"
+                      >
+                        VER TODOS LOS MENSAJES
+                      </button>
+                    </motion.div>
+                  </>
+                )}
+              </AnimatePresence>
+            </div>
+
             <div className="h-7 w-px bg-white/[0.06] mx-1" />
             <UserMenu onLogout={onLogout} />
           </div>

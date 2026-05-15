@@ -154,7 +154,7 @@ export default function AuthPage({ mode }) {
         profile 
       });
       
-      navigate(profile.role === 'admin' || profile.role === 'manager' ? '/admin' : '/dashboard');
+      navigate('/dashboard');
     } catch (err) {
       console.error('Error finalizando login:', err);
       setFormError('Error al completar el login. Inténtalo de nuevo.');
@@ -405,10 +405,11 @@ export default function AuthPage({ mode }) {
     setIsSubmitting(true);
 
     try {
-      const session = await bootstrapLocalSession({ isAdmin: true });
+      const isTargetAdmin = targetRole === 'admin';
+      const session = await bootstrapLocalSession({ isAdmin: isTargetAdmin });
       navigate('/dashboard', {
         state: {
-          isAdmin: true,
+          isAdmin: isTargetAdmin,
           localMode: true
         }
       });
@@ -468,34 +469,6 @@ export default function AuthPage({ mode }) {
             {/* Registro de Empresa - Siempre Admin */}
 
             <form noValidate onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-              {isLogin && (
-                <div style={{ borderRadius: 12, border: '1px solid rgba(34,197,94,0.35)', background: 'rgba(34,197,94,0.08)', padding: 12, marginBottom: 10 }}>
-                  <div style={{ fontSize: 12.5, fontWeight: 600, color: '#86efac', marginBottom: 10 }}>
-                    Acceso de prueba para testers
-                  </div>
-                  <div style={{ display: 'grid', gap: 8, gridTemplateColumns: '1fr' }}>
-                    <button
-                      type="button"
-                      className="tp-btn"
-                      disabled={isSubmitting}
-                      onClick={() => handleLocalQuickAccess('admin')}
-                      style={{
-                        borderRadius: 10,
-                        border: '1px solid rgba(37,99,235,0.35)',
-                        background: 'rgba(37,99,235,0.14)',
-                        color: '#bfdbfe',
-                        padding: '10px 12px',
-                        fontSize: 13,
-                        fontWeight: 600,
-                        cursor: isSubmitting ? 'not-allowed' : 'pointer'
-                      }}
-                    >
-                      ACCESO TEMPORAL (ADMIN)
-                    </button>
-                  </div>
-                </div>
-              )}
-
               {!!formError && (
                 <div role="alert" aria-live="assertive" style={{ borderRadius: 10, border: '1px solid rgba(239,68,68,0.35)', background: 'rgba(239,68,68,0.08)', color: '#fecaca', fontSize: 13, padding: '10px 12px', fontWeight: 500 }}>
                   {formError}
@@ -629,9 +602,7 @@ export default function AuthPage({ mode }) {
                   : (isLogin ? 'Acceder' : 'Empezar prueba gratuita')}
               </button>
 
-              {Capacitor.isNativePlatform() && (
-                <>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '8px 0' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '8px 0' }}>
                     <div style={{ flex: 1, height: 1, background: 'var(--border)', opacity: 0.5 }} />
                     <span style={{ fontSize: 13, color: 'var(--t2)', fontWeight: 500 }}>o continúa con</span>
                     <div style={{ flex: 1, height: 1, background: 'var(--border)', opacity: 0.5 }} />
@@ -666,8 +637,6 @@ export default function AuthPage({ mode }) {
                     </svg>
                     Google
                   </button>
-                </>
-              )}
 
               {debugStatus && (
                 <div style={{ 

@@ -23,6 +23,7 @@ import {
   Bell,
   CaretRight,
   Fingerprint,
+  SquaresFour,
 } from '@phosphor-icons/react';
 import { Capacitor } from '@capacitor/core';
 import Logo from '@/components/ui/Logo';
@@ -58,6 +59,8 @@ export default function EmployeeDashboard({
   autoClockStatus = 'idle',
   autoClockCenter = null,
   autoClockDistance = null,
+  error = '',
+  success = '',
 }) {
   const [activeTab, setActiveTab] = useState(TABS.CLOCK);
   const isMobile = useMemo(() => Capacitor.isNativePlatform(), []);
@@ -141,7 +144,7 @@ export default function EmployeeDashboard({
       <div className="relative flex flex-col items-center justify-center my-4">
         {/* Glow */}
         <div className={cn(
-          'absolute w-56 h-56 rounded-full blur-[80px] opacity-20 transition-colors duration-1000',
+          'absolute w-56 h-56 rounded-full blur-[80px] opacity-20 transition-colors duration-1000 pointer-events-none',
           clockedIn ? (isOnBreak ? 'bg-amber-500' : 'bg-emerald-500') : 'bg-blue-600'
         )} />
 
@@ -264,9 +267,20 @@ export default function EmployeeDashboard({
       ) : (
         <div className="space-y-2">
           {registros.slice(0, 20).map((ficha, idx) => {
-            const start = ficha.startTime ? new Date(ficha.startTime) : null;
-            const end = ficha.endTime ? new Date(ficha.endTime) : null;
-            const hours = ficha.totalMinutes ? (ficha.totalMinutes / 60).toFixed(1) : '—';
+            // Combinar fecha (YYYY-MM-DD) con hora (HH:mm:ss) para crear un objeto Date válido
+            const parseFichaDate = (dateStr, timeStr) => {
+              if (!dateStr || !timeStr) return null;
+              try {
+                // El formato esperado es YYYY-MM-DD y HH:mm[:ss]
+                const isoStr = `${dateStr.split('T')[0]}T${timeStr}`;
+                const d = new Date(isoStr);
+                return isNaN(d.getTime()) ? null : d;
+              } catch (e) { return null; }
+            };
+
+            const start = parseFichaDate(ficha.date, ficha.startTime);
+            const end = parseFichaDate(ficha.date, ficha.endTime);
+            const hours = ficha.hoursWorked ? Number(ficha.hoursWorked).toFixed(1) : (ficha.totalMinutes ? (ficha.totalMinutes / 60).toFixed(1) : '—');
             const isToday = start && start.toDateString() === new Date().toDateString();
 
             return (
@@ -452,6 +466,28 @@ export default function EmployeeDashboard({
 
   return (
     <div className="min-h-screen bg-[#0a0a0c] text-white font-sans flex flex-col overflow-hidden">
+      {/* Feedback Toasts */}
+      <AnimatePresence>
+        {(error || success) && (
+          <motion.div
+            initial={{ opacity: 0, y: -50 }}
+            animate={{ opacity: 1, y: 20 }}
+            exit={{ opacity: 0, y: -50 }}
+            className="fixed top-0 left-0 right-0 z-[100] px-6"
+          >
+            <div className={cn(
+              "max-w-sm mx-auto p-4 rounded-2xl border shadow-2xl flex items-center gap-3",
+              error 
+                ? "bg-rose-500/10 border-rose-500/20 text-rose-200" 
+                : "bg-emerald-500/10 border-emerald-500/20 text-emerald-200"
+            )}>
+              {error ? <Warning size={20} weight="fill" /> : <CheckCircle size={20} weight="fill" />}
+              <p className="text-sm font-medium">{error || success}</p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Background */}
       <div className="fixed inset-0 pointer-events-none">
         <div className={cn(
@@ -476,7 +512,7 @@ export default function EmployeeDashboard({
               <p className="text-sm font-bold text-white">{displayName}</p>
             </div>
           </div>
-          <Logo size="xs" />
+            <Logo size="xs" />
         </div>
       </header>
 

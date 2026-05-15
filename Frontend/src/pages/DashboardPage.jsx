@@ -35,6 +35,7 @@ import api, {
   createSchedule,
   listSchedules
 } from '@/lib/api';
+import { z } from 'zod';
 
 // Icons
 import { Clock, Users, MapPin, Calendar, FileText, Search, Download, LayoutDashboard } from 'lucide-react';
@@ -97,6 +98,21 @@ function cn(...classes) {
 
 export default function DashboardPage() {
   const navigate = useNavigate();
+
+  // Esquema de validación para Empleados (Producción)
+  const employeeSchema = z.object({
+    displayName: z.string().min(3, "El nombre debe tener al menos 3 caracteres"),
+    email: z.string().email("El formato del email no es válido"),
+    role: z.enum(['admin', 'manager', 'employee'], { 
+      errorMap: () => ({ message: "Selecciona un rango de autoridad válido" }) 
+    }),
+    dni: z.string().min(8, "El DNI/NIE debe ser válido"),
+    phone: z.string().optional(),
+    hourlyRate: z.coerce.number().min(0, "La tarifa no puede ser negativa"),
+    workCenterId: z.string().optional(),
+    status: z.enum(['active', 'suspended'])
+  });
+
   const [activeTab, setActiveTab] = useState('Inicio');
   const [registrosFilters, setRegistrosFilters] = useState({ employeeId: '', startDate: '', endDate: '' });
 
@@ -116,7 +132,7 @@ export default function DashboardPage() {
     setLoading,
     loadData,
     handleLogout
-  } = useDashboardData(registrosFilters, true);
+  } = useDashboardData(registrosFilters);
 
   const isMobile = useMemo(() => Capacitor.isNativePlatform(), []);
   const isAdmin = useMemo(() => profile?.role === 'admin' || profile?.role === 'manager', [profile]);
@@ -138,12 +154,59 @@ export default function DashboardPage() {
   const [modalMode, setModalMode] = useState('create');
   const [modalData, setModalData] = useState(null);
   const [selectedEmployee, setSelectedEmployee] = useState(null);
+  const [hasAcceptedLocal, setHasAcceptedLocal] = useState(false);
 
   const [showGeolocationConsent, setShowGeolocationConsent] = useState(false);
   const [geolocationModalMode, setGeolocationModalMode] = useState('consent'); 
   const { location: geoLocation, error: geoError, loading: geoLoading, consentGiven, requestLocation, revokeConsent } = useGeolocation();
 
   const elapsedWorkingTime = useClockTimer(activeFicha, clockedIn, isOnBreak);
+
+  // 🔔 Sistema de Notificaciones Reales
+  const realNotifications = useMemo(() => {
+    const list = [];
+    if (!profile) return list;
+
+    if (isAdmin) {
+      // 1. Ausencias pendientes (Admin)
+      const pendingAbs = (absences || []).filter(a => a.status === 'pending');
+      pendingAbs.forEach(a => {
+        list.push({
+          id: `abs-${a.id}`,
+          title: 'Solicitud de Ausencia',
+          desc: `${a.employeeName || 'Un empleado'} solicita ${a.type}`,
+          type: 'absence',
+          time: 'Pendiente'
+        });
+      });
+
+      // 2. Registros anómalos (Si existen)
+      const anomalies = (registros || []).filter(r => r.metadata?.outside_zone).slice(0, 2);
+      anomalies.forEach(r => {
+        list.push({
+          id: `reg-${r.id}`,
+          title: 'Fichaje fuera de zona',
+          desc: `${r.employeeName || 'Empleado'} fichó fuera del radio permitido`,
+          type: 'warning',
+          time: 'Revisar'
+        });
+      });
+    } else {
+      // 1. Mis ausencias aprobadas/rechazadas recientemente
+      const myAbs = (absences || []).filter(a => a.status !== 'pending').slice(0, 3);
+      myAbs.forEach(a => {
+        list.push({
+          id: `abs-${a.id}`,
+          title: a.status === 'approved' ? 'Ausencia Aprobada' : 'Ausencia Rechazada',
+          desc: `Tu solicitud de ${a.type} ha sido ${a.status === 'approved' ? 'validada' : 'denegada'}`,
+          type: a.status === 'approved' ? 'success' : 'warning',
+          time: 'Actualizado'
+        });
+      });
+    }
+
+    return list;
+  }, [profile, isAdmin, absences, registros]);
 
   // 🔒 Auto-Clock (Geofencing automático para empleados en móvil)
   const {
@@ -198,6 +261,7 @@ export default function DashboardPage() {
     try {
       const session = getClientSession();
       await acceptTerms(session.token);
+      setHasAcceptedLocal(true);
       setProfile(prev => ({ ...prev, hasAcceptedTerms: true }));
       showFeedback('success', 'Términos aceptados correctamente.');
     } catch (err) {
@@ -212,8 +276,7 @@ export default function DashboardPage() {
     if (!session?.token) return;
 
     // Check if user requires geolocation
-    const currentUser = employees.find(emp => emp.uid === session.userId || emp.id === session.userId);
-    const requiresGeo = currentUser?.requiresGeolocation;
+    const requiresGeo = profile?.requiresGeolocation;
 
     if (requiresGeo && !consentGiven) {
       setShowGeolocationConsent(true);
@@ -225,12 +288,12 @@ export default function DashboardPage() {
 
       if (requiresGeo && consentGiven) {
         // Request location if needed
-        await requestLocation();
-          if (geoLocation) {
+        const coords = await requestLocation();
+        if (coords) {
           payload = {
             location: {
-              lat: geoLocation.latitude,
-              lng: geoLocation.longitude,
+              lat: coords.latitude,
+              lng: coords.longitude,
             }
           };
         }
@@ -253,6 +316,7 @@ export default function DashboardPage() {
       await loadData('core');
     } catch (err) {
       const msg = err.response?.data?.error || err.message || 'Error en fichaje.';
+      console.log('DEBUG: Error en fichaje:', msg);
       showFeedback('error', msg);
     }
   };
@@ -290,18 +354,31 @@ export default function DashboardPage() {
   const handleEmployeeSubmit = async (values) => {
     const session = getClientSession();
     if (!session?.token) return;
+
     try {
+      // Validación técnica Zod antes de enviar a API
+      const validatedData = employeeSchema.parse(values);
+      
+      setLoading(true);
       if (modalMode === 'edit') {
-        await api.put(`/api/v1/employees/${modalData.id}`, values, { token: session?.token });
+        await api.put(`/api/v1/employees/${modalData.id}`, validatedData, { token: session?.token });
       } else {
-        await createEmployee(session.token, values);
+        await createEmployee(session.token, validatedData);
       }
+      
       await refreshAllData();
       closeModal();
-      showFeedback('success', 'Empleado guardado.');
+      showFeedback('success', `Usuario ${validatedData.displayName} registrado correctamente.`);
     } catch (err) {
-      const msg = err.response?.data?.error || err.message || 'Error al guardar empleado.';
-      showFeedback('error', msg);
+      if (err instanceof z.ZodError) {
+        const firstError = err.errors[0].message;
+        showFeedback('error', `Dato inválido: ${firstError}`);
+      } else {
+        const msg = err.response?.data?.error || err.message || 'Error al guardar empleado.';
+        showFeedback('error', msg);
+      }
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -545,7 +622,7 @@ export default function DashboardPage() {
 
   if (loading) return <Loader />;
 
-  // ─── EMPLEADO: Interfaz dedicada, sin acceso a funciones admin ───
+  // ─── VISTA EMPLEADO: Interfaz dedicada ───
   if (!isAdmin) {
     return (
       <EmployeeDashboard
@@ -564,6 +641,8 @@ export default function DashboardPage() {
         autoClockStatus={autoClockStatus}
         autoClockCenter={autoClockCenter}
         autoClockDistance={autoClockDistance}
+        error={error}
+        success={success}
       />
     );
   }
@@ -575,6 +654,7 @@ export default function DashboardPage() {
       setActiveTab={setActiveTab}
       onLogout={handleLogout}
       profile={profile}
+      notifications={realNotifications}
     >
       {!isMobile && (
         <div className="mb-10">
@@ -639,8 +719,7 @@ export default function DashboardPage() {
               workCenters={workCenters}
               profile={profile}
               onEdit={(row) => {
-                const isPrivileged = profile?.role === 'admin' || profile?.role === 'manager';
-                if (isPrivileged) {
+                if (isAdmin) {
                   if (row.status === 'disputed') openModal('review_correction', 'edit', row);
                   else openModal('registros', 'edit', row);
                 } else {
@@ -851,7 +930,7 @@ export default function DashboardPage() {
       </ModalBase>
 
       {/* MODAL DE CONSENTIMIENTO LEGAL OBLIGATORIO */}
-      {profile && !profile.hasAcceptedTerms && (
+      {profile && !profile.hasAcceptedTerms && !hasAcceptedLocal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
           <div className="absolute inset-0 bg-black/80 backdrop-blur-md" />
           <div className="relative w-full max-w-xl bg-[#0d0d0f] border border-white/[0.08] rounded-[32px] p-8 shadow-2xl space-y-6">
