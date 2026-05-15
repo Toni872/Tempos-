@@ -82,7 +82,6 @@ function App() {
           </Routes>
         </AnimatePresence>
       </Suspense>
-      <FloatingDownloadBtn />
     </>
   )
 }

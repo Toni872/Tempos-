@@ -77,6 +77,6 @@ class LocalRateLimiter {
   }
 }
 
-export const apiRateLimiter = new LocalRateLimiter(50, 60000); // 50 req per minute
+export const apiRateLimiter = new LocalRateLimiter(200, 60000); // 200 req per minute (ajustado para dev)
 export const authRateLimiter = new LocalRateLimiter(5, 300000); // 5 req per 5 minutes
 
