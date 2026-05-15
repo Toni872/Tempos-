@@ -41,6 +41,9 @@ export class User {
     invitedAt?: string;
     invitedBy?: string;
     companyName?: string;
+    phone?: string;
+    isTrial?: boolean;
+    trialExpiresAt?: string;
   };
 
   @Column({ type: "boolean", default: false })
