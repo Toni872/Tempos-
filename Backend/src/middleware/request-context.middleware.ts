@@ -104,3 +104,25 @@ export function requirePermission(
 
   return true;
 }
+
+/**
+ * Middleware para bloquear el acceso si el Trial ha expirado.
+ */
+export function requireActiveSubscription(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): void {
+  const auth = getAuthContext(req);
+
+  if (auth.isTrial && auth.isTrialExpired) {
+    res.status(402).json({
+      error: "TRIAL_EXPIRED",
+      message: "Tu periodo de prueba ha finalizado. Por favor, activa un plan para continuar.",
+      trialExpiresAt: auth.trialExpiresAt
+    });
+    return;
+  }
+
+  next();
+}

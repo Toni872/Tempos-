@@ -31,6 +31,8 @@ function ctx(overrides: Partial<AuthContext> = {}): AuthContext {
     companyId: "tenant-a",
     status: "active",
     isPrivileged: false,
+    isTrial: false,
+    isTrialExpired: false,
     ...overrides,
   };
 }

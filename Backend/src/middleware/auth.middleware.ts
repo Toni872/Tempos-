@@ -21,6 +21,9 @@ export type AuthContext = {
   companyId: string;
   status: "active" | "suspended" | "deleted";
   isPrivileged: boolean;
+  isTrial: boolean;
+  trialExpiresAt?: string;
+  isTrialExpired: boolean;
 };
 
 export const DEFAULT_COMPANY_ID = "tempos-demo";
@@ -146,6 +149,10 @@ export function buildAuthContext(
     firebaseUser.company_id ||
     DEFAULT_COMPANY_ID;
 
+  const isTrial = !!currentUser?.metadata?.isTrial;
+  const trialExpiresAt = currentUser?.metadata?.trialExpiresAt;
+  const isTrialExpired = isTrial && trialExpiresAt ? new Date() > new Date(trialExpiresAt) : false;
+
   return {
     uid: firebaseUser.uid,
     email: currentUser?.email || firebaseUser.email || "",
@@ -156,5 +163,8 @@ export function buildAuthContext(
     companyId,
     status: (currentUser?.status as any) || "active",
     isPrivileged: role === "admin" || role === "manager" || role === "auditor",
+    isTrial,
+    trialExpiresAt,
+    isTrialExpired,
   };
 }
