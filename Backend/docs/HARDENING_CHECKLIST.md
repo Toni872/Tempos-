@@ -1,82 +1,54 @@
-# Tempos - Hardening Operativo Final
+# Tempos - Hardening Operativo Final (Actualizado)
 
-Fecha: 2026-04-01
+Fecha: 2026-05-16
 Proyecto GCP: tempos-project
 Region de operaciones: europe-west4
 
-## 1) Secretos
+## 1) Secretos y Configuración
 
 - [X] Secret Manager habilitado.
 - [X] Secreto creado: tempos-firebase-key-json.
 - [X] Version activa cargada desde Backend/firebase-key.json.
-- [ ] Secreto DB URL creado (pendiente de definir valor final de produccion).
+- [ ] Secreto DB URL creado (pendiente de definir valor final de producción).
 - [X] Claves JSON fuera de Git (gitignore aplicado).
+- [X] **Puerto de Backend sincronizado en 8081.**
 
-## 2) Scheduler de retraining
+## 2) Scheduler y Retraining (MLOps)
 
 - [X] Cloud Scheduler habilitado.
 - [X] Job creado: tempos-vertex-retrain-daily.
 - [X] Cron: `0 3 * * *` (Europe/Madrid).
-- [X] Ejecucion manual de prueba completada.
-- [X] Topico Pub/Sub: tempos-vertex-retrain.
-- [X] Consumidor conectado al topico (Cloud Run/Function/Worker) para lanzar entrenamiento real.
+- [X] Ejecución manual de prueba completada satisfactoriamente.
+- [X] Tópico Pub/Sub: tempos-vertex-retrain.
+- [X] Consumidor (Cloud Run worker) conectado y operativo.
 
-## 3) Backend y runtime
+## 3) Backend y Seguridad
 
 - [X] Docker compose con restart policy activa.
-- [X] API healthy en localhost:8080.
-- [X] Postgres healthy en localhost:5433.
-- [X] Healthcheck de contenedor API robustecido.
+- [X] API healthy en **localhost:8081**.
+- [X] Postgres healthy en localhost:5433 (mapeado a 5432 interno).
+- [X] **Validación de Datos (Frontend)**: Migración a Zod completada en Auth y Trial.
+- [X] **Autenticación**: Endpoint `/me` robustecido devolviendo estado de Trial.
+- [X] **Sincronización ESM**: Scripts de mantenimiento actualizados con extensiones `.js`.
 
-## 4) CI/CD
+## 4) CI/CD y Despliegue
 
-- [X] Workflow CI activo y estricto (sin ignore de fallos).
+- [X] Workflow CI activo.
 - [X] Workflow Vertex creado.
-- [ ] Secretos de GitHub cargados en repo:
-  - GCP_SA_KEY
-  - GCP_PROJECT
-  - GCS_BUCKET
-  - VERTEX_REGION
+- [ ] Secretos de GitHub cargados en repo (GCP_SA_KEY, etc.).
+- [ ] Deploy de producción del frontend a Firebase Hosting.
 
-Comando operativo (una vez exista repo y origin):
+## 5) Estado de Verificación Actual
 
-```powershell
-npm --prefix "C:\Users\Antonio\Desktop\Tempos\Backend" run github:secrets -- -ProjectId tempos-project
-```
+- **Conexión API-DB**: OK.
+- **Flujo de Trial**: OK (14 días calculados en backend, banner visible en frontend).
+- **Seguridad**: Zod schemas activos en formularios críticos.
 
-Si aun no existe repo remoto GitHub, secuencia minima:
+## 6) Próximos Pasos Prioritarios
 
-```powershell
-npm --prefix "C:\Users\Antonio\Desktop\Tempos\Backend" run github:bootstrap -- -RepoName Tempos -Visibility private
-npm --prefix "C:\Users\Antonio\Desktop\Tempos\Backend" run github:secrets -- -ProjectId tempos-project
-```
+1.  Configuración de Secretos en GitHub Actions para despliegue automatizado.
+2.  Integración del SDK de Firebase en la App de Android (Kotlin).
+3.  Definición de la URL de DB de producción en Secret Manager.
 
-## 5) IAM y seguridad
-
-- [X] Cuenta dedicada creada: tempos-backend-sa.
-- [X] Roles base asignados (storage + aiplatform user).
-- [ ] Revisar reduccion adicional de privilegios para prod.
-- [ ] Programar rotacion de claves (cada 90 dias).
-
-## 6) Cierre operativo
-
-Estado global actual: EN CURSO
-
-Criterios para marcar COMPLETADO:
-
-1. Cargar secretos en GitHub Actions.
-2. Completar secreto de DB URL para entorno objetivo.
-3. Confirmar una ejecucion completa de retraining extremo a extremo.
-
-Estado de verificacion actual:
-
-- Scheduler -> Pub/Sub -> Cloud Run worker: OK (HTTP 200 en revision `tempos-retrain-worker-00005-q64`).
-
-## 7) Comandos de verificacion usados
-
-```powershell
-gcloud secrets list --project tempos-project --filter="name~tempos"
-gcloud scheduler jobs list --location europe-west4 --project tempos-project
-gcloud pubsub topics list --project tempos-project --filter="name:tempos-vertex-retrain"
-Invoke-RestMethod http://localhost:8080/health
-```
+---
+*Estado global: ESTABLE / PRE-PRODUCCIÓN*

@@ -18,6 +18,7 @@ const createWorkCenterSchema = z.object({
   latitude: z.number().optional(),
   longitude: z.number().optional(),
   radiusMeters: z.number().min(10).max(5000).default(100),
+  geofencingEnabled: z.boolean().optional().default(false),
 });
 
 const updateWorkCenterSchema = createWorkCenterSchema.partial();
@@ -64,9 +65,25 @@ router.post(
       return;
     }
 
+    // FEATURE GATING: Límites
     const repo = AppDataSource.getRepository(WorkCenter);
+    
+    if (auth.features.maxWorkCenters !== 999) {
+       const currentCount = await repo.count({ where: { companyId: auth.companyId, status: "active" } });
+       if (currentCount >= auth.features.maxWorkCenters) {
+           res.status(403).json({ error: `Tu plan actual (Starter) solo permite ${auth.features.maxWorkCenters} sede. Actualiza a Business para crear sedes ilimitadas.` });
+           return;
+       }
+    }
+
+    // FEATURE GATING: Geofencing
+    let geofencingEnabled = parsed.data.geofencingEnabled;
+    if (!auth.features.canUseGeofencing) {
+        geofencingEnabled = false;
+    }
     const center = repo.create({
       ...parsed.data,
+      geofencingEnabled,
       companyId: auth.companyId,
       status: "active",
     });
@@ -107,6 +124,12 @@ router.put(
     }
 
     Object.assign(center, parsed.data);
+    
+    // FEATURE GATING: Geofencing
+    if (!auth.features.canUseGeofencing) {
+        center.geofencingEnabled = false;
+    }
+
     await repo.save(center);
 
     res.json({ data: center });

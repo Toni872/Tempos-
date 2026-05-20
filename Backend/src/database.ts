@@ -62,8 +62,9 @@ export const AppDataSource = new DataSource({
   migrations:
     process.env.NODE_ENV === "production" ? ["dist/migrations/**/*.js"] : [],
   subscribers: [],
-  ssl:
-    process.env.NODE_ENV === "production"
-      ? { rejectUnauthorized: false }
-      : false,
+  // Railway PostgreSQL REQUIERE SSL incluso en desarrollo.
+  // Sin SSL, la conexión se cierra con ECONNRESET.
+  ssl: dbUrl.includes("rlwy.net") || process.env.NODE_ENV === "production"
+    ? { rejectUnauthorized: false }
+    : false,
 });

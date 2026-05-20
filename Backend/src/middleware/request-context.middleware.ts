@@ -31,8 +31,6 @@ export async function appUserContextMiddleware(
 
       // INGENIERÍA SENIOR: Auto-registro o Migración de usuario si no existe en la DB local
       if (!currentUser && firebaseUser.email) {
-      // INGENIERÍA SENIOR: Auto-registro de usuario si no existe en la DB local
-      if (!currentUser && firebaseUser.email) {
         console.log(
           "🆕 [CONTEXT] Auto-registrando usuario:",
           firebaseUser.email,
@@ -49,7 +47,6 @@ export async function appUserContextMiddleware(
         });
         await userRepo.save(currentUser);
       }
-      }
     }
 
     (req as any).currentUser = currentUser;
@@ -60,7 +57,7 @@ export async function appUserContextMiddleware(
     next();
   } catch (err) {
     console.error("❌ [CONTEXT_MIDDLEWARE] Error crítico:", err);
-    next();
+    next(err);
   }
 }
 
@@ -115,13 +112,37 @@ export function requireActiveSubscription(
 ): void {
   const auth = getAuthContext(req);
 
-  if (auth.isTrial && auth.isTrialExpired) {
+  // Guardia: si el middleware de contexto no pudo construir el auth (p.ej. BD caída),
+  // devolvemos un 503 limpio en lugar de crashear con "Cannot read properties of undefined".
+  if (!auth) {
+    res.status(503).json({
+      error: "SERVICE_UNAVAILABLE",
+      message: "El servicio no está disponible temporalmente. Inténtalo de nuevo en unos segundos.",
+    });
+    return;
+  }
+
+  // Si está en periodo de prueba y ha expirado
+  if (auth.subscriptionPlan === "trial" && auth.isTrialExpired) {
     res.status(402).json({
       error: "TRIAL_EXPIRED",
       message: "Tu periodo de prueba ha finalizado. Por favor, activa un plan para continuar.",
       trialExpiresAt: auth.trialExpiresAt
     });
     return;
+  }
+
+  // Si tiene un plan de pago pero no está activo ni en trialing (por ejemplo, cancelado o impago)
+  if (auth.subscriptionPlan !== "trial") {
+    const validStatuses = ["active", "trialing"];
+    if (!auth.subscriptionStatus || !validStatuses.includes(auth.subscriptionStatus)) {
+      res.status(402).json({
+        error: "SUBSCRIPTION_INACTIVE",
+        message: "Tu suscripción no está activa. Por favor, revisa tu facturación para continuar.",
+        subscriptionStatus: auth.subscriptionStatus
+      });
+      return;
+    }
   }
 
   next();

@@ -17,7 +17,7 @@ import {
 } from 'firebase/auth';
 
 const firebaseConfig = {
-  apiKey: 'AIzaSyCK2gjZJFXG-24OSylfns5uckDjK5LuDuM', // Actualizada desde google-services.json
+  apiKey: 'AIzaSyB9TxpuAfSpnUh0KB66BheE_5dWTr7w8hU', // Browser Key autorizada para Web/Localhost
   authDomain: 'tempos-project-f1e77.firebaseapp.com',
   projectId: 'tempos-project-f1e77',
   storageBucket: 'tempos-project-f1e77.firebasestorage.app',

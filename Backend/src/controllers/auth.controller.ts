@@ -44,9 +44,10 @@ router.post(
     });
 
     if (!user && firebaseUser.email) {
+      const normalizedEmail = firebaseUser.email.toLowerCase();
       // Comprobar si existe por Email (fue creado por un admin previamente)
       user = await userRepository.findOne({
-        where: { email: firebaseUser.email },
+        where: { email: normalizedEmail },
       });
       if (user) {
         // Vincular el UID de Firebase al registro existente
@@ -102,12 +103,12 @@ router.post(
       user.emailVerified = firebaseUser.email_verified;
       user.role = requestedRole;
       user.displayName = bodyParams.name || user.displayName;
+      user.isTrial = requestedRole === "admin";
+      user.trialExpiresAt = requestedRole === "admin" ? new Date(Date.now() + 14 * 24 * 60 * 60 * 1000) : undefined;
       user.metadata = {
         ...user.metadata,
         createdAt: new Date().toISOString(),
         phone: bodyParams.phone || user.metadata?.phone || "",
-        isTrial: requestedRole === "admin",
-        trialExpiresAt: requestedRole === "admin" ? new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString() : undefined
       };
       
       await userRepository.save(user);
@@ -154,23 +155,28 @@ router.post(
     // Crear nuevo usuario
     user = userRepository.create({
       uid: firebaseUser.uid,
-      email: firebaseUser.email,
+      email: firebaseUser.email.toLowerCase(),
       displayName: finalDisplayName,
       photoURL: firebaseUser.picture || undefined,
       emailVerified: firebaseUser.email_verified,
       companyId: companyId,
       role: requestedRole,
       authorizedDeviceId: deviceId,
+      isTrial: requestedRole === "admin",
+      trialExpiresAt: requestedRole === "admin" ? new Date(Date.now() + 14 * 24 * 60 * 60 * 1000) : undefined,
       metadata: {
         createdAt: new Date().toISOString(),
         companyName: bodyParams.companyName || "",
         phone: bodyParams.phone || "",
-        isTrial: requestedRole === "admin",
-        trialExpiresAt: requestedRole === "admin" ? new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString() : undefined
       },
     });
 
-    await userRepository.save(user);
+    try {
+      await userRepository.save(user);
+    } catch (saveErr) {
+      console.error("❌ [AUTH ERROR] Error crítico al guardar usuario:", saveErr);
+      throw saveErr; // El errorHandler lo convertirá en 409 si es duplicado
+    }
 
     // Si es un administrador nuevo (Trial), enviar email premium de bienvenida
     if (requestedRole === "admin") {
@@ -203,6 +209,12 @@ router.get(
   appUserContextMiddleware,
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const auth = getAuthContext(req);
+    
+    if (!auth?.uid) {
+      res.status(503).json({ error: "Servicio temporalmente no disponible. Inténtalo de nuevo." });
+      return;
+    }
+
     const userRepository = AppDataSource.getRepository(User);
 
     const user = await userRepository.findOne({
@@ -257,6 +269,10 @@ router.get(
       createdAt: user.createdAt,
       hasDeviceBound: !!user.authorizedDeviceId,
       requiresGeolocation: user.requiresGeolocation,
+      isTrial: user.isTrial,
+      trialExpiresAt: user.trialExpiresAt,
+      isTrialExpired: user.trialExpiresAt ? new Date() > user.trialExpiresAt : false,
+      features: auth.features,
     });
   }),
 );
@@ -442,6 +458,42 @@ router.post(
 
     res.json({
       message: `Dispositivo desvinculado para ${targetUser.displayName || targetUser.email}.`,
+    });
+  }),
+);
+
+/**
+ * POST /api/v1/auth/dev-upgrade
+ * Simula la actualización a un plan (Solo para desarrollo)
+ */
+router.post(
+  "/dev-upgrade",
+  firebaseAuthMiddleware,
+  appUserContextMiddleware,
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const auth = getAuthContext(req);
+    const { planId } = req.body;
+
+    const userRepository = AppDataSource.getRepository(User);
+    const user = await userRepository.findOne({
+      where: { uid: auth.uid },
+    });
+
+    if (!user) {
+      res.status(404).json({ error: "Usuario no encontrado" });
+      return;
+    }
+
+    user.subscriptionPlan = planId || "business";
+    user.subscriptionStatus = "active";
+    await userRepository.save(user);
+
+    res.json({
+      message: `Plan simulado actualizado a ${user.subscriptionPlan}`,
+      user: {
+        uid: user.uid,
+        subscriptionPlan: user.subscriptionPlan,
+      },
     });
   }),
 );

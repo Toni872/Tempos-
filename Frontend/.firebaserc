@@ -1,5 +1,7 @@
 {
   "projects": {
     "default": "tempos-project"
-  }
+  },
+  "targets": {},
+  "etags": {}
 }

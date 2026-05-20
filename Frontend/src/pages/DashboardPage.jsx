@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState, lazy, Suspense } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useDashboardData } from '@/hooks/useDashboardData';
 import api, { 
@@ -43,29 +43,40 @@ import { ShieldCheck, CheckCircle } from '@phosphor-icons/react';
 
 // Modular Components
 import DashboardShell from '@/components/dashboard/DashboardShell';
-import OverviewTab from '@/components/dashboard/OverviewTab';
-import HomeHub from '@/components/dashboard/HomeHub';
-import EmployeeTab from '@/components/dashboard/EmployeeTab';
-import AttendanceTab from '@/components/dashboard/AttendanceTab';
-import AnalisisTab from '@/components/dashboard/AnalisisTab';
-import InformesTab from '@/components/dashboard/InformesTab';
-import NominasTab from '@/components/dashboard/NominasTab';
-import HorariosTab from '@/components/dashboard/HorariosTab';
-import SedesTab from '@/components/dashboard/SedesTab';
-import AusenciasTab from '@/components/dashboard/AusenciasTab';
-import DocumentosTab from '@/components/dashboard/DocumentosTab';
-import MensajesTab from '@/components/dashboard/MensajesTab';
-import PerfilTab from '@/components/dashboard/PerfilTab';
-import ConfiguracionTab from '@/components/dashboard/ConfiguracionTab';
-import GeoMapaTab from '@/components/dashboard/GeoMapaTab';
 import QuickClock from '@/components/dashboard/QuickClock';
 import MobileQuickClock from '@/components/dashboard/MobileQuickClock';
-import AuditTrailModal from '@/components/dashboard/AuditTrailModal';
 import { Capacitor } from '@capacitor/core';
 
-// Specific Forms
-import ScheduleForm from '@/components/dashboard/ScheduleForm';
-import ShiftAssignForm from '@/components/dashboard/ShiftAssignForm';
+// Lazy Loaded Modular Tabs (Optimizes initial load bundle)
+const HomeHub = lazy(() => import('@/components/dashboard/HomeHub'));
+const EmployeeTab = lazy(() => import('@/components/dashboard/EmployeeTab'));
+const AttendanceTab = lazy(() => import('@/components/dashboard/AttendanceTab'));
+const AnalisisTab = lazy(() => import('@/components/dashboard/AnalisisTab'));
+const InformesTab = lazy(() => import('@/components/dashboard/InformesTab'));
+const NominasTab = lazy(() => import('@/components/dashboard/NominasTab'));
+const HorariosTab = lazy(() => import('@/components/dashboard/HorariosTab'));
+const SedesTab = lazy(() => import('@/components/dashboard/SedesTab'));
+const AusenciasTab = lazy(() => import('@/components/dashboard/AusenciasTab'));
+const DocumentosTab = lazy(() => import('@/components/dashboard/DocumentosTab'));
+const MensajesTab = lazy(() => import('@/components/dashboard/MensajesTab'));
+const PerfilTab = lazy(() => import('@/components/dashboard/PerfilTab'));
+const ConfiguracionTab = lazy(() => import('@/components/dashboard/ConfiguracionTab'));
+const GeoMapaTab = lazy(() => import('@/components/dashboard/GeoMapaTab'));
+const PlanesTab = lazy(() => import('@/components/dashboard/PlanesTab'));
+const ComplianceTab = lazy(() => import('@/components/dashboard/ComplianceTab'));
+
+// Lazy Loaded Specific Forms & Heavy Modals
+const ScheduleForm = lazy(() => import('@/components/dashboard/ScheduleForm'));
+const ShiftAssignForm = lazy(() => import('@/components/dashboard/ShiftAssignForm'));
+const EmpleadoForm = lazy(() => import('@/components/dashboard/EmpleadoForm'));
+const WorkCenterForm = lazy(() => import('@/components/dashboard/WorkCenterForm'));
+const DocumentoForm = lazy(() => import('@/components/dashboard/DocumentoForm'));
+const AusenciaForm = lazy(() => import('@/components/dashboard/AusenciaForm'));
+const FichaForm = lazy(() => import('@/components/dashboard/FichaForm'));
+const CorrectionRequestForm = lazy(() => import('@/components/dashboard/CorrectionRequestForm'));
+const ExpedienteEmpleado = lazy(() => import('@/components/dashboard/ExpedienteEmpleado'));
+const AuditTrailModal = lazy(() => import('@/components/dashboard/AuditTrailModal'));
+const TrialExpiredOverlay = lazy(() => import('@/components/dashboard/TrialExpiredOverlay'));
 
 // Existing UI Components
 import ModalBase from '@/components/dashboard/ModalBase';
@@ -78,20 +89,8 @@ import { useAutoClock } from '@/hooks/useAutoClock';
 import Loader from '@/components/dashboard/Loader';
 import Success from '@/components/dashboard/Success';
 import ErrorComponent from '@/components/dashboard/Error';
-import EmpleadoForm from '@/components/dashboard/EmpleadoForm';
-import WorkCenterForm from '@/components/dashboard/WorkCenterForm';
-import DocumentoForm from '@/components/dashboard/DocumentoForm';
-import AusenciaForm from '@/components/dashboard/AusenciaForm';
-import FichaForm from '@/components/dashboard/FichaForm';
-import CorrectionRequestForm from '@/components/dashboard/CorrectionRequestForm';
-import ComplianceTab from '@/components/dashboard/ComplianceTab';
-import ExpedienteEmpleado from '@/components/dashboard/ExpedienteEmpleado';
-import MapaAuditoria from '@/components/dashboard/MapaAuditoria';
-import SchedulingGrid from '@/components/dashboard/SchedulingGrid';
 import TabErrorBoundary from '@/components/TabErrorBoundary';
-import ErrorBoundary from "@/components/ui/ErrorBoundary";
 import EmployeeDashboard from '@/components/dashboard/EmployeeDashboard';
-import TrialExpiredOverlay from '@/components/dashboard/TrialExpiredOverlay';
 
 function cn(...classes) {
   return classes.filter(Boolean).join(' ');
@@ -135,6 +134,11 @@ export default function DashboardPage() {
     loadData,
     handleLogout
   } = useDashboardData(registrosFilters);
+
+  // 🔄 Recarga completa de todas las entidades del dashboard
+  const refreshAllData = useCallback(async () => {
+    await loadData('all');
+  }, [loadData]);
 
   const isMobile = useMemo(() => Capacitor.isNativePlatform(), []);
   const isAdmin = useMemo(() => profile?.role === 'admin' || profile?.role === 'manager', [profile]);
@@ -624,6 +628,18 @@ export default function DashboardPage() {
 
   if (loading) return <Loader />;
 
+  if (!profile) {
+    return (
+      <div className="h-screen w-full flex items-center justify-center bg-[#0a0a0c]">
+        <ErrorComponent 
+          message="No se pudo cargar tu perfil. Es posible que haya un problema de conexión con el servidor. Por favor, inténtalo de nuevo." 
+          onRetry={handleLogout} 
+          retryText="Volver al Login"
+        />
+      </div>
+    );
+  }
+
   // ─── VISTA EMPLEADO: Interfaz dedicada ───
   if (!isAdmin) {
     return (
@@ -679,256 +695,265 @@ export default function DashboardPage() {
               elapsedTime={elapsedWorkingTime}
             />
           ) : (
-            <>
+            <Suspense fallback={<Loader />}>
               {activeTab === 'Inicio' && (
-            <HomeHub 
-              profile={profile}
-              setActiveTab={setActiveTab}
-              stats={{
-                working: dashboardStats?.metrics?.working || 0,
-                totalEmployees: employees.length,
-                todayRegistros: registros.filter(r => r.startTime?.includes(new Date().toISOString().split('T')[0])).length,
-                pendingAbsences: stats.pendingAbsences || 0
-              }}
-            />
-          )}
+                <HomeHub 
+                  profile={profile}
+                  setActiveTab={setActiveTab}
+                  stats={{
+                    working: dashboardStats?.metrics?.working || 0,
+                    totalEmployees: employees.length,
+                    todayRegistros: registros.filter(r => r.startTime?.includes(new Date().toISOString().split('T')[0])).length,
+                    pendingAbsences: stats.pendingAbsences || 0
+                  }}
+                />
+              )}
 
-          {activeTab === 'Equipo' && (
-            <EmployeeTab 
-              employees={employees}
-              onAddEmployee={() => openModal('empleado')}
-              onEditEmployee={(emp) => openModal('empleado', 'edit', emp)}
-              onDeleteEmployee={handleEmployeeDelete}
-              onViewExpediente={setSelectedEmployee}
-            />
-          )}
+              {activeTab === 'Equipo' && (
+                <EmployeeTab 
+                  employees={employees}
+                  onAddEmployee={() => openModal('empleado')}
+                  onEditEmployee={(emp) => openModal('empleado', 'edit', emp)}
+                  onDeleteEmployee={handleEmployeeDelete}
+                  onViewExpediente={setSelectedEmployee}
+                />
+              )}
 
-          {activeTab === 'GeoMapa' && (
-            <GeoMapaTab
-              registros={registros}
-              workCenters={workCenters}
-              employees={employees}
-            />
-          )}
+              {activeTab === 'GeoMapa' && (
+                <GeoMapaTab
+                  registros={registros}
+                  workCenters={workCenters}
+                  employees={employees}
+                />
+              )}
 
-          {activeTab === 'Registros' && (
-            <AttendanceTab 
-              registros={registros} 
-              filters={registrosFilters}
-              setFilters={setRegistrosFilters}
-              onExport={handleExportReport}
-              employees={employees}
-              workCenters={workCenters}
-              profile={profile}
-              onEdit={(row) => {
-                if (isAdmin) {
-                  if (row.status === 'disputed') openModal('review_correction', 'edit', row);
-                  else openModal('registros', 'edit', row);
-                } else {
-                  openModal('correction', 'edit', row);
-                }
-              }}
-              onViewAudit={(row) => { setSelectedAuditFichaId(row.id); setAuditModalOpen(true); }}
-            />
-          )}
+              {activeTab === 'Registros' && (
+                <AttendanceTab 
+                  registros={registros} 
+                  filters={registrosFilters}
+                  setFilters={setRegistrosFilters}
+                  onExport={handleExportReport}
+                  employees={employees}
+                  workCenters={workCenters}
+                  profile={profile}
+                  onEdit={(row) => {
+                    if (isAdmin) {
+                      if (row.status === 'disputed') openModal('review_correction', 'edit', row);
+                      else openModal('registros', 'edit', row);
+                    } else {
+                      openModal('correction', 'edit', row);
+                    }
+                  }}
+                  onViewAudit={(row) => { setSelectedAuditFichaId(row.id); setAuditModalOpen(true); }}
+                />
+              )}
 
-          {activeTab === 'Horarios' && (
-            <HorariosTab 
-              employees={employees}
-              schedules={schedules || []}
-              assignments={shiftAssignments}
-              isAdmin={isAdmin}
-              profile={profile}
-              onAssign={(emp, date) => openModal('assign_shift', 'create', { userId: emp.id, startDate: date.toISOString().split('T')[0] })}
-              onAddTemplate={() => openModal('schedule')}
-              onEditTemplate={(sch) => openModal('schedule', 'edit', sch)}
-              onDeleteTemplate={handleScheduleDelete}
-            />
-          )}
+              {activeTab === 'Horarios' && (
+                <HorariosTab 
+                  employees={employees}
+                  schedules={schedules || []}
+                  assignments={shiftAssignments}
+                  isAdmin={isAdmin}
+                  profile={profile}
+                  onAssign={(emp, date) => openModal('assign_shift', 'create', { userId: emp.id, startDate: date.toISOString().split('T')[0] })}
+                  onAddTemplate={() => openModal('schedule')}
+                  onEditTemplate={(sch) => openModal('schedule', 'edit', sch)}
+                  onDeleteTemplate={handleScheduleDelete}
+                />
+              )}
 
-          {activeTab === 'Sedes' && (
-            <SedesTab 
-              workCenters={workCenters || []}
-              onAdd={() => openModal('workcenter')}
-              onEdit={(wc) => openModal('workcenter', 'edit', wc)}
-              onDelete={handleWorkCenterDelete}
-            />
-          )}
+              {activeTab === 'Sedes' && (
+                <SedesTab 
+                  workCenters={workCenters || []}
+                  profile={profile}
+                  onAdd={() => openModal('workcenter')}
+                  onEdit={(wc) => openModal('workcenter', 'edit', wc)}
+                  onDelete={handleWorkCenterDelete}
+                />
+              )}
 
-          {activeTab === 'Legal' && (
-            <ComplianceTab onExportInspection={handleExportReport} />
-          )}
+              {activeTab === 'Legal' && (
+                <ComplianceTab onExportInspection={handleExportReport} />
+              )}
 
-          {activeTab === 'Ausencias' && (
-            <AusenciasTab
-              pendingAbsences={pendingAbsences}
-              isAdmin={isAdmin}
-              onRequestAbsence={() => openModal('ausencia')}
-              onActOnAbsence={actOnAbsence}
-            />
-          )}
+              {activeTab === 'Ausencias' && (
+                <AusenciasTab
+                  pendingAbsences={pendingAbsences}
+                  isAdmin={isAdmin}
+                  profile={profile}
+                  onRequestAbsence={() => openModal('ausencia')}
+                  onActOnAbsence={actOnAbsence}
+                />
+              )}
 
-          {activeTab === 'Documentos' && (
-            <DocumentosTab
-              documents={documents}
-              isAdmin={isAdmin}
-              onUploadDocument={() => openModal('documento')}
-              onDownloadDocument={handleDownloadDocument}
-              onSignDocument={handleSignDocument}
-            />
-          )}
+              {activeTab === 'Documentos' && (
+                <DocumentosTab
+                  documents={documents}
+                  isAdmin={isAdmin}
+                  onUploadDocument={() => openModal('documento')}
+                  onDownloadDocument={handleDownloadDocument}
+                  onSignDocument={handleSignDocument}
+                />
+              )}
 
-          {activeTab === 'Análisis' && (
-            <AnalisisTab
-              registros={registros}
-              workCenters={workCenters}
-              employees={employees}
-            />
-          )}
+              {activeTab === 'Análisis' && (
+                <AnalisisTab
+                  registros={registros}
+                  workCenters={workCenters}
+                  employees={employees}
+                />
+              )}
 
-          {activeTab === 'Informes' && (
-            <InformesTab 
-              auditLogs={auditLogRows}
-              onExportAudit={handleExportAudit}
-              onExportInspection={handleExportReport}
-              onResetFilters={handleResetAuditFilters}
-              registros={registros}
-              workCenters={workCenters}
-              employees={employees}
-            />
-          )}
+              {activeTab === 'Informes' && (
+                <InformesTab 
+                  auditLogs={auditLogRows}
+                  onExportAudit={handleExportAudit}
+                  onExportInspection={handleExportReport}
+                  onResetFilters={handleResetAuditFilters}
+                  registros={registros}
+                  workCenters={workCenters}
+                  employees={employees}
+                />
+              )}
 
-          {activeTab === 'Nóminas' && (
-            <NominasTab
-              employees={employees}
-              documents={documents}
-              onUploadDocument={() => openModal('documento')}
-            />
-          )}
+              {activeTab === 'Nóminas' && (
+                <NominasTab
+                  employees={employees}
+                  documents={documents}
+                  onUploadDocument={() => openModal('documento')}
+                />
+              )}
 
-          {activeTab === 'Mensajes' && (
-            <MensajesTab profile={profile} employees={employees} />
-          )}
+              {activeTab === 'Mensajes' && (
+                <MensajesTab profile={profile} employees={employees} />
+              )}
 
-          {activeTab === 'Mi Perfil' && (
-            <PerfilTab 
-              profile={profile || {}}
-              consentGiven={consentGiven}
-              openRevokeModal={openRevokeModal}
-              onUpdate={() => loadData('core')}
-            />
-          )}
+              {activeTab === 'Mi Perfil' && (
+                <PerfilTab 
+                  profile={profile || {}}
+                  consentGiven={consentGiven}
+                  openRevokeModal={openRevokeModal}
+                  onUpdate={() => loadData('core')}
+                />
+              )}
 
-          {activeTab === 'Mi Empresa' && (
-            <ConfiguracionTab 
-              profile={profile}
-              isAdmin={isAdmin}
-            />
-          )}
-            </>
+              {activeTab === 'Planes' && (
+                <PlanesTab profile={profile} />
+              )}
+
+              {activeTab === 'Mi Empresa' && (
+                <ConfiguracionTab 
+                  profile={profile}
+                  isAdmin={isAdmin}
+                />
+              )}
+            </Suspense>
           )}
         </div>
       </TabErrorBoundary>
 
 
       <ModalBase open={!!modal} onClose={closeModal} title={modal}>
-        {modal === 'empleado' && (
-          <EmpleadoForm 
-            mode={modalMode} 
-            initialValues={modalData} 
-            onSubmit={handleEmployeeSubmit}
-            onCancel={closeModal}
-            loading={loading}
-          />
-        )}
-        {modal === 'registros' && (
-          <FichaForm 
-            initialData={modalData}
-            onSubmit={handleFichaSubmit}
-            onCancel={closeModal}
-            loading={loading}
-          />
-        )}
-        {modal === 'correction' && (
-          <CorrectionRequestForm 
-            initialData={modalData}
-            onSubmit={handleCorrectionSubmit}
-            onCancel={closeModal}
-            loading={loading}
-          />
-        )}
-        {modal === 'review_correction' && (
-          <div className="space-y-6">
-            <div className="p-4 rounded-2xl bg-amber-500/5 border border-amber-500/10 space-y-3">
-              <h4 className="text-xs font-black uppercase tracking-widest text-amber-500">Solicitud de Corrección</h4>
-              <p className="text-[13px] text-zinc-300"><strong>Motivo:</strong> {modalData?.metadata?.correctionRequest?.reason}</p>
-              <div className="grid grid-cols-2 gap-4 pt-2">
-                <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.04]">
-                  <p className="text-[10px] text-zinc-600 font-bold uppercase">Anterior</p>
-                  <p className="text-xs text-zinc-400">{modalData?.startTime} - {modalData?.endTime}</p>
-                </div>
-                <div className="p-3 rounded-xl bg-blue-500/5 border border-blue-500/10">
-                  <p className="text-[10px] text-blue-500 font-bold uppercase">Propuesto</p>
-                  <p className="text-xs text-blue-400">
-                    {modalData?.metadata?.correctionRequest?.proposedChanges?.startTime || modalData?.startTime} - {modalData?.metadata?.correctionRequest?.proposedChanges?.endTime || modalData?.endTime}
-                  </p>
+        <Suspense fallback={<Loader />}>
+          {modal === 'empleado' && (
+            <EmpleadoForm 
+              mode={modalMode} 
+              initialValues={modalData} 
+              onSubmit={handleEmployeeSubmit}
+              onCancel={closeModal}
+              loading={loading}
+            />
+          )}
+          {modal === 'registros' && (
+            <FichaForm 
+              initialData={modalData}
+              onSubmit={handleFichaSubmit}
+              onCancel={closeModal}
+              loading={loading}
+            />
+          )}
+          {modal === 'correction' && (
+            <CorrectionRequestForm 
+              initialData={modalData}
+              onSubmit={handleCorrectionSubmit}
+              onCancel={closeModal}
+              loading={loading}
+            />
+          )}
+          {modal === 'review_correction' && (
+            <div className="space-y-6">
+              <div className="p-4 rounded-2xl bg-amber-500/5 border border-amber-500/10 space-y-3">
+                <h4 className="text-xs font-black uppercase tracking-widest text-amber-500">Solicitud de Corrección</h4>
+                <p className="text-[13px] text-zinc-300"><strong>Motivo:</strong> {modalData?.metadata?.correctionRequest?.reason}</p>
+                <div className="grid grid-cols-2 gap-4 pt-2">
+                  <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.04]">
+                    <p className="text-[10px] text-zinc-600 font-bold uppercase">Anterior</p>
+                    <p className="text-xs text-zinc-400">{modalData?.startTime} - {modalData?.endTime}</p>
+                  </div>
+                  <div className="p-3 rounded-xl bg-blue-500/5 border border-blue-500/10">
+                    <p className="text-[10px] text-blue-500 font-bold uppercase">Propuesto</p>
+                    <p className="text-xs text-blue-400">
+                      {modalData?.metadata?.correctionRequest?.proposedChanges?.startTime || modalData?.startTime} - {modalData?.metadata?.correctionRequest?.proposedChanges?.endTime || modalData?.endTime}
+                    </p>
+                  </div>
                 </div>
               </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 ml-1">Comentario de Revisión (Opcional)</label>
+                <textarea 
+                  id="reviewComment"
+                  className="w-full bg-[#111114] border border-white/[0.06] rounded-xl py-3 px-4 text-sm text-white focus:ring-1 focus:ring-blue-600 outline-none transition-all min-h-[80px] resize-none"
+                  placeholder="Indica el motivo de la aprobación o rechazo..."
+                />
+              </div>
+              <div className="flex items-center gap-3 pt-4">
+                <button
+                  onClick={() => handleReviewCorrection('rejected', document.getElementById('reviewComment').value)}
+                  className="flex-1 px-6 py-4 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-500 text-[11px] font-black uppercase tracking-widest hover:bg-rose-500/20 transition-all"
+                  disabled={loading}
+                >
+                  Rechazar
+                </button>
+                <button
+                  onClick={() => handleReviewCorrection('approved', document.getElementById('reviewComment').value)}
+                  className="flex-[2] px-6 py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-black uppercase tracking-widest transition-all shadow-lg shadow-emerald-600/20"
+                  disabled={loading}
+                >
+                  Aprobar y Aplicar
+                </button>
+              </div>
             </div>
-            <div className="space-y-2">
-              <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 ml-1">Comentario de Revisión (Opcional)</label>
-              <textarea 
-                id="reviewComment"
-                className="w-full bg-[#111114] border border-white/[0.06] rounded-xl py-3 px-4 text-sm text-white focus:ring-1 focus:ring-blue-600 outline-none transition-all min-h-[80px] resize-none"
-                placeholder="Indica el motivo de la aprobación o rechazo..."
-              />
-            </div>
-            <div className="flex items-center gap-3 pt-4">
-              <button
-                onClick={() => handleReviewCorrection('rejected', document.getElementById('reviewComment').value)}
-                className="flex-1 px-6 py-4 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-500 text-[11px] font-black uppercase tracking-widest hover:bg-rose-500/20 transition-all"
-                disabled={loading}
-              >
-                Rechazar
-              </button>
-              <button
-                onClick={() => handleReviewCorrection('approved', document.getElementById('reviewComment').value)}
-                className="flex-[2] px-6 py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-black uppercase tracking-widest transition-all shadow-lg shadow-emerald-600/20"
-                disabled={loading}
-              >
-                Aprobar y Aplicar
-              </button>
-            </div>
-          </div>
-        )}
-        {modal === 'workcenter' && (
-          <WorkCenterForm 
-            initialData={modalData} 
-            onSubmit={handleWorkCenterSubmit} 
-            onCancel={closeModal} 
-            loading={loading} 
-          />
-        )}
-        {modal === 'ausencia' && <AusenciaForm onSubmit={handleAbsenceSubmit} onCancel={closeModal} loading={loading} />}
-        {modal === 'documento' && <DocumentoForm onSubmit={handleDocumentSubmit} onCancel={closeModal} loading={loading} />}
-        {modal === 'schedule' && (
-          <ScheduleForm 
-            mode={modalMode}
-            initialValues={modalData}
-            onSubmit={handleScheduleSubmit} 
-            onCancel={closeModal} 
-            loading={loading}
-          />
-        )}
-        {modal === 'assign_shift' && <ShiftAssignForm initialValues={modalData} employees={employees} schedules={schedules} onSubmit={async (data) => { 
-          try { 
-            const session = getClientSession();
-            await assignShift(session.token, data); 
-            closeModal(); 
-            refreshAllData(); 
-            showFeedback('success', 'Turno asignado.');
-          } catch (err) { showFeedback('error', 'Error al asignar turno.'); } 
-        }} onCancel={closeModal} />}
+          )}
+          {modal === 'workcenter' && (
+            <WorkCenterForm 
+              initialData={modalData} 
+              onSubmit={handleWorkCenterSubmit} 
+              onCancel={closeModal} 
+              loading={loading}
+              profile={profile} 
+            />
+          )}
+          {modal === 'ausencia' && <AusenciaForm onSubmit={handleAbsenceSubmit} onCancel={closeModal} loading={loading} />}
+          {modal === 'documento' && <DocumentoForm onSubmit={handleDocumentSubmit} onCancel={closeModal} loading={loading} />}
+          {modal === 'schedule' && (
+            <ScheduleForm 
+              mode={modalMode}
+              initialValues={modalData}
+              onSubmit={handleScheduleSubmit} 
+              onCancel={closeModal} 
+              loading={loading}
+            />
+          )}
+          {modal === 'assign_shift' && <ShiftAssignForm initialValues={modalData} employees={employees} schedules={schedules} onSubmit={async (data) => { 
+            try { 
+              const session = getClientSession();
+              await assignShift(session.token, data); 
+              closeModal(); 
+              refreshAllData(); 
+              showFeedback('success', 'Turno asignado.');
+            } catch (err) { showFeedback('error', 'Error al asignar turno.'); } 
+          }} onCancel={closeModal} />}
+        </Suspense>
       </ModalBase>
 
       {/* MODAL DE CONSENTIMIENTO LEGAL OBLIGATORIO */}
@@ -970,14 +995,16 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {selectedEmployee && (
-        <ExpedienteEmpleado 
-          employee={selectedEmployee} 
-          onClose={() => setSelectedEmployee(null)} 
-          fichas={[]}
-          onUpdate={refreshAllData}
-        />
-      )}
+      <Suspense fallback={null}>
+        {selectedEmployee && (
+          <ExpedienteEmpleado 
+            employee={selectedEmployee} 
+            onClose={() => setSelectedEmployee(null)} 
+            fichas={[]}
+            onUpdate={refreshAllData}
+          />
+        )}
+      </Suspense>
 
       {success && <Success message={success} onClose={() => setSuccess('')} />}
       {error && <ErrorComponent message={error} onClose={() => setError('')} />}
@@ -990,15 +1017,17 @@ export default function DashboardPage() {
         onRevoke={handleGeolocationConsentRevoke}
       />
 
-      <AuditTrailModal 
-        open={auditModalOpen}
-        onClose={() => setAuditModalOpen(false)}
-        fichaId={selectedAuditFichaId}
-      />
+      <Suspense fallback={null}>
+        <AuditTrailModal 
+          open={auditModalOpen}
+          onClose={() => setAuditModalOpen(false)}
+          fichaId={selectedAuditFichaId}
+        />
 
-      {isTrialExpired && (
-        <TrialExpiredOverlay trialExpiresAt={profile?.trialExpiresAt} />
-      )}
+        {isTrialExpired && (
+          <TrialExpiredOverlay trialExpiresAt={profile?.trialExpiresAt} />
+        )}
+      </Suspense>
     </DashboardShell>
   );
 }

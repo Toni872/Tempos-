@@ -42,9 +42,25 @@ export class User {
     invitedBy?: string;
     companyName?: string;
     phone?: string;
-    isTrial?: boolean;
-    trialExpiresAt?: string;
   };
+
+  @Column({ type: "boolean", default: false })
+  isTrial!: boolean;
+
+  @Column({ type: "timestamp", nullable: true })
+  trialExpiresAt?: Date;
+
+  @Column({ type: "varchar", nullable: true })
+  stripeCustomerId?: string;
+
+  @Column({ type: "varchar", nullable: true })
+  stripeSubscriptionId?: string;
+
+  @Column({ type: "varchar", default: "trial" })
+  subscriptionPlan!: string; // 'trial', 'starter', 'business', 'enterprise'
+
+  @Column({ type: "varchar", nullable: true })
+  subscriptionStatus?: string; // 'active', 'trialing', 'canceled', 'incomplete', 'past_due', etc.
 
   @Column({ type: "boolean", default: false })
   hasAutoClock!: boolean;

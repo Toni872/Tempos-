@@ -7,7 +7,9 @@ import {
   EmployeeSchema, 
   WorkCenterSchema, 
   DocumentSchema, 
-  AbsenceSchema 
+  AbsenceSchema,
+  CheckoutSessionResponseSchema,
+  PortalSessionResponseSchema 
 } from './schemas';
 
 import { Capacitor, CapacitorHttp } from '@capacitor/core';
@@ -633,6 +635,24 @@ export async function unsubscribePush(endpoint) {
 
 export async function sendTestPush() {
   return request('/api/v1/push/send-test', { method: 'POST' });
+}
+
+// Billing / Stripe
+export async function createCheckoutSession(token, lookupKey) {
+  const res = await request('/api/v1/billing/create-checkout-session', {
+    method: 'POST',
+    token,
+    body: JSON.stringify({ lookup_key: lookupKey })
+  });
+  return CheckoutSessionResponseSchema.parse(res);
+}
+
+export async function createPortalSession(token) {
+  const res = await request('/api/v1/billing/create-portal-session', {
+    method: 'POST',
+    token
+  });
+  return PortalSessionResponseSchema.parse(res);
 }
 
 const api = {

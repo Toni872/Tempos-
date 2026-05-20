@@ -10,7 +10,7 @@ import {
 import Toggle from '@/components/ui/Toggle';
 import { cn } from '@/lib/utils';
 
-export default function WorkCenterForm({ initialData, onSubmit, onCancel }) {
+export default function WorkCenterForm({ initialData, onSubmit, onCancel, profile }) {
   // Aseguramos valores por defecto para evitar warnings de uncontrolled input
   const [formData, setFormData] = useState({
     name: initialData?.name || '',
@@ -88,18 +88,31 @@ export default function WorkCenterForm({ initialData, onSubmit, onCancel }) {
         <div className="p-6 rounded-2xl bg-white/[0.02] border border-white/[0.06] space-y-5">
            <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                 <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-500">
+                 <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center", profile?.features?.canUseGeofencing === false ? "bg-zinc-500/10 text-zinc-500" : "bg-blue-500/10 text-blue-500")}>
                     <Crosshair weight="duotone" className="w-5 h-5" />
                  </div>
                  <div>
-                    <h4 className="text-xs font-black text-white uppercase tracking-widest leading-none">Geofencing</h4>
-                    <p className="text-[10px] text-zinc-600 font-medium mt-1">Limitar fichajes al radio de la sede.</p>
+                    <h4 className="text-xs font-black text-white uppercase tracking-widest leading-none flex items-center gap-2">
+                      Geofencing
+                      {profile?.features?.canUseGeofencing === false && (
+                        <span className="text-[9px] bg-rose-500/20 text-rose-400 px-2 py-0.5 rounded-full flex items-center gap-1">
+                          🔒 BUSINESS
+                        </span>
+                      )}
+                    </h4>
+                    <p className="text-[10px] text-zinc-600 font-medium mt-1">
+                      {profile?.features?.canUseGeofencing === false 
+                        ? "Mejora tu plan para activar el control perimetral."
+                        : "Limitar fichajes al radio de la sede."}
+                    </p>
                  </div>
               </div>
-              <Toggle 
-                enabled={formData.geofencingEnabled} 
-                onChange={(val) => setFormData(p => ({ ...p, geofencingEnabled: val }))} 
-              />
+              <div className={cn("transition-opacity", profile?.features?.canUseGeofencing === false && "opacity-50 pointer-events-none")}>
+                <Toggle 
+                  enabled={formData.geofencingEnabled && profile?.features?.canUseGeofencing !== false} 
+                  onChange={(val) => setFormData(p => ({ ...p, geofencingEnabled: val }))} 
+                />
+              </div>
            </div>
 
            {formData.geofencingEnabled && (
