@@ -6,6 +6,7 @@ import { getDeviceUniqueId } from '@/lib/nativeServices';
 import { Capacitor } from '@capacitor/core';
 import api from '@/lib/api';
 import Logo from '@/components/ui/Logo';
+import { z } from 'zod';
 
 const MIN_PASSWORD_LENGTH = 8;
 const AUTH_FIELD_IDS = {
@@ -211,32 +212,31 @@ export default function AuthPage({ mode }) {
     });
   };
 
+  const loginSchema = z.object({
+    email: z.string().min(1, "El correo electrónico es obligatorio.").email("Introduce un correo electrónico válido."),
+    password: z.string().min(1, "La contraseña es obligatoria.").min(MIN_PASSWORD_LENGTH, `La contraseña debe tener al menos ${MIN_PASSWORD_LENGTH} caracteres.`)
+  });
+
+  const registerSchema = z.object({
+    companyName: z.string().min(1, "El nombre de la empresa es obligatorio para administradores."),
+    name: z.string().min(1, "El nombre completo es obligatorio."),
+    email: z.string().min(1, "El correo electrónico es obligatorio.").email("Introduce un correo electrónico válido."),
+    password: z.string().min(1, "La contraseña es obligatoria.").min(MIN_PASSWORD_LENGTH, `La contraseña debe tener al menos ${MIN_PASSWORD_LENGTH} caracteres.`)
+  });
+
   const validateForm = () => {
-    const nextErrors = {};
-    const trimmedEmail = email.trim();
-    const trimmedPassword = password.trim();
-
-    if (!isLogin && role === 'admin' && !companyName.trim()) {
-      nextErrors.companyName = 'El nombre de la empresa es obligatorio para administradores.';
+    const data = { email, password, name, companyName };
+    const schema = isLogin ? loginSchema : registerSchema;
+    
+    const result = schema.safeParse(data);
+    if (!result.success) {
+      const nextErrors = {};
+      result.error.errors.forEach(err => {
+        nextErrors[err.path[0]] = err.message;
+      });
+      return nextErrors;
     }
-
-    if (!isLogin && !name.trim()) {
-      nextErrors.name = 'El nombre completo es obligatorio.';
-    }
-
-    if (!trimmedEmail) {
-      nextErrors.email = 'El correo electrónico es obligatorio.';
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
-      nextErrors.email = 'Introduce un correo electrónico válido.';
-    }
-
-    if (!trimmedPassword) {
-      nextErrors.password = 'La contraseña es obligatoria.';
-    } else if (trimmedPassword.length < MIN_PASSWORD_LENGTH) {
-      nextErrors.password = `La contraseña debe tener al menos ${MIN_PASSWORD_LENGTH} caracteres.`;
-    }
-
-    return nextErrors;
+    return {};
   };
 
 

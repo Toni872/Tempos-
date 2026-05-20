@@ -1,0 +1,26 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isSameCompany(companyId) {
+      return isAuthenticated() && (
+        request.auth.token.companyId == companyId || 
+        request.auth.token.company_id == companyId
+      );
+    }
+
+    // Estructura de carpetas: /companies/{companyId}/documents/{docId}
+    match /companies/{companyId}/{allPaths=**} {
+      allow read, write: if isSameCompany(companyId);
+    }
+
+    // Bloqueo total del resto
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

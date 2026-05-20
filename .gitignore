@@ -38,3 +38,7 @@ jdk*/
 *.rar
 *.exe
 *.msi
+
+# Binary artifacts (APK/AAB)
+*.apk
+*.aab

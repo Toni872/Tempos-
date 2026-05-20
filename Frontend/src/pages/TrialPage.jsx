@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import Logo from '@/components/ui/Logo';
 import { signUpAndGetIdToken } from '@/lib/firebaseClient';
 import { registerMe, getMe, setClientSession } from '@/lib/api';
+import { z } from 'zod';
 
 const PHONE_REGEX = /^[+]?[(]?[0-9\s-]{6,20}$/;
 const TRIAL_FIELD_IDS = {
@@ -89,39 +90,28 @@ export default function TrialPage() {
     });
   };
 
+  const trialSchema = z.object({
+    company: z.string().min(1, "El nombre de la empresa es obligatorio."),
+    phone: z.string().min(1, "El teléfono de contacto es obligatorio.").regex(PHONE_REGEX, "Introduce un teléfono válido."),
+    firstName: z.string().min(1, "El nombre es obligatorio."),
+    lastName: z.string().min(1, "Los apellidos son obligatorios."),
+    email: z.string().min(1, "El email profesional es obligatorio.").email("Introduce un email profesional válido."),
+    password: z.string().min(1, "La contraseña es obligatoria.").min(8, "Debe tener al menos 8 caracteres."),
+    acceptedPrivacy: z.literal(true, {
+      errorMap: () => ({ message: "Debes aceptar la política de privacidad para continuar." })
+    })
+  });
+
   const validateForm = () => {
-    const nextErrors = {};
-    const emailValue = formData.email.trim();
-
-    if (!formData.company.trim()) {
-      nextErrors.company = 'El nombre de la empresa es obligatorio.';
+    const result = trialSchema.safeParse(formData);
+    if (!result.success) {
+      const nextErrors = {};
+      result.error.errors.forEach(err => {
+        nextErrors[err.path[0]] = err.message;
+      });
+      return nextErrors;
     }
-    if (!formData.phone.trim()) {
-      nextErrors.phone = 'El teléfono de contacto es obligatorio.';
-    } else if (!PHONE_REGEX.test(formData.phone.trim())) {
-      nextErrors.phone = 'Introduce un teléfono válido.';
-    }
-    if (!formData.firstName.trim()) {
-      nextErrors.firstName = 'El nombre es obligatorio.';
-    }
-    if (!formData.lastName.trim()) {
-      nextErrors.lastName = 'Los apellidos son obligatorios.';
-    }
-    if (!emailValue) {
-      nextErrors.email = 'El email profesional es obligatorio.';
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailValue)) {
-      nextErrors.email = 'Introduce un email profesional válido.';
-    }
-    if (!formData.password) {
-      nextErrors.password = 'La contraseña es obligatoria.';
-    } else if (formData.password.length < 8) {
-      nextErrors.password = 'Debe tener al menos 8 caracteres.';
-    }
-    if (!formData.acceptedPrivacy) {
-      nextErrors.acceptedPrivacy = 'Debes aceptar la política de privacidad para continuar.';
-    }
-
-    return nextErrors;
+    return {};
   };
 
   const handleSubmit = async (e) => {

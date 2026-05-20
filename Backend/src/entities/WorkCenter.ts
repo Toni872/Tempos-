@@ -26,6 +26,9 @@ export class WorkCenter {
   @Column({ type: "integer", default: 100 })
   radiusMeters!: number; // Radio de la geocerca para permitir fichaje
 
+  @Column({ type: "boolean", default: false })
+  geofencingEnabled!: boolean;
+
   @Column({ type: "varchar", length: 255, unique: true, nullable: true })
   qrToken?: string; // Token único para fichaje por QR físico en el centro
 

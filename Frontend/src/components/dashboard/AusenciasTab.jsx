@@ -169,15 +169,17 @@ export default function AusenciasTab({ absences = [], onAdd, onEdit, onDelete, o
     initialState: { pagination: { pageSize: 10 } }
   });
 
+  const canManage = profile?.features?.canManageLeaves !== false;
+
   return (
     <div className="space-y-10 animate-in fade-in duration-700">
       <SectionHeader 
         icon={CalendarX}
         title="Gestión de Disponibilidad"
         subtitle="Auditoría de licencias, vacaciones y ausencias del escuadrón operativo."
-        actionLabel="Nueva Solicitud"
-        actionIcon={Plus}
-        onAction={onAdd}
+        actionLabel={canManage ? "Nueva Solicitud" : "BLOQUEADO 🔒"}
+        actionIcon={canManage ? Plus : undefined}
+        onAction={canManage ? onAdd : () => alert('La gestión de ausencias requiere el plan Business.')}
       />
 
       {/* Métricas Superiores Premium */}

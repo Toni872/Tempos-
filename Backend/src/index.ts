@@ -17,6 +17,7 @@ import contactRoutes from "./controllers/contact.controller.js";
 import workCenterRoutes from "./controllers/workcenters.controller.js";
 import scheduleController from "./controllers/schedule.controller.js";
 import pushRoutes from "./controllers/push.controller.js";
+import billingRoutes from "./controllers/billing.controller.js";
 import webauthnRoutes from "./routes/webauthn.routes.js";
 import logRoutes from "./controllers/log.controller.js";
 import systemRoutes from "./controllers/system.controller.js";
@@ -124,7 +125,16 @@ app.use(
       req.method === "OPTIONS",
   }),
 );
-app.use(express.json({ limit: "10mb" }));
+app.use(
+  express.json({
+    limit: "10mb",
+    verify: (req: any, _res, buf) => {
+      if (req.originalUrl?.startsWith("/api/v1/billing/webhook")) {
+        req.rawBody = buf;
+      }
+    },
+  }),
+);
 app.use(express.urlencoded({ limit: "10mb", extended: true }));
 
 // ─── Health & Status ───────────────────────────────────────────────────────────
@@ -154,6 +164,7 @@ app.use("/api/v1/work-centers", firebaseAuthMiddleware, appUserContextMiddleware
 app.use("/api/v1/schedules", firebaseAuthMiddleware, appUserContextMiddleware, requireActiveSubscription, scheduleController);
 app.use("/api/v1/push", pushRoutes);
 app.use("/api/v1/webauthn", webauthnRoutes);
+app.use("/api/v1/billing", billingRoutes);
 app.use("/api/v1/logs", logRoutes);
 app.use("/api/v1/system", systemRoutes);
 
@@ -201,6 +212,10 @@ app.get(
       isTrial: auth.isTrial,
       trialExpiresAt: auth.trialExpiresAt,
       isTrialExpired: auth.isTrialExpired,
+      stripeCustomerId: auth.stripeCustomerId,
+      stripeSubscriptionId: auth.stripeSubscriptionId,
+      subscriptionPlan: auth.subscriptionPlan,
+      subscriptionStatus: auth.subscriptionStatus,
     });
   },
 );
@@ -210,10 +225,29 @@ app.use(notFoundHandler);
 app.use(errorHandler);
 
 // ─── Database init & Server ────────────────────────────────────────────────────
-AppDataSource.initialize()
-  .then(async () => {
-    console.log("✅ Base de datos conectada");
+async function initializeDatabase(retries = 5, delay = 2000): Promise<void> {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      await AppDataSource.initialize();
+      console.log("✅ Base de datos conectada");
+      return;
+    } catch (err: any) {
+      const isTransient = ["ECONNRESET", "ECONNREFUSED", "ETIMEDOUT"].includes(err.code);
+      console.error(
+        `❌ Intento ${attempt}/${retries} - Error conectando BD: ${err.code || err.message}`
+      );
+      if (attempt === retries || !isTransient) {
+        throw err;
+      }
+      const waitMs = delay * Math.pow(2, attempt - 1);
+      console.log(`⏳ Reintentando en ${waitMs / 1000}s...`);
+      await new Promise((r) => setTimeout(r, waitMs));
+    }
+  }
+}
 
+initializeDatabase()
+  .then(async () => {
     app.listen(Number(PORT), "0.0.0.0", async () => {
       console.log(`🚀 Servidor escuchando en puerto ${PORT} (0.0.0.0)`);
 
@@ -242,7 +276,7 @@ AppDataSource.initialize()
     });
   })
   .catch((err) => {
-    console.error("❌ Error inicializando BD:", err);
+    console.error("❌ Error fatal inicializando BD tras todos los reintentos:", err);
     process.exit(1);
   });
 

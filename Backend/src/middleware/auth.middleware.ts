@@ -24,6 +24,15 @@ export type AuthContext = {
   isTrial: boolean;
   trialExpiresAt?: string;
   isTrialExpired: boolean;
+  stripeCustomerId?: string;
+  stripeSubscriptionId?: string;
+  subscriptionPlan: string;
+  subscriptionStatus?: string;
+  features: {
+    canUseGeofencing: boolean;
+    canManageLeaves: boolean;
+    maxWorkCenters: number;
+  };
 };
 
 export const DEFAULT_COMPANY_ID = "tempos-demo";
@@ -149,8 +158,9 @@ export function buildAuthContext(
     firebaseUser.company_id ||
     DEFAULT_COMPANY_ID;
 
-  const isTrial = !!currentUser?.metadata?.isTrial;
-  const trialExpiresAt = currentUser?.metadata?.trialExpiresAt;
+  const subscriptionPlan = currentUser?.subscriptionPlan || "trial";
+  const isTrial = subscriptionPlan === "trial" || !!currentUser?.isTrial;
+  const trialExpiresAt = currentUser?.trialExpiresAt ? (currentUser.trialExpiresAt instanceof Date ? currentUser.trialExpiresAt.toISOString() : currentUser.trialExpiresAt) : undefined;
   const isTrialExpired = isTrial && trialExpiresAt ? new Date() > new Date(trialExpiresAt) : false;
 
   return {
@@ -166,5 +176,14 @@ export function buildAuthContext(
     isTrial,
     trialExpiresAt,
     isTrialExpired,
+    stripeCustomerId: currentUser?.stripeCustomerId,
+    stripeSubscriptionId: currentUser?.stripeSubscriptionId,
+    subscriptionPlan,
+    subscriptionStatus: currentUser?.subscriptionStatus,
+    features: {
+      canUseGeofencing: subscriptionPlan !== "starter",
+      canManageLeaves: subscriptionPlan !== "starter",
+      maxWorkCenters: subscriptionPlan === "starter" ? 1 : 999,
+    },
   };
 }

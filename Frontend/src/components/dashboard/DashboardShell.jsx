@@ -21,6 +21,7 @@ import {
   ShieldCheck,
   Clock,
   CalendarX,
+  CreditCard,
 } from '@phosphor-icons/react';
 import UserMenu from '@/components/UserMenu';
 import Logo from '@/components/ui/Logo';
@@ -46,6 +47,7 @@ const sidebarItems = [
   ] },
   { group: 'Configuración', items: [
     { name: 'Mi Empresa', icon: GearSix },
+    { name: 'Planes', icon: CreditCard },
     { name: 'Legal', icon: ShieldCheck },
     { name: 'Mi Perfil', icon: UserCircleGear },
   ] }
@@ -271,7 +273,44 @@ export default function DashboardShell({
         </header>
 
         {/* Dynamic Canvas */}
-        <div className="flex-1 overflow-y-auto p-6 lg:p-10 scrollbar-hide">
+        <div className="flex-1 overflow-y-auto p-6 lg:p-10 scrollbar-hide pt-0">
+          {/* Trial Status Banner */}
+          {profile?.isTrial && !profile?.isTrialExpired && (
+            <motion.div 
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mb-8 p-4 rounded-2xl bg-blue-500/[0.03] border border-blue-500/20 backdrop-blur-md flex items-center justify-between group hover:bg-blue-500/[0.05] transition-all duration-500"
+            >
+              <div className="flex items-center gap-4">
+                <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center border border-blue-500/20 group-hover:scale-110 transition-transform duration-500">
+                  <Clock weight="duotone" className="w-5 h-5 text-blue-400" />
+                </div>
+                <div>
+                  <h4 className="text-[13px] font-bold text-white tracking-tight">Periodo de Prueba Activo</h4>
+                  <p className="text-[11px] text-zinc-500 font-medium">
+                    Tienes acceso total a todas las funciones Premium de Tempos.
+                  </p>
+                </div>
+              </div>
+              
+              <div className="flex items-center gap-6">
+                <div className="text-right">
+                  <span className="block text-[18px] font-black text-blue-400 leading-none">
+                    {Math.max(0, Math.floor((new Date(profile.trialExpiresAt) - new Date()) / (1000 * 60 * 60 * 24)))}
+                  </span>
+                  <span className="text-[9px] font-black text-zinc-600 uppercase tracking-widest">Días restantes</span>
+                </div>
+                <div className="h-8 w-px bg-white/5" />
+                <button 
+                  onClick={() => setActiveTab('Planes')}
+                  className="px-4 py-2 rounded-xl bg-blue-500 hover:bg-blue-400 text-white text-[11px] font-bold uppercase tracking-wider shadow-[0_0_15px_rgba(59,130,246,0.3)] transition-all active:scale-95"
+                >
+                  Actualizar a Pro
+                </button>
+              </div>
+            </motion.div>
+          )}
+
           <AnimatePresence mode="wait">
             <motion.div
               key={activeTab}

@@ -56,6 +56,13 @@ router.post(
   appUserContextMiddleware,
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const auth = getAuthContext(req);
+    
+    // FEATURE GATING: Ausencias
+    if (!auth.features.canManageLeaves) {
+       res.status(403).json({ error: "La gestión de ausencias y vacaciones requiere el Plan Business." });
+       return;
+    }
+
     const parsed = createAbsenceSchema.safeParse(req.body);
 
     if (!parsed.success) {

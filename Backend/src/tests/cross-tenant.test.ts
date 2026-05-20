@@ -33,6 +33,7 @@ function ctx(overrides: Partial<AuthContext> = {}): AuthContext {
     isPrivileged: false,
     isTrial: false,
     isTrialExpired: false,
+    subscriptionPlan: "trial",
     ...overrides,
   };
 }

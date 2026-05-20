@@ -13,7 +13,7 @@ import {
 import ModalBase from './ModalBase';
 import Badge from '@/components/ui/Badge';
 import { cn } from '@/lib/utils';
-import api from '@/lib/api';
+import api, { getClientSession } from '@/lib/api';
 
 export default function AuditTrailModal({ open, onClose, fichaId }) {
   const [loading, setLoading] = useState(false);
@@ -28,7 +28,7 @@ export default function AuditTrailModal({ open, onClose, fichaId }) {
   const loadAuditTrail = async () => {
     setLoading(true);
     try {
-      const session = api.getClientSession();
+      const session = getClientSession();
       const res = await api.get(`/api/v1/fichas/${fichaId}/audit-trail`, { token: session.token });
       setData(res);
     } catch (err) {

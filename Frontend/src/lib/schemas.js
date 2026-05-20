@@ -83,3 +83,18 @@ export const AbsenceSchema = z.object({
   endDate: z.string(),
   status: z.enum(['pending', 'approved', 'rejected']).default('pending'),
 }).passthrough();
+
+/**
+ * Esquema para Respuesta de Sesión de Checkout
+ */
+export const CheckoutSessionResponseSchema = z.object({
+  id: z.string(),
+  url: z.string().url(),
+}).passthrough();
+
+/**
+ * Esquema para Respuesta de Sesión de Portal de Stripe
+ */
+export const PortalSessionResponseSchema = z.object({
+  url: z.string().url(),
+}).passthrough();
