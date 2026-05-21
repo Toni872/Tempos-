@@ -45,6 +45,18 @@ function initFirebaseAdmin() {
 
   const keyPath =
     process.env.GOOGLE_APPLICATION_CREDENTIALS || "./firebase-key.json";
+
+  // Si FIREBASE_KEY_JSON está definido como env var (Railway secret),
+  // escribirlo a disco para que admin.credential.cert() pueda leerlo
+  if (process.env.FIREBASE_KEY_JSON && !fs.existsSync(keyPath)) {
+    try {
+      fs.writeFileSync(keyPath, process.env.FIREBASE_KEY_JSON, "utf-8");
+      console.log("✅ Firebase key escrita desde FIREBASE_KEY_JSON env var");
+    } catch (err) {
+      console.error("❌ No se pudo escribir firebase-key.json:", err);
+    }
+  }
+
   if (fs.existsSync(keyPath)) {
     admin.initializeApp({
       credential: admin.credential.cert(keyPath),
@@ -55,7 +67,7 @@ function initFirebaseAdmin() {
     admin.initializeApp({
       projectId: process.env.FIREBASE_PROJECT_ID || "tempos-project-f1e77",
     });
-    console.log("✅ Firebase Admin (ADC/Default)");
+    console.log("✅ Firebase Admin (ADC/Default) — puede fallar en Railway sin credenciales");
   }
 }
 
