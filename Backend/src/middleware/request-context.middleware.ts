@@ -29,23 +29,53 @@ export async function appUserContextMiddleware(
         where: { uid: firebaseUser.uid },
       });
 
-      // INGENIERÍA SENIOR: Auto-registro o Migración de usuario si no existe en la DB local
+      // En desarrollo: si el usuario existe pero tiene role employee, lo subimos a admin
+      if (currentUser && process.env.NODE_ENV !== "production") {
+        const bypassRole = firebaseUser.role || (firebaseUser.admin ? "admin" : null);
+        if (bypassRole && currentUser.role !== bypassRole) {
+          currentUser.role = bypassRole as UserRole;
+          await userRepo.save(currentUser);
+        }
+      }
+
+      // Si no existe por UID, buscar por email (usuario pre-creado por admin)
       if (!currentUser && firebaseUser.email) {
-        console.log(
-          "🆕 [CONTEXT] Auto-registrando usuario:",
-          firebaseUser.email,
-        );
-        currentUser = userRepo.create({
-          uid: firebaseUser.uid,
-          email: firebaseUser.email,
-          displayName: firebaseUser.name,
-          role: "admin", // Le damos admin por defecto en dev
-          status: "active",
-          requiresGeolocation: false,
-          requiresQR: false,
-          companyId: "tempos-demo",
+        const userByEmail = await userRepo.findOne({
+          where: { email: firebaseUser.email },
         });
-        await userRepo.save(currentUser);
+
+        if (userByEmail) {
+          // Vincular Firebase UID al empleado pre-creado
+          userByEmail.uid = firebaseUser.uid;
+          if (firebaseUser.picture) userByEmail.photoURL = firebaseUser.picture;
+          if (firebaseUser.name) userByEmail.displayName = firebaseUser.name;
+          await userRepo.save(userByEmail);
+          currentUser = userByEmail;
+        } else if (process.env.NODE_ENV !== "production") {
+          console.warn(
+            `⚠️ [DEV] Usuario ${firebaseUser.email} no encontrado en DB. ` +
+              `Creando usuario temporal para desarrollo.`,
+          );
+          currentUser = userRepo.create({
+            uid: firebaseUser.uid,
+            email: firebaseUser.email,
+            displayName: firebaseUser.name || "Dev User",
+            role: (firebaseUser.role || (firebaseUser.admin ? "admin" : "employee")) as UserRole,
+            status: "active",
+            requiresGeolocation: false,
+            requiresQR: false,
+            companyId: "tempos-demo",
+          });
+          await userRepo.save(currentUser);
+        } else {
+          _res.status(401).json({
+            error: "Usuario no encontrado",
+            code: "USER_NOT_FOUND",
+            message:
+              "No tienes acceso a Tempos. Contacta al administrador de tu empresa.",
+          });
+          return;
+        }
       }
     }
 

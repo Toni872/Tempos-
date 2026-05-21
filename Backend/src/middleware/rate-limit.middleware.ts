@@ -34,6 +34,22 @@ export function createAuthRateLimiter(overrides: Partial<Options> = {}) {
 
 export const authRateLimiter = createAuthRateLimiter();
 
+export function createRegisterRateLimiter(overrides: Partial<Options> = {}) {
+  return rateLimit({
+    windowMs: 60 * 60 * 1000, // 1 hora
+    limit: 10,
+    standardHeaders: "draft-7",
+    legacyHeaders: false,
+    message: {
+      error: "Demasiados intentos de registro. Intenta de nuevo en una hora.",
+    },
+    skip: () => process.env.NODE_ENV === "development",
+    ...overrides,
+  });
+}
+
+export const registerRateLimiter = createRegisterRateLimiter();
+
 export const apiRateLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 minuto
   limit: process.env.NODE_ENV === "production" ? 100 : 500,

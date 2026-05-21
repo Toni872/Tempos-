@@ -38,7 +38,6 @@ import api, {
 import { z } from 'zod';
 
 // Icons
-import { Clock, Users, MapPin, Calendar, FileText, Search, Download, LayoutDashboard } from 'lucide-react';
 import { ShieldCheck, CheckCircle } from '@phosphor-icons/react';
 
 // Modular Components
@@ -369,12 +368,16 @@ export default function DashboardPage() {
       if (modalMode === 'edit') {
         await api.put(`/api/v1/employees/${modalData.id}`, validatedData, { token: session?.token });
       } else {
-        await createEmployee(session.token, validatedData);
+        const res = await createEmployee(session.token, validatedData);
+        showFeedback('success', res?.message || `Invitación enviada a ${validatedData.email}.`);
+        await refreshAllData();
+        closeModal();
+        return;
       }
       
       await refreshAllData();
       closeModal();
-      showFeedback('success', `Usuario ${validatedData.displayName} registrado correctamente.`);
+      showFeedback('success', `Usuario ${validatedData.displayName} actualizado correctamente.`);
     } catch (err) {
       if (err instanceof z.ZodError) {
         const firstError = err.errors[0].message;
@@ -508,14 +511,18 @@ export default function DashboardPage() {
   };
 
   const handleEmployeeDelete = async (emp) => {
-    if (!confirm(`¿Eliminar al empleado ${emp.name}?`)) return;
+    const name = emp.displayName || emp.name || emp.email || 'este empleado';
+    if (!confirm(`¿Dar de baja a ${name}?`)) return;
     try {
       const session = getClientSession();
-      await api.delete(`/api/v1/employees/${emp.id}`, { token: session?.token });
+      const uid = emp.uid || emp.id;
+      if (!uid) throw new Error('UID no encontrado');
+      await api.delete(`/api/v1/employees/${uid}`, { token: session?.token });
       await refreshAllData();
-      showFeedback('success', 'Empleado eliminado correctamente.');
+      showFeedback('success', `${name} dado de baja correctamente.`);
     } catch (err) {
-      showFeedback('error', 'Error al eliminar empleado.');
+      const msg = err?.response?.data?.error || err.message || 'Error al dar de baja.';
+      showFeedback('error', msg);
     }
   };
 

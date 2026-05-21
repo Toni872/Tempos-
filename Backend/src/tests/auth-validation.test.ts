@@ -23,3 +23,41 @@ test("updateAuthProfileSchema rechaza displayName excesivamente largo", () => {
 
   assert.equal(result.success, false);
 });
+
+// ─── registerSchema ────────────────────────────────────────────────────────
+
+import { registerSchema } from "../utils/validation.js";
+
+test("registerSchema acepta un dominio valido", () => {
+  const result = registerSchema.safeParse({
+    companyDomain: "acme.com",
+  });
+  assert.equal(result.success, true);
+});
+
+test("registerSchema acepta companyDomain opcional (ausente)", () => {
+  const result = registerSchema.safeParse({});
+  assert.equal(result.success, true);
+});
+
+test("registerSchema acepta companyDomain vacio", () => {
+  const result = registerSchema.safeParse({ companyDomain: "" });
+  assert.equal(result.success, true);
+});
+
+test("registerSchema acepta companyDomain con guiones y subdominios", () => {
+  const result = registerSchema.safeParse({
+    companyDomain: "sub.domain.co.uk",
+  });
+  assert.equal(result.success, true);
+});
+
+test("registerSchema acepta companyDomain con valor valido junto a otros campos", () => {
+  const result = registerSchema.safeParse({
+    name: "Admin User",
+    role: "admin",
+    companyName: "Acme Inc",
+    companyDomain: "acme.com",
+  });
+  assert.equal(result.success, true);
+});

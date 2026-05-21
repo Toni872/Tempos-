@@ -42,3 +42,14 @@ jdk*/
 # Binary artifacts (APK/AAB)
 *.apk
 *.aab
+
+# Dev artifacts (local only)
+Backend/email_preview.txt
+Backend/server.err
+Backend/scratch/
+Frontend/vite.err
+LEEME_LOGOTIPO.md
+openspec/
+stripe-sample/
+.atl/
+tempos_logo_actual.png

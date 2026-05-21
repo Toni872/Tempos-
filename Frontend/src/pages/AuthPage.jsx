@@ -68,8 +68,9 @@ export default function AuthPage({ mode }) {
   const [email, setEmail] = useState(() => trialState?.email || '');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
-  const [role] = useState('admin'); // Siempre admin para registros web
+  const role = Capacitor.isNativePlatform() ? 'employee' : 'admin';
   const [companyName, setCompanyName] = useState(() => trialState?.company || '');
+  const [companyDomain, setCompanyDomain] = useState('');
   const [errors, setErrors] = useState({});
   const [debugStatus, setDebugStatus] = useState('');
   const [formError, setFormError] = useState('');
@@ -99,7 +100,7 @@ export default function AuthPage({ mode }) {
     }
   }, [isLogin, location.pathname, location.state, navigate]);
 
-  // Manejar el retorno de la redirección de Google
+  // Manejar el retorno de la redirección de Google (web y nativo)
   useEffect(() => {
     const checkRedirect = async () => {
       try {
@@ -117,15 +118,12 @@ export default function AuthPage({ mode }) {
       }
     };
     
-    if (Capacitor.isNativePlatform()) {
-      checkRedirect();
-    }
+    checkRedirect();
   }, []);
 
   const finalizeLogin = async (idToken) => {
     setIsSubmitting(true);
     try {
-      const effectiveRole = Capacitor.isNativePlatform() ? 'employee' : role;
       let deviceId = undefined;
       if (Capacitor.isNativePlatform()) {
         try {
@@ -135,8 +133,8 @@ export default function AuthPage({ mode }) {
       
       try {
         await registerMe(idToken, {
-          role: effectiveRole,
-          companyName: effectiveRole === 'admin' ? 'Mi Empresa' : undefined,
+          role,
+          companyName: role === 'admin' ? 'Mi Empresa' : undefined,
           deviceId,
         });
       } catch (regErr) { }
@@ -172,34 +170,6 @@ export default function AuthPage({ mode }) {
     }
   }, [isLogin, navigate]);
 
-  // Manejar el retorno de Google (Redirect)
-  useEffect(() => {
-    const checkRedirect = async () => {
-      try {
-        const idToken = await handleRedirectResult();
-        if (idToken) {
-          setIsSubmitting(true);
-          try {
-            await registerMe(idToken, { role: 'admin', companyName: 'Google Company' });
-          } catch { /* Ignorar si ya existe */ }
-          const profile = await getMe(idToken);
-          setClientSession({ 
-            token: idToken, 
-            isAdmin: profile.role === 'admin' || profile.role === 'manager', 
-            localMode: false, 
-            profile 
-          });
-          navigate('/dashboard');
-        }
-      } catch (err) {
-        console.error('Error en retorno de Google:', err);
-      } finally {
-        setIsSubmitting(false);
-      }
-    };
-    checkRedirect();
-  }, [navigate]);
-
   const clearFieldError = (field) => {
     setErrors(prev => {
       if (!prev[field]) {
@@ -219,13 +189,14 @@ export default function AuthPage({ mode }) {
 
   const registerSchema = z.object({
     companyName: z.string().min(1, "El nombre de la empresa es obligatorio para administradores."),
+    companyDomain: z.string().optional(),
     name: z.string().min(1, "El nombre completo es obligatorio."),
     email: z.string().min(1, "El correo electrónico es obligatorio.").email("Introduce un correo electrónico válido."),
     password: z.string().min(1, "La contraseña es obligatoria.").min(MIN_PASSWORD_LENGTH, `La contraseña debe tener al menos ${MIN_PASSWORD_LENGTH} caracteres.`)
   });
 
   const validateForm = () => {
-    const data = { email, password, name, companyName };
+    const data = { email, password, name, companyName, companyDomain };
     const schema = isLogin ? loginSchema : registerSchema;
     
     const result = schema.safeParse(data);
@@ -282,6 +253,7 @@ export default function AuthPage({ mode }) {
         await registerMe(idToken, { 
           role, 
           companyName,
+          companyDomain: role === 'admin' ? companyDomain.trim() || undefined : undefined,
           name: name || undefined 
         });
       } catch (err) {
@@ -335,7 +307,7 @@ export default function AuthPage({ mode }) {
 
       setDebugStatus('Token recibido. Registrando en el sistema...');
 
-      const effectiveRole = Capacitor.isNativePlatform() ? 'employee' : role;
+      const effectiveRole = role;
       let deviceId = undefined;
       if (Capacitor.isNativePlatform()) {
         try {
@@ -494,6 +466,20 @@ export default function AuthPage({ mode }) {
                     style={getInputStyle(!!errors.companyName)}
                   />
                   <ErrorText id="companyName-error" message={errors.companyName} />
+
+                  <label style={{ display: 'block', fontSize: 13, color: 'var(--t2)', marginBottom: 6, fontWeight: 500, marginTop: 16 }}>Dominio de la empresa <span style={{ color: 'var(--t3)', fontWeight: 400 }}>(opcional)</span></label>
+                  <input 
+                    id="auth-companyDomain"
+                    type="text"
+                    value={companyDomain}
+                    onChange={e => {
+                      setCompanyDomain(e.target.value);
+                      setFormError('');
+                    }}
+                    autoComplete="url"
+                    placeholder="miempresa.com"
+                    style={getInputStyle(false)}
+                  />
                 </div>
               )}
 

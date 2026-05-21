@@ -6,11 +6,11 @@ import LandingPage from '@/pages/LandingPage'
 const AuthPage = lazy(() => import('@/pages/AuthPage'))
 const DashboardPage = lazy(() => import('@/pages/DashboardPage'))
 const KioskPage = lazy(() => import('@/pages/KioskPage'))
+const AcceptInvitationPage = lazy(() => import('@/pages/AcceptInvitationPage'))
 const TrialPage = lazy(() => import('@/pages/TrialPage'))
 const MarketingPage = lazy(() => import('@/pages/MarketingPage'))
 const PrivacyPolicy = lazy(() => import('@/pages/PrivacyPolicy'))
 const TermsOfService = lazy(() => import('@/pages/TermsOfService'))
-import FloatingDownloadBtn from '@/components/ui/FloatingDownloadBtn'
 
 function App() {
   const [installPrompt, setInstallPrompt] = useState(null)
@@ -76,6 +76,7 @@ function App() {
             <Route path="/register" element={<PageWrapper><AuthPage mode="register" /></PageWrapper>} />
             <Route path="/dashboard" element={<PageWrapper><DashboardPage /></PageWrapper>} />
             <Route path="/kiosk" element={<PageWrapper><KioskPage /></PageWrapper>} />
+            <Route path="/invite/:token" element={<PageWrapper><AcceptInvitationPage /></PageWrapper>} />
             <Route path="/trial" element={<PageWrapper><TrialPage /></PageWrapper>} />
             <Route path="/legal/privacidad" element={<PageWrapper><PrivacyPolicy /></PageWrapper>} />
             <Route path="/legal/terminos" element={<PageWrapper><TermsOfService /></PageWrapper>} />

@@ -19,7 +19,7 @@ export type AuthContext = {
   emailVerified: boolean;
   role: UserRole;
   companyId: string;
-  status: "active" | "suspended" | "deleted";
+  status: "active" | "pending" | "suspended" | "deleted";
   isPrivileged: boolean;
   isTrial: boolean;
   trialExpiresAt?: string;
@@ -66,45 +66,57 @@ export const firebaseAuthMiddleware = async (
   res: Response,
   next: NextFunction,
 ): Promise<void> => {
-  const authHeader = req.headers.authorization;
   const isDev = process.env.NODE_ENV !== "production";
 
-  // 1. Manejo de falta de cabecera
-  if (!authHeader?.startsWith("Bearer ")) {
-    if (isDev) {
-      req.firebaseUser = getDevBypassFirebaseUser("test-admin") as any;
-      return next();
+  // EN DESARROLLO: usamos el token real si existe (para nombre/email correctos) pero forzando admin
+  if (isDev) {
+    const authHeader = req.headers.authorization;
+    if (authHeader?.startsWith("Bearer ")) {
+      const idToken = authHeader.substring(7);
+      const payload = tryUnsafeDecode(idToken);
+      if (payload) {
+        const bypass = getDevBypassFirebaseUser("test-admin")!;
+        req.firebaseUser = {
+          ...payload,
+          ...bypass,
+          uid: payload.uid || payload.user_id || payload.sub || bypass.uid,
+          email: payload.email || bypass.email,
+          name: payload.name || bypass.name,
+        } as any;
+        return next();
+      }
     }
+    req.firebaseUser = getDevBypassFirebaseUser("test-admin") as any;
+    return next();
+  }
+
+  // EN PRODUCCIÓN: flujo normal con Firebase
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader?.startsWith("Bearer ")) {
     res.status(401).json({ error: "Autorización requerida" });
     return;
   }
 
   const idToken = authHeader.substring(7);
-  const isTestToken = DEV_BYPASS_TOKENS.includes(idToken as any);
 
-  // 2. Bypass para testers (habilitado también en producción para fase de pruebas)
-  if (isDev || isTestToken) {
-    const bypassUser = getDevBypassFirebaseUser(idToken);
-    if (bypassUser) {
-      req.firebaseUser = bypassUser as any;
-      return next();
+  // SOLO en desarrollo: permitir tokens de test
+  if (isDev) {
+    const isTestToken = DEV_BYPASS_TOKENS.includes(idToken as any);
+    if (isTestToken) {
+      const bypassUser = getDevBypassFirebaseUser(idToken);
+      if (bypassUser) {
+        req.firebaseUser = bypassUser as any;
+        return next();
+      }
     }
   }
 
-  // 3. Verificación Real
   try {
     const decodedToken = await admin.auth().verifyIdToken(idToken);
     req.firebaseUser = decodedToken as FirebaseUserLike;
     next();
   } catch (err) {
-    if (isDev) {
-      // Rescue mode para tokens caducados en local
-      const payload = tryUnsafeDecode(idToken);
-      if (payload) {
-        req.firebaseUser = payload as any;
-        return next();
-      }
-    }
     console.error("Auth Error:", err);
     res.status(401).json({ error: "Token inválido o expirado" });
   }
@@ -125,6 +137,42 @@ function tryUnsafeDecode(token: string): any {
   } catch {
     return null;
   }
+}
+
+export function requireEmailVerified(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): void {
+  const firebaseUser = (req as any).firebaseUser;
+  const uid = firebaseUser?.uid || "";
+  const isDevToken = uid === "dev-admin-uid" || uid === "dev-employee-uid";
+
+  // Skip for temp_ UIDs (employee invite flow)
+  if (uid.startsWith("temp_")) {
+    next();
+    return;
+  }
+
+  // Skip for dev/test bypass tokens
+  if (isDevToken) {
+    next();
+    return;
+  }
+
+  // Check if user status is pending (requires admin approval)
+  const currentUser = (req as any).currentUser;
+  if (currentUser?.status === "pending") {
+    res.status(403).json({ error: "cuenta_pendiente_aprobacion", blocked: true });
+    return;
+  }
+
+  if (!firebaseUser?.email_verified) {
+    res.status(403).json({ error: "email_no_verificado", blocked: true });
+    return;
+  }
+
+  next();
 }
 
 export function getDevBypassFirebaseUser(
