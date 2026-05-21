@@ -14,7 +14,7 @@ import {
 
 import { Capacitor, CapacitorHttp } from '@capacitor/core';
 
-const DEFAULT_LOCAL_API = 'http://localhost:8081';
+const DEFAULT_LOCAL_API = 'http://127.0.0.1:8081';
 const PROD_API = 'https://tempos-production.up.railway.app';
 const SESSION_STORAGE_KEY = 'tempos.session';
 const OFFLINE_QUEUE_KEY = 'tempos.offline_queue';
@@ -33,13 +33,11 @@ function getApiBaseUrl() {
     const isDev = !PROD_API.includes('railway.app'); // Simplificado para detectar entorno
     
     // Si estamos en desarrollo (o queremos probar local en el móvil), usamos la IP
-    const target = (process.env.NODE_ENV === 'production') ? PROD_API : `http://${LOCAL_IP}:8081`;
+    const target = import.meta.env.PROD ? PROD_API : `http://${LOCAL_IP}:8081`;
     
-    console.log(`⚡ [API] Modo Nativo detectado. Conectando a: ${target}`);
     return target;
   }
   
-  console.log('🌐 [API] Modo Web detectado. Usando:', DEFAULT_LOCAL_API);
   return DEFAULT_LOCAL_API;
 }
 
@@ -369,6 +367,16 @@ export async function listAbsences(token) {
 
 export async function createEmployee(token, data) {
   return request('/api/v1/employees', { method: 'POST', token, body: JSON.stringify(data) });
+}
+
+export async function getInvitation(token) {
+  try {
+    const res = await request(`/api/v1/invitations/${token}`, { method: 'GET' });
+    return res;
+  } catch (err) {
+    logger.error('Error in getInvitation', err);
+    throw err;
+  }
 }
 
 export async function updateEmployee(token, id, data) {

@@ -301,7 +301,29 @@ export const userRoleSchema = z.enum([
   "auditor",
   "employee",
 ]);
-export const userStatusSchema = z.enum(["active", "suspended", "deleted"]);
+export const registerSchema = z.object({
+  name: z
+    .string()
+    .trim()
+    .min(2, "Nombre demasiado corto")
+    .max(120, "Nombre demasiado largo")
+    .optional(),
+  role: userRoleSchema.optional(),
+  companyName: z
+    .string()
+    .trim()
+    .min(2, "Nombre de empresa demasiado corto")
+    .max(200, "Nombre de empresa demasiado largo")
+    .optional(),
+  companyDomain: z.string()
+    .optional()
+    .refine(val => !val || /^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)*\.[a-zA-Z]{2,}$/.test(val), {
+      message: "El dominio de la empresa no es válido"
+    }),
+  phone: z.string().optional(),
+  deviceId: z.string().optional(),
+});
+export const userStatusSchema = z.enum(["active", "pending", "suspended", "deleted"]);
 
 export const createEmployeeSchema = z.object({
   email: z.string().trim().email("Email inválido"),

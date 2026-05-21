@@ -72,7 +72,7 @@ export class User {
   updatedAt!: Date;
 
   @Column({ type: "varchar", default: "active" })
-  status!: "active" | "suspended" | "deleted";
+  status!: "active" | "pending" | "suspended" | "deleted";
 
   @Column({ type: "boolean", default: false })
   hasAcceptedTerms!: boolean;
@@ -100,6 +100,13 @@ export class User {
 
   @Column({ type: "boolean", default: false })
   isAutoClockEnabled!: boolean; // Si el usuario tiene permitido el fichaje automático
+
+  // Token de invitación para empleados
+  @Column({ type: "varchar", nullable: true })
+  invitationToken?: string;
+
+  @Column({ type: "timestamp", nullable: true })
+  invitationExpiresAt?: Date;
 
   // Campos de WebAuthn
   @Column({ type: "varchar", nullable: true })

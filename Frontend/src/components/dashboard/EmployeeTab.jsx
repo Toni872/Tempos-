@@ -6,7 +6,7 @@ import {
   Funnel, 
   Eye,
   UserCircleGear,
-  TrashSimple,
+  Prohibit,
   ShieldCheck,
   IdentificationCard,
   User,
@@ -115,7 +115,7 @@ export default function EmployeeTab({
                   {isActive ? 'VIGENTE' : 'BAJA'}
                 </span>
              </div>
-             <span className="text-[9px] text-white/20 font-bold uppercase pl-3.5 italic">Alta: {new Date(data.createdAt).toLocaleDateString()}</span>
+             <span className="text-[9px] text-white/20 font-bold uppercase pl-3.5 italic">Alta: {data.createdAt ? new Date(data.createdAt).toLocaleDateString() : '—'}</span>
           </div>
         )
       }
@@ -309,7 +309,14 @@ export default function EmployeeTab({
                     <div className="flex items-center justify-end gap-2">
                       <ActionBtn onClick={(e) => { e.stopPropagation(); onViewExpediente(row.original); }} icon={Eye} color="blue" />
                       <ActionBtn onClick={(e) => { e.stopPropagation(); onEditEmployee(row.original); }} icon={UserCircleGear} color="zinc" />
-                      <ActionBtn onClick={(e) => { e.stopPropagation(); onDeleteEmployee(row.original); }} icon={TrashSimple} color="rose" />
+                      <button
+                        onClick={(e) => { e.stopPropagation(); onDeleteEmployee(row.original); }}
+                        title="Dar de baja"
+                        className="p-3 rounded-2xl bg-white/[0.03] border border-transparent text-rose-500/50 hover:bg-rose-500/10 hover:border-rose-500/30 hover:text-rose-500 transition-all flex items-center gap-2"
+                      >
+                        <Prohibit size={18} weight="bold" />
+                        <span className="hidden xl:inline text-[9px] font-black uppercase tracking-widest">Baja</span>
+                      </button>
                     </div>
                   </td>
                 </tr>

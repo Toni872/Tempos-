@@ -21,9 +21,13 @@ import billingRoutes from "./controllers/billing.controller.js";
 import webauthnRoutes from "./routes/webauthn.routes.js";
 import logRoutes from "./controllers/log.controller.js";
 import systemRoutes from "./controllers/system.controller.js";
+import invitationsRoutes from "./controllers/invitations.controller.js";
 import { GdprController } from "./controllers/gdpr.controller.js";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler.js";
-import { firebaseAuthMiddleware } from "./middleware/auth.middleware.js";
+import {
+  firebaseAuthMiddleware,
+  requireEmailVerified,
+} from "./middleware/auth.middleware.js";
 import {
   authRateLimiter,
   apiRateLimiter,
@@ -154,14 +158,15 @@ app.get("/status", async (_req: Request, res: Response) => {
 // ─── Routes ────────────────────────────────────────────────────────────────────
 app.use("/api/v1", apiRateLimiter);
 app.use("/api/v1/auth", authRateLimiter, authRoutes);
-app.use("/api/v1/fichas", firebaseAuthMiddleware, appUserContextMiddleware, requireActiveSubscription, fichaRoutes);
-app.use("/api/v1/employees", firebaseAuthMiddleware, appUserContextMiddleware, requireActiveSubscription, employeesRoutes);
-app.use("/api/v1/documents", firebaseAuthMiddleware, appUserContextMiddleware, requireActiveSubscription, documentsRoutes);
-app.use("/api/v1/absences", firebaseAuthMiddleware, appUserContextMiddleware, requireActiveSubscription, absencesRoutes);
-app.use("/api/v1/reports", firebaseAuthMiddleware, appUserContextMiddleware, requireActiveSubscription, reportsRoutes);
+app.use("/api/v1/fichas", firebaseAuthMiddleware, appUserContextMiddleware, requireEmailVerified, requireActiveSubscription, fichaRoutes);
+app.use("/api/v1/employees", firebaseAuthMiddleware, appUserContextMiddleware, requireEmailVerified, requireActiveSubscription, employeesRoutes);
+app.use("/api/v1/documents", firebaseAuthMiddleware, appUserContextMiddleware, requireEmailVerified, requireActiveSubscription, documentsRoutes);
+app.use("/api/v1/absences", firebaseAuthMiddleware, appUserContextMiddleware, requireEmailVerified, requireActiveSubscription, absencesRoutes);
+app.use("/api/v1/reports", firebaseAuthMiddleware, appUserContextMiddleware, requireEmailVerified, requireActiveSubscription, reportsRoutes);
 app.use("/api/v1/contact", contactRoutes);
-app.use("/api/v1/work-centers", firebaseAuthMiddleware, appUserContextMiddleware, requireActiveSubscription, workCenterRoutes);
-app.use("/api/v1/schedules", firebaseAuthMiddleware, appUserContextMiddleware, requireActiveSubscription, scheduleController);
+app.use("/api/v1/invitations", invitationsRoutes); // Público — sin auth
+app.use("/api/v1/work-centers", firebaseAuthMiddleware, appUserContextMiddleware, requireEmailVerified, requireActiveSubscription, workCenterRoutes);
+app.use("/api/v1/schedules", firebaseAuthMiddleware, appUserContextMiddleware, requireEmailVerified, requireActiveSubscription, scheduleController);
 app.use("/api/v1/push", pushRoutes);
 app.use("/api/v1/webauthn", webauthnRoutes);
 app.use("/api/v1/billing", billingRoutes);

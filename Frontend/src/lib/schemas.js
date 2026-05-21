@@ -12,7 +12,7 @@ export const UserSchema = z.object({
   hasAcceptedTerms: z.boolean().default(false),
   requiresGeolocation: z.boolean().default(false),
   requiresQR: z.boolean().default(false),
-  status: z.string().default('active'),
+  status: z.enum(["active", "pending", "suspended", "deleted"]).default('active'),
 }).passthrough(); // Permite campos adicionales sin romper
 
 /**

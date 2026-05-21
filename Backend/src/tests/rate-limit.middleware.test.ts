@@ -86,3 +86,70 @@ test("auth rate limiter permite peticiones cuando skip devuelve true", async () 
     assert.equal(second.status, 200);
   });
 });
+
+// ─── registerRateLimiter ───────────────────────────────────────────────────
+
+import { createRegisterRateLimiter } from "../middleware/rate-limit.middleware.js";
+
+function createRegisterApp() {
+  const app = express();
+
+  // Create isolated instance with no skip for testing
+  const testLimiter = createRegisterRateLimiter({ skip: () => false });
+
+  app.use("/api/v1/auth/register", testLimiter);
+
+  app.post("/api/v1/auth/register", (_req, res) => {
+    res.status(201).json({ ok: true });
+  });
+
+  // Different auth endpoint — should NOT be affected by register limiter
+  app.get("/api/v1/auth/me", (_req, res) => {
+    res.status(200).json({ ok: true });
+  });
+
+  return app;
+}
+
+test("registerRateLimiter: 10ma request pasa, 11va retorna 429", async () => {
+  const app = createRegisterApp();
+
+  await withTestServer(app, async (baseUrl) => {
+    const url = `${baseUrl}/api/v1/auth/register`;
+
+    // 10 requests — todas pasan
+    for (let i = 0; i < 10; i++) {
+      const res = await fetch(url, { method: "POST" });
+      assert.equal(res.status, 201, `Request ${i + 1} should pass`);
+    }
+
+    // 11va — bloqueada
+    const blocked = await fetch(url, { method: "POST" });
+    assert.equal(blocked.status, 429);
+
+    const payload = (await blocked.json()) as { error?: string };
+    assert.ok(payload.error?.includes("Demasiados intentos de registro"));
+  });
+});
+
+test("registerRateLimiter: otros endpoints auth no se ven afectados", async () => {
+  const app = createRegisterApp();
+
+  await withTestServer(app, async (baseUrl) => {
+    const registerUrl = `${baseUrl}/api/v1/auth/register`;
+
+    // Consumir el rate limit de register
+    for (let i = 0; i < 10; i++) {
+      const res = await fetch(registerUrl, { method: "POST" });
+      assert.equal(res.status, 201);
+    }
+
+    // register endpoint ahora bloquea
+    const blocked = await fetch(registerUrl, { method: "POST" });
+    assert.equal(blocked.status, 429);
+
+    // /auth/me no deberia verse afectado
+    const meRes = await fetch(`${baseUrl}/api/v1/auth/me`);
+    assert.equal(meRes.status, 200);
+  });
+});

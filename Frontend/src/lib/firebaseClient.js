@@ -11,9 +11,6 @@ import {
   createUserWithEmailAndPassword,
   sendPasswordResetEmail,
   signOut,
-  browserPopupRedirectResolver,
-  indexedDBLocalPersistence,
-  initializeAuth
 } from 'firebase/auth';
 
 const firebaseConfig = {
@@ -85,7 +82,7 @@ export const signInWithGoogleAndGetIdToken = async (onStatusUpdate) => {
   } catch (error) {
     console.error('❌ [AUTH] Error Google Redirect/Popup:', error);
     if (onStatusUpdate) onStatusUpdate('Error: ' + (error.message || 'Desconocido'));
-    return null;
+    throw error;
   }
 };
 

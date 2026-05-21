@@ -34,6 +34,11 @@ function ctx(overrides: Partial<AuthContext> = {}): AuthContext {
     isTrial: false,
     isTrialExpired: false,
     subscriptionPlan: "trial",
+    features: {
+      canUseGeofencing: true,
+      canManageLeaves: true,
+      maxWorkCenters: 999,
+    },
     ...overrides,
   };
 }

@@ -15,6 +15,7 @@ import {
   updateEmployeeSchema,
 } from "../utils/validation.js";
 import { randomUUID } from "crypto";
+import { EmailService } from "../services/EmailService.js";
 
 const router = Router();
 
@@ -128,13 +129,34 @@ router.post(
       return;
     }
 
+    // Generar token de invitación (expira en 7 días)
+    const invitationToken = randomUUID();
+    const invitationExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+    // Obtener datos del admin para el email de invitación
+    let adminName = "Tu administrador";
+    let companyName = "tu empresa";
+    try {
+      const adminUser = await userRepository.findOne({
+        where: { uid: auth.uid },
+      });
+      if (adminUser) {
+        adminName = adminUser.displayName || adminUser.email || "Tu administrador";
+        companyName = adminUser.metadata?.companyName || "tu empresa";
+      }
+    } catch {
+      // Si falla la consulta, usamos valores por defecto
+    }
+
     const employee = userRepository.create({
       uid: `temp_${randomUUID()}`, // Placeholder UID
       email: parsed.data.email,
       displayName: parsed.data.displayName,
       role: parsed.data.role,
       companyId: auth.companyId,
-      status: "active",
+      status: "pending", // Pendiente hasta que se registre
+      invitationToken,
+      invitationExpiresAt,
       hourlyRate: parsed.data.hourlyRate ?? 0,
       overtimeRate: parsed.data.overtimeRate ?? 0,
       requiresGeolocation: parsed.data.requiresGeolocation ?? false,
@@ -149,23 +171,51 @@ router.post(
 
     await userRepository.save(employee);
 
+    // Enviar email de invitación
+    let emailSent = false;
+    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+    const inviteLink = `${frontendUrl}/invite/${invitationToken}`;
+
+    try {
+      await EmailService.sendEmployeeInvite(
+        employee.email,
+        employee.displayName || "Usuario",
+        companyName,
+        adminName,
+        inviteLink,
+      );
+      emailSent = true;
+    } catch (emailErr) {
+      console.error(
+        `⚠️ [Employees] Failed to send invitation email to ${employee.email}:`,
+        emailErr,
+      );
+    }
+
     await logAction({
       userId: auth.uid,
       companyId: auth.companyId,
       action: "employee_created",
-      metadata: { employeeUid: employee.uid, email: employee.email },
+      metadata: {
+        employeeUid: employee.uid,
+        email: employee.email,
+        invitationSent: emailSent,
+      },
       ip: req.ip,
       userAgent: req.get("user-agent"),
     });
 
     res.status(201).json({
-      message:
-        "Empleado creado correctamente. El usuario podrá acceder al registrarse con este email.",
+      message: emailSent
+        ? `Empleado creado. Se ha enviado una invitación a ${employee.email}.`
+        : `Empleado creado. No se pudo enviar el email de invitación a ${employee.email}. Podés reenviarla manualmente.`,
       employee: {
         uid: employee.uid,
         email: employee.email,
         displayName: employee.displayName,
         role: employee.role,
+        status: "pending",
+        invitationSent: emailSent,
       },
     });
   }),

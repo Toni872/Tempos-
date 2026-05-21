@@ -82,15 +82,15 @@ export default defineConfig({
       'X-XSS-Protection': '1; mode=block',
       'Referrer-Policy': 'no-referrer-when-downgrade',
       'Cross-Origin-Opener-Policy': 'unsafe-none',
-      'Content-Security-Policy': "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://*.google.com https://*.googleapis.com https://*.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' http://localhost:8081 http://localhost:5173 http://localhost:5174 https:; worker-src 'self' blob:; frame-src 'self' https://*.firebaseapp.com https://*.google.com https:;"
+      'Content-Security-Policy': "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://*.google.com https://*.googleapis.com https://*.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' http://127.0.0.1:8081 http://localhost:5173 http://localhost:5174 https:; worker-src 'self' blob:; frame-src 'self' https://*.firebaseapp.com https://*.google.com https:;"
     },
     proxy: {
       '/api': {
-        target: 'http://localhost:8081',
+        target: 'http://127.0.0.1:8081',
         changeOrigin: true,
       },
       '/status': {
-        target: 'http://localhost:8081',
+        target: 'http://127.0.0.1:8081',
         changeOrigin: true,
       },
     },

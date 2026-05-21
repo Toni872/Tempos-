@@ -12,10 +12,12 @@ import {
 import { asyncHandler } from "../middleware/errorHandler.js";
 import {
   buildValidationError,
+  registerSchema,
   updateAuthProfileSchema,
 } from "../utils/validation.js";
 import { randomUUID } from "crypto";
 import { EmailService } from "../services/EmailService.js";
+import { registerRateLimiter } from "../middleware/rate-limit.middleware.js";
 
 const router = Router();
 
@@ -25,6 +27,7 @@ const router = Router();
  */
 router.post(
   "/register",
+  registerRateLimiter,
   firebaseAuthMiddleware,
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const firebaseUser = (req as any).firebaseUser;
@@ -50,9 +53,22 @@ router.post(
         where: { email: normalizedEmail },
       });
       if (user) {
+        if (!user.uid.startsWith("temp_")) {
+          res.status(409).json({ error: "Este email ya está registrado con otra cuenta." });
+          return;
+        }
         // Vincular el UID de Firebase al registro existente
         user.uid = firebaseUser.uid;
         user.emailVerified = firebaseUser.email_verified;
+
+        // Limpiar token de invitación (ya fue usado)
+        user.invitationToken = null as any;
+        user.invitationExpiresAt = null as any;
+
+        // Si estaba "pending" por invitación, pasar a "active"
+        if (user.status === "pending") {
+          user.status = "active";
+        }
 
         // Mejorar el nombre si venía por defecto o era un email
         if (
@@ -73,27 +89,68 @@ router.post(
 
         res.status(200).json({
           message: "Usuario vinculado correctamente",
-          user: {
+          data: {
             uid: user.uid,
             email: user.email,
-            displayName: user.displayName,
-            photoURL: user.photoURL,
+            role: user.role,
+            companyId: user.companyId,
+            isTrial: user.isTrial,
+            status: user.status,
           },
         });
         return;
       }
     }
 
-    const bodyParams = req.body || {};
+    // Parse request body with Zod schema
+    const parsed = registerSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json(buildValidationError(parsed.error));
+      return;
+    }
+    const body = parsed.data;
+
+    // Si no existe en BD ni por UID ni por email, solo admins pueden auto-registrarse
+    if (!user && firebaseUser.email) {
+      const isAdmin = body.role === "admin" || (firebaseUser as any).admin === true;
+
+      if (!isAdmin) {
+        res.status(404).json({ error: "No tienes una cuenta registrada. Contactá a tu administrador." });
+        return;
+      }
+    }
+
     // Prioridad: 1. Role en el body | 2. Role en el token de Firebase | 3. Default a employee
     let requestedRole: UserRole = "employee";
 
     if (
-      bodyParams.role === "admin" ||
+      body.role === "admin" ||
       firebaseUser.admin === true ||
       firebaseUser.role === "admin"
     ) {
       requestedRole = "admin";
+    }
+
+    // ── Domain validation for admin registration ──────────────
+    const DEV_BYPASS_UIDS = ["dev-admin-uid", "dev-employee-uid"];
+    const skipDomainCheck =
+      process.env.NODE_ENV === "development" ||
+      firebaseUser.uid.startsWith("temp_") ||
+      DEV_BYPASS_UIDS.includes(firebaseUser.uid);
+
+    let registrationStatus: "active" | "pending" = "active";
+    const companyDomain =
+      typeof body.companyDomain === "string"
+        ? body.companyDomain.trim()
+        : "";
+
+    if (requestedRole === "admin" && !skipDomainCheck) {
+      const emailDomain = firebaseUser.email?.split("@")[1]?.toLowerCase();
+      if (!companyDomain) {
+        registrationStatus = "pending";
+      } else if (emailDomain && emailDomain !== companyDomain.toLowerCase()) {
+        registrationStatus = "pending";
+      }
     }
 
     if (user) {
@@ -102,13 +159,13 @@ router.post(
       user.uid = firebaseUser.uid;
       user.emailVerified = firebaseUser.email_verified;
       user.role = requestedRole;
-      user.displayName = bodyParams.name || user.displayName;
+      user.displayName = body.name || user.displayName;
       user.isTrial = requestedRole === "admin";
       user.trialExpiresAt = requestedRole === "admin" ? new Date(Date.now() + 14 * 24 * 60 * 60 * 1000) : undefined;
       user.metadata = {
         ...user.metadata,
         createdAt: new Date().toISOString(),
-        phone: bodyParams.phone || user.metadata?.phone || "",
+        phone: body.phone || user.metadata?.phone || "",
       };
       
       await userRepository.save(user);
@@ -123,10 +180,13 @@ router.post(
 
       res.status(200).json({
         message: "Usuario reactivado correctamente",
-        user: {
+        data: {
           uid: user.uid,
           email: user.email,
-          displayName: user.displayName,
+          role: user.role,
+          companyId: user.companyId,
+          isTrial: user.isTrial,
+          status: user.status,
         },
       });
       return;
@@ -135,8 +195,8 @@ router.post(
 
     if (requestedRole === "admin") {
       const companyName =
-        typeof bodyParams.companyName === "string"
-          ? bodyParams.companyName.trim()
+        typeof body.companyName === "string"
+          ? body.companyName.trim()
           : "";
       const slug = companyName
         ? companyName.toLowerCase().replace(/[^a-z0-9]+/g, "-")
@@ -146,36 +206,55 @@ router.post(
 
     // Vincular dispositivo si viene en el body (primer login nativo)
     const deviceId =
-      typeof bodyParams.deviceId === "string"
-        ? bodyParams.deviceId.trim()
+      typeof body.deviceId === "string"
+        ? body.deviceId.trim()
         : undefined;
     const finalDisplayName =
-      bodyParams.name || firebaseUser.name || firebaseUser.email || "Usuario";
+      body.name || firebaseUser.name || firebaseUser.email || "Usuario";
 
     // Crear nuevo usuario
     user = userRepository.create({
       uid: firebaseUser.uid,
-      email: firebaseUser.email.toLowerCase(),
+      email: firebaseUser.email?.toLowerCase() ?? '',
       displayName: finalDisplayName,
       photoURL: firebaseUser.picture || undefined,
       emailVerified: firebaseUser.email_verified,
       companyId: companyId,
       role: requestedRole,
+      status: registrationStatus,
       authorizedDeviceId: deviceId,
       isTrial: requestedRole === "admin",
       trialExpiresAt: requestedRole === "admin" ? new Date(Date.now() + 14 * 24 * 60 * 60 * 1000) : undefined,
       metadata: {
         createdAt: new Date().toISOString(),
-        companyName: bodyParams.companyName || "",
-        phone: bodyParams.phone || "",
+        companyName: body.companyName || "",
+        phone: body.phone || "",
       },
     });
 
     try {
       await userRepository.save(user);
-    } catch (saveErr) {
+    } catch (saveErr: unknown) {
       console.error("❌ [AUTH ERROR] Error crítico al guardar usuario:", saveErr);
-      throw saveErr; // El errorHandler lo convertirá en 409 si es duplicado
+      const err = saveErr as any;
+      if (err?.code === "ER_DUP_ENTRY" || err?.code === "23505") {
+        res.status(409).json({ error: "Este usuario ya está registrado." });
+        return;
+      }
+      throw saveErr;
+    }
+
+    // Si el registro quedó pendiente, notificar al equipo de Tempos
+    if (registrationStatus === "pending") {
+      try {
+        await EmailService.sendPendingApproval(
+          user.email,
+          user.displayName || "Usuario",
+          companyDomain || "No proporcionado",
+        );
+      } catch (emailErr) {
+        console.error("⚠️ Error al enviar notificación de registro pendiente:", emailErr);
+      }
     }
 
     // Si es un administrador nuevo (Trial), enviar email premium de bienvenida
@@ -188,12 +267,14 @@ router.post(
     }
 
     res.status(201).json({
-      message: "Usuario registrado correctamente",
-      user: {
+      message: "Registro exitoso",
+      data: {
         uid: user.uid,
         email: user.email,
-        displayName: user.displayName,
-        photoURL: user.photoURL,
+        role: user.role,
+        companyId: user.companyId,
+        isTrial: user.isTrial,
+        status: user.status,
       },
     });
   }),
