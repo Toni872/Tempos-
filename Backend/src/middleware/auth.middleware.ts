@@ -61,7 +61,12 @@ function initFirebaseAdmin() {
   }
 
   // 2. FIREBASE_KEY_JSON como variable de entorno (Railway secret)
-  const rawJson = (process.env.FIREBASE_KEY_JSON || "").trim();
+  let rawJson = (process.env.FIREBASE_KEY_JSON || "").trim();
+
+  // Railway a veces envuelve el valor en comillas dobles
+  if (rawJson.startsWith('"') && rawJson.endsWith('"')) {
+    rawJson = rawJson.slice(1, -1);
+  }
 
   if (rawJson) {
     let parsed: Record<string, any> | null = null;
