@@ -61,19 +61,43 @@ function initFirebaseAdmin() {
   }
 
   // 2. FIREBASE_KEY_JSON como variable de entorno (Railway secret)
-  const rawJson = process.env.FIREBASE_KEY_JSON;
-  if (rawJson && rawJson.trim().startsWith("{")) {
-    try {
-      const parsed = JSON.parse(rawJson);
+  const rawJson = (process.env.FIREBASE_KEY_JSON || "").trim();
+
+  if (rawJson) {
+    let parsed: Record<string, any> | null = null;
+
+    // Intentar 1: Parsear como JSON directo (multi-línea)
+    if (rawJson.startsWith("{") || rawJson.startsWith("\"{")) {
+      try {
+        const clean = rawJson.startsWith("\"") ? JSON.parse(rawJson) : rawJson;
+        parsed = JSON.parse(typeof clean === "string" ? clean : JSON.stringify(clean));
+      } catch {
+        parsed = null;
+      }
+    }
+
+    // Intentar 2: Decodificar base64 (Railway single-line friendly)
+    if (!parsed) {
+      try {
+        const decoded = Buffer.from(rawJson, "base64").toString("utf-8");
+        parsed = JSON.parse(decoded);
+      } catch {
+        parsed = null;
+      }
+    }
+
+    if (parsed) {
       admin.initializeApp({
         credential: admin.credential.cert(parsed),
         projectId: process.env.FIREBASE_PROJECT_ID || parsed.project_id,
       });
       console.log("✅ Firebase Admin (Service Account - FIREBASE_KEY_JSON)");
       return;
-    } catch (err) {
-      console.error("❌ Error parseando FIREBASE_KEY_JSON:", err);
-      console.log("➡️ Asegurate de que el JSON completo esté en la variable, sin truncar.");
+    } else {
+      console.error("❌ FIREBASE_KEY_JSON presente pero no se pudo parsear.");
+      console.error("   Raw starts with:", rawJson.substring(0, 60));
+      console.log("   💡 Usá base64 para una sola línea: en terminal, ejecutá:");
+      console.log("   certutil -encode -f firebase-key.json output.txt && type output.txt");
     }
   }
 
