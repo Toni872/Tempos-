@@ -188,9 +188,9 @@ export default function AuthPage({ mode }) {
   });
 
   const registerSchema = z.object({
-    companyName: z.string().min(1, "El nombre de la empresa es obligatorio para administradores."),
+    companyName: z.string().min(2, "El nombre de la empresa debe tener al menos 2 caracteres."),
     companyDomain: z.string().optional(),
-    name: z.string().min(1, "El nombre completo es obligatorio."),
+    name: z.string().min(2, "El nombre completo debe tener al menos 2 caracteres."),
     email: z.string().min(1, "El correo electrónico es obligatorio.").email("Introduce un correo electrónico válido."),
     password: z.string().min(1, "La contraseña es obligatoria.").min(MIN_PASSWORD_LENGTH, `La contraseña debe tener al menos ${MIN_PASSWORD_LENGTH} caracteres.`)
   });
@@ -252,7 +252,7 @@ export default function AuthPage({ mode }) {
       try {
         await registerMe(idToken, { 
           role, 
-          companyName,
+          companyName: role === 'admin' ? companyName.trim() || undefined : undefined,
           companyDomain: role === 'admin' ? companyDomain.trim() || undefined : undefined,
           name: name || undefined 
         });
