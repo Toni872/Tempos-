@@ -14,20 +14,21 @@ export const errorHandler = (
 ): void => {
   const isDev = process.env.NODE_ENV === "development";
 
-  // Log detallado solo en desarrollo
-  if (isDev) {
+  // Log detallado siempre en producción para debugging
+  if (isDev || process.env.VERBOSE_LOG === "true") {
     console.error("❌ [API ERROR]:", err);
   }
 
   let status = err.status || err.statusCode || 500;
   let message = err.message || "Error interno del servidor";
   let code = err.code || "INTERNAL_ERROR";
+  let details: string[] | undefined;
 
   // Manejo de errores específicos de Base de Datos (TypeORM)
   if (err.name === "QueryFailedError") {
     status = 400;
-    message = "Error en la operación de base de datos.";
     code = "DB_QUERY_FAILED";
+    details = [err.message];
     if (
       err.message.includes("duplicate key") ||
       err.message.includes("UNIQUE constraint")
@@ -35,6 +36,14 @@ export const errorHandler = (
       status = 409;
       message = "Ya existe un registro con esos datos.";
       code = "DUPLICATE_ENTRY";
+    } else if (
+      err.message?.includes("does not exist") ||
+      err.message?.includes("relation") ||
+      err.message?.includes("column") ||
+      err.message?.includes("schema")
+    ) {
+      message = "Error de esquema en base de datos. Contacta al administrador.";
+      code = "DB_SCHEMA_MISMATCH";
     }
   }
 
@@ -43,19 +52,15 @@ export const errorHandler = (
     status = 400;
     message = "Datos de entrada inválidos.";
     code = "VALIDATION_ERROR";
-    res.status(status).json({
-      error: { message, code, details: err.issues || err.errors },
-    });
-    return;
+    details = err.issues?.map((i: any) => i.message) || err.errors;
   }
 
+  // Respuesta SIEMPRE plana — el frontend espera { error: "string", code: "..." }
   res.status(status).json({
-    error: {
-      status,
-      code,
-      message,
-      ...(isDev && { stack: err.stack }),
-    },
+    error: message,
+    code,
+    ...(details && details.length > 0 ? { details } : {}),
+    ...(isDev ? { stack: err.stack } : {}),
   });
 };
 

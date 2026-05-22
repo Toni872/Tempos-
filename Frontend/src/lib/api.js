@@ -172,8 +172,22 @@ async function request(path, options = {}, retryCount = 0) {
 
     if (!responseOk) {
       const errorData = responseData || {};
-      const errorMessage = errorData.detail || errorData.message || errorData.error || `Error ${responseStatus}`;
-      throw new ApiError(errorMessage, responseStatus, errorData.code);
+      // Manejar múltiples formatos de error del backend:
+      // - { error: "string" } ← plano
+      // - { error: { message: "string" } } ← anidado (legacy)
+      // - { message: "string" } ← directo
+      // - { detail: "string" } ← directo
+      // - { details: ["string"] } ← array de errores Zod
+      const nestedError = typeof errorData.error === 'object' ? errorData.error : null;
+      const errorMessage = 
+        errorData.detail ||
+        (Array.isArray(errorData.details) ? errorData.details[0] : errorData.details) ||
+        errorData.message ||
+        nestedError?.message ||
+        (typeof errorData.error === 'string' ? errorData.error : null) ||
+        `Error ${responseStatus}`;
+      const errorCode = errorData.code || nestedError?.code || undefined;
+      throw new ApiError(errorMessage, responseStatus, errorCode);
     }
     return responseData;
   } catch (error) {
