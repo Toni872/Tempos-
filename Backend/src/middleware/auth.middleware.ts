@@ -39,6 +39,10 @@ export const DEFAULT_COMPANY_ID = "tempos-demo";
 
 /**
  * Inicialización segura de Firebase Admin
+ * Soporta múltiples formas de pasar las credenciales:
+ *  1. GOOGLE_APPLICATION_CREDENTIALS → path a archivo JSON
+ *  2. FIREBASE_KEY_JSON → JSON string directo (multi-línea o base64)
+ *  3. Fallback a ADC (Application Default Credentials)
  */
 function initFirebaseAdmin() {
   if (admin.apps.length) return;
@@ -46,29 +50,38 @@ function initFirebaseAdmin() {
   const keyPath =
     process.env.GOOGLE_APPLICATION_CREDENTIALS || "./firebase-key.json";
 
-  // Si FIREBASE_KEY_JSON está definido como env var (Railway secret),
-  // escribirlo a disco para que admin.credential.cert() pueda leerlo
-  if (process.env.FIREBASE_KEY_JSON && !fs.existsSync(keyPath)) {
-    try {
-      fs.writeFileSync(keyPath, process.env.FIREBASE_KEY_JSON, "utf-8");
-      console.log("✅ Firebase key escrita desde FIREBASE_KEY_JSON env var");
-    } catch (err) {
-      console.error("❌ No se pudo escribir firebase-key.json:", err);
-    }
-  }
-
+  // 1. Archivo en disco (GOOGLE_APPLICATION_CREDENTIALS o ./firebase-key.json)
   if (fs.existsSync(keyPath)) {
     admin.initializeApp({
       credential: admin.credential.cert(keyPath),
       projectId: process.env.FIREBASE_PROJECT_ID,
     });
-    console.log("✅ Firebase Admin (Service Account)");
-  } else {
-    admin.initializeApp({
-      projectId: process.env.FIREBASE_PROJECT_ID || "tempos-project-f1e77",
-    });
-    console.log("✅ Firebase Admin (ADC/Default) — puede fallar en Railway sin credenciales");
+    console.log("✅ Firebase Admin (Service Account - archivo)");
+    return;
   }
+
+  // 2. FIREBASE_KEY_JSON como variable de entorno (Railway secret)
+  const rawJson = process.env.FIREBASE_KEY_JSON;
+  if (rawJson && rawJson.trim().startsWith("{")) {
+    try {
+      const parsed = JSON.parse(rawJson);
+      admin.initializeApp({
+        credential: admin.credential.cert(parsed),
+        projectId: process.env.FIREBASE_PROJECT_ID || parsed.project_id,
+      });
+      console.log("✅ Firebase Admin (Service Account - FIREBASE_KEY_JSON)");
+      return;
+    } catch (err) {
+      console.error("❌ Error parseando FIREBASE_KEY_JSON:", err);
+      console.log("➡️ Asegurate de que el JSON completo esté en la variable, sin truncar.");
+    }
+  }
+
+  // 3. Fallback a ADC
+  admin.initializeApp({
+    projectId: process.env.FIREBASE_PROJECT_ID || "tempos-project-f1e77",
+  });
+  console.log("ℹ️ Firebase Admin (ADC/Default) — sin service account, puede fallar en Railway");
 }
 
 initFirebaseAdmin();
