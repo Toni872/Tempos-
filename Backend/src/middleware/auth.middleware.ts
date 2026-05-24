@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import admin from "firebase-admin";
 import fs from "fs";
+import { AppDataSource } from "../database.js";
 import type { User, UserRole } from "../entities/User.js";
 
 const DEV_BYPASS_TOKENS = ["test", "test-admin", "test-employee"] as const;
@@ -221,9 +222,30 @@ export function requireEmailVerified(
     return;
   }
 
-  // También verificar el emailVerified del registro en BD (puede haber sido auto-verificado)
-  const dbUserEmailVerified = (req as any).currentUser?.emailVerified === true;
-  if (!firebaseUser?.email_verified && !dbUserEmailVerified) {
+  // Si el usuario existe en BD pero emailVerified=false, lo corregimos al vuelo
+  // (cubre TODOS los caminos de registro, incluso los que el controller no cubre)
+  if (currentUser?.uid && !currentUser.emailVerified) {
+    AppDataSource.getRepository(User)
+      .update({ uid: currentUser.uid }, { emailVerified: true })
+      .then(() => {
+        currentUser.emailVerified = true;
+        console.log(`✅ [AUTH] emailVerified corregido en BD para ${currentUser.email}`);
+      })
+      .catch((dbErr) =>
+        console.error("⚠️ [AUTH] Error corrigiendo emailVerified:", dbErr),
+      );
+    // Dejamos pasar aunque la corrección async todavía no haya terminado
+    next();
+    return;
+  }
+
+  // Si la BD ya tiene emailVerified=true, pasar directamente
+  if (currentUser?.emailVerified === true) {
+    next();
+    return;
+  }
+
+  if (!firebaseUser?.email_verified) {
     res.status(403).json({ error: "email_no_verificado", blocked: true });
     return;
   }
