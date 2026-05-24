@@ -53,11 +53,43 @@ router.post(
         where: { email: normalizedEmail },
       });
       if (user) {
-        if (!user.uid.startsWith("temp_")) {
-          res.status(409).json({ error: "Este email ya está registrado con otra cuenta." });
+        if (!user.uid.startsWith("temp_") && user.uid !== firebaseUser.uid) {
+          // El usuario existe en BD con otro UID (Firebase Auth fue recreado).
+          // Re-link: actualizamos el UID con update() para evitar conflictos de PK.
+          await userRepository.update(
+            { uid: user.uid },
+            {
+              uid: firebaseUser.uid,
+              emailVerified: firebaseUser.email_verified ?? user.emailVerified,
+              ...(firebaseUser.name && (!user.displayName || user.displayName === "Usuario" || user.displayName.includes("@"))
+                ? { displayName: firebaseUser.name }
+                : {}),
+              ...(firebaseUser.picture ? { photoURL: firebaseUser.picture } : {}),
+              invitationToken: null as any,
+              invitationExpiresAt: null as any,
+              status: user.status === "pending" ? "active" : user.status,
+            },
+          );
+
+          // Re-fetch con el nuevo uid
+          user = await userRepository.findOne({
+            where: { uid: firebaseUser.uid },
+          })!;
+
+          res.status(200).json({
+            message: "Cuenta re-vinculada correctamente",
+            data: {
+              uid: user!.uid,
+              email: user!.email,
+              role: user!.role,
+              companyId: user!.companyId,
+              isTrial: user!.isTrial,
+              status: user!.status,
+            },
+          });
           return;
         }
-        // Vincular el UID de Firebase al registro existente
+        // Vincular el UID de Firebase al registro existente (temp_ o mismo uid)
         user.uid = firebaseUser.uid;
         user.emailVerified = firebaseUser.email_verified;
 
