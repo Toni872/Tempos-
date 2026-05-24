@@ -67,4 +67,9 @@ export const AppDataSource = new DataSource({
   ssl: dbUrl.includes("rlwy.net") || process.env.NODE_ENV === "production"
     ? { rejectUnauthorized: false }
     : false,
+  extra: {
+    max: 25,
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 5000,
+  },
 });

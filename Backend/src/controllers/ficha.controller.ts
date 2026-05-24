@@ -274,6 +274,10 @@ router.post(
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const auth = getAuthContext(req);
     const parsed = clockInSchema.safeParse(req.body); // Reutilizamos esquema de clockIn
+    if (!parsed.success) {
+      res.status(400).json(buildValidationError(parsed.error));
+      return;
+    }
 
     try {
       const { effectiveDate } = resolveEffectiveNow(
@@ -304,6 +308,10 @@ router.post(
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const auth = getAuthContext(req);
     const parsed = clockInSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json(buildValidationError(parsed.error));
+      return;
+    }
 
     try {
       const { effectiveDate } = resolveEffectiveNow(

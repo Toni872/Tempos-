@@ -24,6 +24,9 @@ export class EmailService {
         },
       });
     } else {
+      if (process.env.NODE_ENV !== 'development') {
+        console.warn('⚠️ [EMAIL] SMTP no configurado — usando Ethereal. Los emails NO llegan.');
+      }
       const testAccount = await nodemailer.createTestAccount();
       this.transporter = nodemailer.createTransport({
         host: 'smtp.ethereal.email',

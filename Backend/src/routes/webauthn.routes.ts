@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { firebaseAuthMiddleware as requireAuth } from "../middleware/auth.middleware.js";
+import { authRateLimiter } from "../middleware/rate-limit.middleware.js";
 import {
   getRegistrationOptions,
   verifyRegistration,
@@ -20,7 +21,7 @@ router.get(
 router.post("/verify-registration", requireAuth, verifyRegistration);
 
 // Endpoints para autenticarse (No requieren auth, sirven para hacer el login / fichar)
-router.get("/generate-authentication-options", getAuthenticationOptions);
-router.post("/verify-authentication", verifyAuthentication);
+router.get("/generate-authentication-options", authRateLimiter, getAuthenticationOptions);
+router.post("/verify-authentication", authRateLimiter, verifyAuthentication);
 
 export default router;

@@ -2,8 +2,11 @@ import { Router, Request, Response } from "express";
 import { AppDataSource } from "../database.js";
 import { User } from "../entities/User.js";
 import { asyncHandler } from "../middleware/errorHandler.js";
+import { authRateLimiter } from "../middleware/rate-limit.middleware.js";
 
 const router = Router();
+
+router.use(authRateLimiter);
 
 /**
  * GET /api/v1/invitations/:token
