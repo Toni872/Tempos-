@@ -143,7 +143,13 @@ export default function TrialPage() {
     setIsSubmitting(true);
 
     try {
-      const idToken = await signUpAndGetIdToken(formData.email.trim(), formData.password);
+      // Timeout de seguridad: si Firebase tarda más de 15s, liberamos el botón
+      const idToken = await Promise.race([
+        signUpAndGetIdToken(formData.email.trim(), formData.password),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Tiempo de espera agotado. Reintentá.')), 15000)
+        ),
+      ]);
       if (!idToken) throw new Error('Error de validación o usuario ya existente.');
 
       await registerMe(idToken, {
