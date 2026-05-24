@@ -42,7 +42,7 @@ try {
 export const AppDataSource = new DataSource({
   type: "postgres",
   url: dbUrl,
-  synchronize: true, // TEMPORAL: activado para sincronizar schema en producción. Revertir después.
+  synchronize: process.env.DB_SYNC === "true", // Solo activar temporalmente para migraciones
   logging: process.env.NODE_ENV === "development",
   entities: [
     User,
