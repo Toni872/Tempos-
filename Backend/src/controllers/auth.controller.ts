@@ -277,15 +277,22 @@ router.post(
       throw saveErr;
     }
 
-    // Auto-verificar email en Firebase + BD para que el dashboard no bloquee
+    // Auto-verificar email para que el dashboard no bloquee con "email_no_verificado"
     if (!user.emailVerified) {
+      // Firebase update es "best-effort" — si falla (permisos, red), no bloquea el flujo
       try {
         await admin.auth().updateUser(firebaseUser.uid, { emailVerified: true });
+        console.log(`✅ [AUTH] Email verificado en Firebase para ${user.email}`);
+      } catch (verifyErr) {
+        console.error("⚠️ [AUTH] No se pudo verificar email en Firebase:", verifyErr);
+      }
+      // La BD SIEMPRE se actualiza a true para que el middleware requireEmailVerified pase
+      try {
         await userRepository.update({ uid: firebaseUser.uid }, { emailVerified: true });
         user.emailVerified = true;
-        console.log(`✅ [AUTH] Email auto-verificado para ${user.email}`);
-      } catch (verifyErr) {
-        console.error("⚠️ [AUTH] No se pudo auto-verificar email:", verifyErr);
+        console.log(`✅ [AUTH] emailVerified=true en BD para ${user.email}`);
+      } catch (dbErr) {
+        console.error("⚠️ [AUTH] No se pudo actualizar emailVerified en BD:", dbErr);
       }
     }
 
