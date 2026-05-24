@@ -2,7 +2,8 @@ import { Request, Response, NextFunction } from "express";
 import admin from "firebase-admin";
 import fs from "fs";
 import { AppDataSource } from "../database.js";
-import type { User, UserRole } from "../entities/User.js";
+import { User } from "../entities/User.js";
+import type { UserRole } from "../entities/User.js";
 
 const DEV_BYPASS_TOKENS = ["test", "test-admin", "test-employee"] as const;
 
