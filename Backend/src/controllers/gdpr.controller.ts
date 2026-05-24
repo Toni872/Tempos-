@@ -1,11 +1,10 @@
-/* eslint-disable */
-// @ts-nocheck
 import { Request, Response } from "express";
 import { AppDataSource } from "../database.js";
 import { TimeEntry } from "../entities/TimeEntry.js";
 import { User } from "../entities/User.js";
 import { AuditLog } from "../entities/AuditLog.js";
 import { logger } from "../utils/logger.js";
+import { getAuthContext } from "../middleware/request-context.middleware.js";
 
 export class GdprController {
   /**
@@ -14,16 +13,13 @@ export class GdprController {
    */
   static async accessPersonalData(req: Request, res: Response) {
     try {
-      const userId = req.user?.uid;
-      if (!userId) {
-        return res.status(401).json({ error: "User not authenticated" });
-      }
+      const auth = getAuthContext(req);
+      const userId = auth.uid;
 
       // Get user's time entries with GPS data
       const timeEntryRepository = AppDataSource.getRepository(TimeEntry);
       const userTimeEntries = await timeEntryRepository.find({
         where: { userId },
-        relations: ["metadata"],
         order: { createdAt: "DESC" },
       });
 
@@ -54,12 +50,11 @@ export class GdprController {
         user: user,
         timeEntries: userTimeEntries.map((entry) => ({
           id: entry.id,
-          date: entry.date,
-          startTime: entry.startTime,
-          endTime: entry.endTime,
+          timestampUtc: entry.timestampUtc,
+          type: entry.type,
           latitude: entry.latitude,
           longitude: entry.longitude,
-          accuracy: entry.accuracy,
+          source: entry.source,
           createdAt: entry.createdAt,
           metadata: entry.metadata,
         })),
@@ -72,10 +67,10 @@ export class GdprController {
         data: personalData,
         message: "Personal data exported successfully",
       });
-    } catch (error) {
+    } catch (error: any) {
       logger.error("GDPR access request failed", {
         error: error.message,
-        userId: req.user?.uid,
+        userId: getAuthContext(req).uid,
       });
       res.status(500).json({ error: "Failed to access personal data" });
     }
@@ -87,11 +82,13 @@ export class GdprController {
    */
   static async rectifyData(req: Request, res: Response) {
     try {
-      const userId = req.user?.uid;
+      const auth = getAuthContext(req);
+      const userId = auth.uid;
       const { timeEntryId, corrections } = req.body;
 
       if (!userId || !timeEntryId) {
-        return res.status(400).json({ error: "Missing required parameters" });
+        res.status(400).json({ error: "Missing required parameters" });
+        return;
       }
 
       const timeEntryRepository = AppDataSource.getRepository(TimeEntry);
@@ -100,14 +97,25 @@ export class GdprController {
       });
 
       if (!timeEntry) {
-        return res.status(404).json({ error: "Time entry not found" });
+        res.status(404).json({ error: "Time entry not found" });
+        return;
+      }
+
+      // Verify the time entry belongs to the same company
+      const userRepository = AppDataSource.getRepository(User);
+      const entryUser = await userRepository.findOne({
+        where: { uid: userId },
+        select: ["companyId"],
+      });
+      if (!entryUser || entryUser.companyId !== auth.companyId) {
+        res.status(403).json({ error: "Access denied" });
+        return;
       }
 
       // Store original values for audit
       const originalData = {
         latitude: timeEntry.latitude,
         longitude: timeEntry.longitude,
-        accuracy: timeEntry.accuracy,
       };
 
       // Apply corrections
@@ -115,8 +123,6 @@ export class GdprController {
         timeEntry.latitude = corrections.latitude;
       if (corrections.longitude !== undefined)
         timeEntry.longitude = corrections.longitude;
-      if (corrections.accuracy !== undefined)
-        timeEntry.accuracy = corrections.accuracy;
 
       await timeEntryRepository.save(timeEntry);
 
@@ -138,13 +144,12 @@ export class GdprController {
           id: timeEntry.id,
           latitude: timeEntry.latitude,
           longitude: timeEntry.longitude,
-          accuracy: timeEntry.accuracy,
         },
       });
-    } catch (error) {
+    } catch (error: any) {
       logger.error("GDPR rectification failed", {
         error: error.message,
-        userId: req.user?.uid,
+        userId: getAuthContext(req).uid,
       });
       res.status(500).json({ error: "Failed to rectify data" });
     }
@@ -156,32 +161,25 @@ export class GdprController {
    */
   static async deletePersonalData(req: Request, res: Response) {
     try {
-      const userId = req.user?.uid;
-      if (!userId) {
-        return res.status(401).json({ error: "User not authenticated" });
-      }
-
-      const timeEntryRepository = AppDataSource.getRepository(TimeEntry);
-      const auditLogRepository = AppDataSource.getRepository(AuditLog);
+      const auth = getAuthContext(req);
+      const userId = auth.uid;
 
       // Start transaction for data deletion
       await AppDataSource.transaction(async (transactionalEntityManager) => {
         // Anonymize time entries (don't delete, keep for legal compliance)
+        const existing = await transactionalEntityManager.findOne(TimeEntry, {
+          where: { userId },
+        });
+        const existingMetadata = existing?.metadata ?? {};
+
         await transactionalEntityManager.update(
           TimeEntry,
           { userId },
           {
-            latitude: null,
-            longitude: null,
-            accuracy: null,
+            latitude: null as any,
+            longitude: null as any,
             metadata: {
-              ...JSON.parse(
-                JSON.stringify(
-                  await transactionalEntityManager.findOne(TimeEntry, {
-                    where: { userId },
-                  }),
-                )?.metadata || {},
-              ),
+              ...existingMetadata,
               anonymized: true,
               anonymizedAt: new Date(),
             },
@@ -203,10 +201,10 @@ export class GdprController {
         message: "Personal data has been anonymized as per GDPR Article 17",
         note: "Data anonymization completed. Some metadata retained for legal compliance.",
       });
-    } catch (error) {
+    } catch (error: any) {
       logger.error("GDPR erasure failed", {
         error: error.message,
-        userId: req.user?.uid,
+        userId: getAuthContext(req).uid,
       });
       res.status(500).json({ error: "Failed to delete personal data" });
     }
@@ -218,27 +216,25 @@ export class GdprController {
    */
   static async restrictProcessing(req: Request, res: Response) {
     try {
-      const userId = req.user?.uid;
+      const auth = getAuthContext(req);
+      const userId = auth.uid;
       const { restrict } = req.body;
 
-      if (!userId) {
-        return res.status(401).json({ error: "User not authenticated" });
-      }
-
       const userRepository = AppDataSource.getRepository(User);
+      const existingUser = await userRepository.findOne({
+        where: { uid: userId },
+      });
+      const existingMetadata = existingUser?.metadata ?? {};
+
       await userRepository.update(
         { uid: userId },
         {
           requiresGeolocation: !restrict,
           metadata: {
-            ...JSON.parse(
-              JSON.stringify(
-                await userRepository.findOne({ where: { uid: userId } }),
-              )?.metadata || {},
-            ),
+            ...existingMetadata,
             gpsProcessingRestricted: restrict,
             restrictedAt: new Date(),
-          },
+          } as any,
         },
       );
 
@@ -254,10 +250,10 @@ export class GdprController {
         message: `GPS processing ${restrict ? "restricted" : "resumed"} successfully`,
         requiresGeolocation: !restrict,
       });
-    } catch (error) {
+    } catch (error: any) {
       logger.error("GDPR processing restriction failed", {
         error: error.message,
-        userId: req.user?.uid,
+        userId: getAuthContext(req).uid,
       });
       res
         .status(500)
@@ -271,12 +267,9 @@ export class GdprController {
    */
   static async exportData(req: Request, res: Response) {
     try {
-      const userId = req.user?.uid;
+      const auth = getAuthContext(req);
+      const userId = auth.uid;
       const format = req.query.format || "json";
-
-      if (!userId) {
-        return res.status(401).json({ error: "User not authenticated" });
-      }
 
       // Get comprehensive user data
       const timeEntryRepository = AppDataSource.getRepository(TimeEntry);
@@ -337,10 +330,10 @@ export class GdprController {
         );
         res.send(csvData);
       }
-    } catch (error) {
+    } catch (error: any) {
       logger.error("GDPR data export failed", {
         error: error.message,
-        userId: req.user?.uid,
+        userId: getAuthContext(req).uid,
       });
       res.status(500).json({ error: "Failed to export data" });
     }
@@ -374,30 +367,50 @@ export class GdprController {
   }
 
   /**
+   * Sanitize a CSV field to prevent formula injection
+   */
+  private static sanitizeCSVField(val: any): string {
+    const str = String(val);
+    if (
+      str.startsWith("=") ||
+      str.startsWith("+") ||
+      str.startsWith("-") ||
+      str.startsWith("@")
+    ) {
+      return `'${str}`;
+    }
+    return str;
+  }
+
+  /**
    * Convert export data to CSV format
    */
   private static convertToCSV(data: any): string {
     const headers = [
-      "Date",
-      "Start Time",
-      "End Time",
+      "Timestamp",
+      "Type",
       "Latitude",
       "Longitude",
-      "Accuracy",
+      "Source",
       "Created At",
     ];
     const rows = data.timeEntries.map((entry: any) => [
-      entry.date,
-      entry.startTime,
-      entry.endTime,
+      entry.timestampUtc,
+      entry.type,
       entry.latitude,
       entry.longitude,
-      entry.accuracy,
+      entry.source,
       entry.createdAt,
     ]);
 
     const csvContent = [headers, ...rows]
-      .map((row) => row.map((field) => `"${field || ""}"`).join(","))
+      .map((row: any[]) =>
+        row
+          .map((field: any) =>
+            `"${this.sanitizeCSVField(field).replace(/"/g, '""')}"`,
+          )
+          .join(","),
+      )
       .join("\n");
 
     return csvContent;

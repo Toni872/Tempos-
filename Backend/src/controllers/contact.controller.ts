@@ -1,7 +1,10 @@
 import { Router, Request, Response } from "express";
 import { asyncHandler } from "../middleware/errorHandler.js";
+import { authRateLimiter } from "../middleware/rate-limit.middleware.js";
 
 const router = Router();
+
+router.use(authRateLimiter);
 
 const NAME_MAX = 120;
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;

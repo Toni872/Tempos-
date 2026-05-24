@@ -1,7 +1,10 @@
 import { Request, Response, Router } from "express";
 import { NotificationService } from "../services/NotificationService.js";
+import { authRateLimiter } from "../middleware/rate-limit.middleware.js";
 
 const router = Router();
+
+router.use(authRateLimiter);
 
 /**
  * Endpoint para recibir errores del Frontend y notificarlos.
