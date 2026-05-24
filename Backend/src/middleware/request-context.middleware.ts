@@ -46,11 +46,27 @@ export async function appUserContextMiddleware(
 
         if (userByEmail) {
           // Vincular Firebase UID al empleado pre-creado
-          userByEmail.uid = firebaseUser.uid;
-          if (firebaseUser.picture) userByEmail.photoURL = firebaseUser.picture;
-          if (firebaseUser.name) userByEmail.displayName = firebaseUser.name;
-          await userRepo.save(userByEmail);
-          currentUser = userByEmail;
+          // Usamos update() en vez de cambiar uid y save() para evitar conflictos de PK
+          if (userByEmail.uid !== firebaseUser.uid) {
+            await userRepo.update(
+              { uid: userByEmail.uid },
+              {
+                uid: firebaseUser.uid,
+                ...(firebaseUser.picture ? { photoURL: firebaseUser.picture } : {}),
+                ...(firebaseUser.name ? { displayName: firebaseUser.name } : {}),
+                emailVerified: true,
+              },
+            );
+            // Re-fetch con el nuevo uid
+            currentUser = await userRepo.findOne({
+              where: { uid: firebaseUser.uid },
+            });
+          } else {
+            // Mismo uid, solo actualizar metadata
+            if (firebaseUser.picture) userByEmail.photoURL = firebaseUser.picture;
+            if (firebaseUser.name) userByEmail.displayName = firebaseUser.name;
+            currentUser = await userRepo.save(userByEmail);
+          }
         } else if (process.env.NODE_ENV !== "production") {
           console.warn(
             `⚠️ [DEV] Usuario ${firebaseUser.email} no encontrado en DB. ` +
