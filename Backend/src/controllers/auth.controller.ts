@@ -18,6 +18,7 @@ import {
 import { randomUUID } from "crypto";
 import { EmailService } from "../services/EmailService.js";
 import { registerRateLimiter } from "../middleware/rate-limit.middleware.js";
+import admin from "firebase-admin";
 
 const router = Router();
 
@@ -274,6 +275,18 @@ router.post(
         return;
       }
       throw saveErr;
+    }
+
+    // Auto-verificar email en Firebase + BD para que el dashboard no bloquee
+    if (!user.emailVerified) {
+      try {
+        await admin.auth().updateUser(firebaseUser.uid, { emailVerified: true });
+        await userRepository.update({ uid: firebaseUser.uid }, { emailVerified: true });
+        user.emailVerified = true;
+        console.log(`✅ [AUTH] Email auto-verificado para ${user.email}`);
+      } catch (verifyErr) {
+        console.error("⚠️ [AUTH] No se pudo auto-verificar email:", verifyErr);
+      }
     }
 
     // Si el registro quedó pendiente, notificar al equipo de Tempos

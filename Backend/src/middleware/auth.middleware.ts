@@ -221,7 +221,9 @@ export function requireEmailVerified(
     return;
   }
 
-  if (!firebaseUser?.email_verified) {
+  // También verificar el emailVerified del registro en BD (puede haber sido auto-verificado)
+  const dbUserEmailVerified = (req as any).currentUser?.emailVerified === true;
+  if (!firebaseUser?.email_verified && !dbUserEmailVerified) {
     res.status(403).json({ error: "email_no_verificado", blocked: true });
     return;
   }
