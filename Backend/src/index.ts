@@ -39,7 +39,7 @@ import {
 } from "./middleware/request-context.middleware.js";
 
 const app: Express = express();
-const PORT = process.env.PORT || 8081;
+const PORT = process.env.PORT || 8080;
 
 // ─── Middleware ────────────────────────────────────────────────────────────────
 
@@ -90,14 +90,14 @@ app.use(
       // Permitir peticiones sin origen (como apps móviles o curl)
       if (!origin) return callback(null, true);
 
+      const isProd = (process.env.NODE_ENV || "").trim() === "production";
       const isLocalhost =
         origin.startsWith("http://localhost:") ||
         origin.startsWith("http://127.0.0.1:");
 
       if (
         allowedOrigins.indexOf(origin) !== -1 ||
-        (isLocalhost && process.env.NODE_ENV !== "production") ||
-        process.env.NODE_ENV !== "production"
+        (!isProd && isLocalhost)
       ) {
         callback(null, true);
       } else {

@@ -2,6 +2,7 @@ import { Suspense, lazy, useState, useEffect } from 'react'
 import { Routes, Route, useLocation } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import LandingPage from '@/pages/LandingPage'
+import ErrorBoundary from '@/components/ErrorBoundary'
 
 const AuthPage = lazy(() => import('@/pages/AuthPage'))
 const DashboardPage = lazy(() => import('@/pages/DashboardPage'))
@@ -55,34 +56,36 @@ function App() {
         </div>
       )}
 
-      <Suspense
-        fallback={
-          <div className="tp-root h-screen grid place-items-center bg-[#0a0a0c] text-zinc-500 font-sans">
-            <div className="flex flex-col items-center gap-4">
-              <div className="w-10 h-10 border-2 border-blue-500/20 border-t-blue-500 rounded-full animate-spin" />
-              <span className="text-sm font-medium tracking-tight">Cargando interfaz...</span>
+      <ErrorBoundary>
+        <Suspense
+          fallback={
+            <div className="tp-root h-screen grid place-items-center bg-[#0a0a0c] text-zinc-500 font-sans">
+              <div className="flex flex-col items-center gap-4">
+                <div className="w-10 h-10 border-2 border-blue-500/20 border-t-blue-500 rounded-full animate-spin" />
+                <span className="text-sm font-medium tracking-tight">Cargando interfaz...</span>
+              </div>
             </div>
-          </div>
-        }
-      >
-        <AnimatePresence mode="wait">
-          <Routes location={location} key={location.pathname}>
-            <Route path="/" element={<PageWrapper><LandingPage /></PageWrapper>} />
-            <Route path="/funcionalidades" element={<PageWrapper><MarketingPage kind="funcionalidades" /></PageWrapper>} />
-            <Route path="/faqs" element={<PageWrapper><MarketingPage kind="faqs" /></PageWrapper>} />
-            <Route path="/blog" element={<PageWrapper><MarketingPage kind="blog" /></PageWrapper>} />
-            <Route path="/contacto" element={<PageWrapper><MarketingPage kind="contacto" /></PageWrapper>} />
-            <Route path="/login" element={<PageWrapper><AuthPage mode="login" /></PageWrapper>} />
-            <Route path="/register" element={<PageWrapper><AuthPage mode="register" /></PageWrapper>} />
-            <Route path="/dashboard" element={<PageWrapper><DashboardPage /></PageWrapper>} />
-            <Route path="/kiosk" element={<PageWrapper><KioskPage /></PageWrapper>} />
-            <Route path="/invite/:token" element={<PageWrapper><AcceptInvitationPage /></PageWrapper>} />
-            <Route path="/trial" element={<PageWrapper><TrialPage /></PageWrapper>} />
-            <Route path="/legal/privacidad" element={<PageWrapper><PrivacyPolicy /></PageWrapper>} />
-            <Route path="/legal/terminos" element={<PageWrapper><TermsOfService /></PageWrapper>} />
-          </Routes>
-        </AnimatePresence>
-      </Suspense>
+          }
+        >
+          <AnimatePresence mode="wait">
+            <Routes location={location} key={location.pathname}>
+              <Route path="/" element={<PageWrapper><LandingPage /></PageWrapper>} />
+              <Route path="/funcionalidades" element={<PageWrapper><MarketingPage kind="funcionalidades" /></PageWrapper>} />
+              <Route path="/faqs" element={<PageWrapper><MarketingPage kind="faqs" /></PageWrapper>} />
+              <Route path="/blog" element={<PageWrapper><MarketingPage kind="blog" /></PageWrapper>} />
+              <Route path="/contacto" element={<PageWrapper><MarketingPage kind="contacto" /></PageWrapper>} />
+              <Route path="/login" element={<PageWrapper><AuthPage mode="login" /></PageWrapper>} />
+              <Route path="/register" element={<PageWrapper><AuthPage mode="register" /></PageWrapper>} />
+              <Route path="/dashboard" element={<PageWrapper><DashboardPage /></PageWrapper>} />
+              <Route path="/kiosk" element={<PageWrapper><KioskPage /></PageWrapper>} />
+              <Route path="/invite/:token" element={<PageWrapper><AcceptInvitationPage /></PageWrapper>} />
+              <Route path="/trial" element={<PageWrapper><TrialPage /></PageWrapper>} />
+              <Route path="/legal/privacidad" element={<PageWrapper><PrivacyPolicy /></PageWrapper>} />
+              <Route path="/legal/terminos" element={<PageWrapper><TermsOfService /></PageWrapper>} />
+            </Routes>
+          </AnimatePresence>
+        </Suspense>
+      </ErrorBoundary>
     </>
   )
 }
