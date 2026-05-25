@@ -60,41 +60,16 @@ router.post(
       });
       if (user) {
         if (!user.uid.startsWith("temp_") && user.uid !== firebaseUser.uid) {
-          // El usuario existe en BD con otro UID (Firebase Auth fue recreado).
-          // Re-link: actualizamos el UID con update() para evitar conflictos de PK.
-          await userRepository.update(
-            { uid: user.uid },
-            {
-              uid: firebaseUser.uid,
-              emailVerified: firebaseUser.email_verified ?? user.emailVerified,
-              ...(firebaseUser.name && (!user.displayName || user.displayName === "Usuario" || user.displayName.includes("@"))
-                ? { displayName: firebaseUser.name }
-                : {}),
-              ...(firebaseUser.picture ? { photoURL: firebaseUser.picture } : {}),
-              invitationToken: null as any,
-              invitationExpiresAt: null as any,
-              status: user.status === "pending" ? "active" : user.status,
-            },
-          );
-
-          // Re-fetch con el nuevo uid
-          user = await userRepository.findOne({
-            where: { uid: firebaseUser.uid },
-          })!;
-
-          res.status(200).json({
-            message: "Cuenta re-vinculada correctamente",
-            data: {
-              uid: user!.uid,
-              email: user!.email,
-              role: user!.role,
-              companyId: user!.companyId,
-              isTrial: user!.isTrial,
-              status: user!.status,
-            },
+          // El usuario existe en BD con otro UID pero ya estaba completamente registrado.
+          // Esto suele ocurrir si el usuario borró su cuenta en Firebase pero no en PostgreSQL (ej: en desarrollo),
+          // o si está intentando iniciar sesión con un método diferente que Firebase no enlazó automáticamente.
+          res.status(409).json({
+            error: "El correo ya está registrado con otro método de acceso o la cuenta está en un estado inconsistente. Por favor, usa el método de inicio de sesión original.",
           });
           return;
         }
+        const oldUid = user.uid;
+
         // Vincular el UID de Firebase al registro existente (temp_ o mismo uid)
         user.uid = firebaseUser.uid;
         user.emailVerified = firebaseUser.email_verified;
@@ -123,7 +98,19 @@ router.post(
           user.photoURL = firebaseUser.picture;
         }
 
-        await userRepository.save(user);
+        // Al ser un cambio de Primary Key (de temp_ a firebase uid), debemos usar update()
+        await userRepository.update(
+          { uid: oldUid },
+          {
+            uid: user.uid,
+            emailVerified: user.emailVerified,
+            invitationToken: user.invitationToken,
+            invitationExpiresAt: user.invitationExpiresAt,
+            status: user.status,
+            displayName: user.displayName,
+            photoURL: user.photoURL,
+          }
+        );
 
         res.status(200).json({
           message: "Usuario vinculado correctamente",
