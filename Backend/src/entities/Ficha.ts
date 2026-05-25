@@ -38,7 +38,7 @@ export class Ficha {
   @Column({ type: "varchar", length: 128 })
   userId!: string;
 
-  @ManyToOne(() => User)
+  @ManyToOne(() => User, { onDelete: "CASCADE", onUpdate: "CASCADE" })
   @JoinColumn({ name: "userId" })
   user!: User;
 
