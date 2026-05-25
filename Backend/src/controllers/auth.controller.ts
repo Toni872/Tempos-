@@ -197,17 +197,86 @@ router.post(
       },
     });
 
-    // Si hay que re-linkear, hacemos la eliminación del UID antiguo y la inserción
-    // del nuevo usuario dentro de una transacción para asegurar atomicidad.
+    // --- RE-LINK: UPDATE-based en lugar de DELETE + re-create ---
+    // Descubre FKs dinámicamente via information_schema y re-apunta TODAS
+    // las referencias al nuevo UID. NO depende de ON DELETE CASCADE en la BD.
     if (relinkOldUid) {
       try {
         await AppDataSource.manager.transaction(async (manager) => {
-          const txRepo = manager.getRepository(User);
-          // Borramos el usuario antiguo (ON DELETE CASCADE en la BD se encargará)
-          await txRepo.delete({ uid: relinkOldUid });
-          // Insertamos el nuevo usuario
-          await txRepo.save(user);
+          // 1. Descubrir TODAS las FK → users(uid) dinámicamente
+          const fks: Array<{ table_name: string; column_name: string }> = await manager.query(
+            `SELECT tc.table_name::text AS table_name,
+                    kcu.column_name::text AS column_name
+             FROM information_schema.table_constraints tc
+             JOIN information_schema.key_column_usage kcu
+               ON tc.constraint_name = kcu.constraint_name
+               AND tc.table_catalog = kcu.table_catalog
+               AND tc.table_schema = kcu.table_schema
+             JOIN information_schema.constraint_column_usage ccu
+               ON tc.constraint_name = ccu.constraint_name
+               AND tc.table_catalog = ccu.table_catalog
+               AND tc.table_schema = ccu.table_schema
+             WHERE tc.constraint_type = 'FOREIGN KEY'
+               AND ccu.table_name = 'users'
+               AND ccu.column_name = 'uid'`
+          );
+
+          // 2. Re-apuntar todas las referencias hijas al nuevo UID
+          for (const fk of fks) {
+            const tbl = `"${fk.table_name.replace(/"/g, '""')}"`;
+            const col = `"${fk.column_name.replace(/"/g, '""')}"`;
+            await manager.query(
+              `UPDATE ${tbl} SET ${col} = $1 WHERE ${col} = $2`,
+              [firebaseUser.uid, relinkOldUid]
+            );
+          }
+
+          // 3. Actualizar el registro del usuario (PK + metadatos)
+          //    Ya no hay referencias al oldUid, así que no hay conflicto de FK.
+          await manager.query(
+            `UPDATE "users" SET
+              "uid" = $1,
+              "displayName" = $2,
+              "photoURL" = $3,
+              "emailVerified" = $4,
+              "companyId" = $5,
+              "role" = $6,
+              "status" = $7,
+              "authorizedDeviceId" = $8,
+              "isTrial" = $9,
+              "trialExpiresAt" = $10,
+              "metadata" = $11
+             WHERE "uid" = $12`,
+            [
+              firebaseUser.uid,
+              finalDisplayName,
+              firebaseUser.picture || null,
+              firebaseUser.email_verified ?? true,
+              companyId,
+              requestedRole,
+              registrationStatus,
+              deviceId || null,
+              requestedRole === "admin",
+              requestedRole === "admin"
+                ? new Date(Date.now() + 14 * 24 * 60 * 60 * 1000)
+                : null,
+              JSON.stringify({
+                createdAt: new Date().toISOString(),
+                linkedFromUid: relinkOldUid,
+                companyName: body.companyName || "",
+                phone: body.phone || "",
+              }),
+              relinkOldUid,
+            ]
+          );
         });
+
+        // Recargar el usuario actualizado desde la BD para el resto del flujo
+        user = await userRepository.findOne({ where: { uid: firebaseUser.uid } });
+        if (!user) {
+          res.status(500).json({ error: "Error al re-linkear usuario. Contactá a soporte." });
+          return;
+        }
       } catch (saveErr: unknown) {
         console.error("❌ [AUTH ERROR] Error crítico al re-linkear usuario:", saveErr);
         const err = saveErr as any;
