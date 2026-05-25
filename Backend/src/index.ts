@@ -235,6 +235,20 @@ async function initializeDatabase(retries = 5, delay = 2000): Promise<void> {
     try {
       await AppDataSource.initialize();
       console.log("✅ Base de datos conectada");
+
+      // Ejecutar migraciones pendientes automáticamente
+      try {
+        const pending = await AppDataSource.runMigrations();
+        if (pending.length > 0) {
+          console.log(
+            `📦 Migraciones aplicadas: ${pending.map((m) => m.name).join(", ")}`,
+          );
+        }
+      } catch (migErr) {
+        console.error("⚠️ Error ejecutando migraciones:", migErr);
+        // No bloqueamos el startup si fallan las migraciones
+      }
+
       return;
     } catch (err: any) {
       const isTransient = ["ECONNRESET", "ECONNREFUSED", "ETIMEDOUT"].includes(err.code);
