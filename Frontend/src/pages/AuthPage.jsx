@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
-import { bootstrapLocalSession, getClientSession, registerMe, getMe, setClientSession } from '@/lib/api';
+import { bootstrapLocalSession, getClientSession, registerMe, getMe, setClientSession, clearClientSession } from '@/lib/api';
 import { signInAndGetIdToken, signUpAndGetIdToken, sendPasswordReset } from '@/lib/firebaseClient';
 import { Capacitor } from '@capacitor/core';
 import Logo from '@/components/ui/Logo';
@@ -100,6 +100,20 @@ export default function AuthPage({ mode }) {
   useEffect(() => {
     const existingSession = getClientSession();
     if (isLogin && existingSession?.token) {
+      // Validar que el token no esté expirado antes de redirigir
+      const tokenPayload = (() => {
+        try {
+          const parts = existingSession.token.split('.');
+          if (parts.length !== 3) return null;
+          return JSON.parse(atob(parts[1]));
+        } catch { return null; }
+      })();
+      const now = Math.floor(Date.now() / 1000);
+      if (tokenPayload?.exp && tokenPayload.exp < now) {
+        // Token expirado: limpiar sesión y quedarse en login
+        clearClientSession();
+        return;
+      }
       navigate('/dashboard', { replace: true });
     }
   }, [isLogin, navigate]);
