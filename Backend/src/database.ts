@@ -60,7 +60,9 @@ export const AppDataSource = new DataSource({
     PushSubscription,
   ],
   migrations:
-    process.env.NODE_ENV === "production" ? ["dist/migrations/**/*.js"] : [],
+    process.env.NODE_ENV === "production"
+      ? ["dist/migrations/**/*.js"]
+      : ["src/migrations/**/*.ts"],
   subscribers: [],
   // Railway PostgreSQL REQUIERE SSL incluso en desarrollo.
   // Sin SSL, la conexión se cierra con ECONNRESET.
