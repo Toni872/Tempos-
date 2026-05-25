@@ -39,6 +39,11 @@ router.post(
       where: { uid: firebaseUser.uid },
     });
 
+    if (user) {
+      res.status(409).json({ message: "El usuario ya está registrado", data: { uid: user.uid } });
+      return;
+    }
+
     // DEBUG: Ver qué recibimos de Firebase
     console.log("DEBUG [AUTH]: Firebase User Data ->", {
       uid: firebaseUser.uid,
@@ -186,44 +191,6 @@ router.post(
       }
     }
 
-    if (user) {
-      // Si el usuario existe en la BD pero estamos aquí, es que viene de un registro limpio de Firebase.
-      // Vamos a actualizarlo con el nuevo UID para permitir el acceso.
-      user.uid = firebaseUser.uid;
-      user.emailVerified = firebaseUser.email_verified;
-      user.role = requestedRole;
-      user.displayName = body.name || user.displayName;
-      user.isTrial = requestedRole === "admin";
-      user.trialExpiresAt = requestedRole === "admin" ? new Date(Date.now() + 14 * 24 * 60 * 60 * 1000) : undefined;
-      user.metadata = {
-        ...user.metadata,
-        createdAt: new Date().toISOString(),
-        phone: body.phone || user.metadata?.phone || "",
-      };
-      
-      await userRepository.save(user);
-      
-      if (requestedRole === "admin") {
-        try {
-          await EmailService.sendTrialWelcome(user.email, user.displayName || "Usuario");
-        } catch (emailErr) {
-          console.error("⚠️ Error al enviar email de bienvenida:", emailErr);
-        }
-      }
-
-      res.status(200).json({
-        message: "Usuario reactivado correctamente",
-        data: {
-          uid: user.uid,
-          email: user.email,
-          role: user.role,
-          companyId: user.companyId,
-          isTrial: user.isTrial,
-          status: user.status,
-        },
-      });
-      return;
-    }
     let companyId = DEFAULT_COMPANY_ID;
 
     if (requestedRole === "admin") {

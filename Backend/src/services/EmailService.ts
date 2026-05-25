@@ -296,7 +296,9 @@ export class EmailService {
         console.log(`📧 [EMAIL] Preview URL: ${url}`);
         try {
           appendFileSync(join(process.cwd(), 'email_preview.txt'), `${url}\n`);
-        } catch {}
+        } catch {
+          // ignore file write errors in preview mode
+        }
       }
       console.log(`📧 [EMAIL] Invitation sent to ${email} for ${companyName}`);
     } catch (error) {
