@@ -40,6 +40,7 @@ export class User {
     lastSignInTime?: string;
     invitedAt?: string;
     invitedBy?: string;
+    linkedFromUid?: string;
     companyName?: string;
     phone?: string;
   };
