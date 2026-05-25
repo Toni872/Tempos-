@@ -1,4 +1,4 @@
-import { randomUUID } from "crypto";
+import crypto from "crypto";
 import { Request, Response, NextFunction } from "express";
 import { AppDataSource } from "../database.js";
 import { User, type UserRole } from "../entities/User.js";
@@ -39,54 +39,47 @@ export async function appUserContextMiddleware(
         }
       }
 
-      // Si no existe por UID, buscar por email (usuario pre-creado por admin)
+      // Si NO existe por UID, buscamos por email (UID cambió → re-link)
       if (!currentUser && firebaseUser.email) {
         const userByEmail = await userRepo.findOne({
           where: { email: firebaseUser.email },
         });
 
         if (userByEmail) {
-          // Vincular Firebase UID al empleado pre-creado
-          // Estrategia: INSERT new user → UPDATE children → DELETE old user.
-          // Así la FK constraint siempre se cumple: newUid existe en users
-          // antes de que las tablas hijas lo referencien.
           if (userByEmail.uid !== firebaseUser.uid) {
+            // ── RE-LINK: UID cambió, migrar usuario al nuevo UID ──
+            // Estrategia: 1) liberar email  2) INSERT nuevo  3) UPDATE hijos  4) DELETE viejo
+            console.log(
+              `🔄 [MIDDLEWARE] Re-link ${userByEmail.email}: ${userByEmail.uid} → ${firebaseUser.uid}`,
+            );
+
+            const fks: Array<{ table_name: string; column_name: string }> = await AppDataSource.manager.query(
+              `SELECT tc.table_name::text AS table_name,
+                      kcu.column_name::text AS column_name
+               FROM information_schema.table_constraints tc
+               JOIN information_schema.key_column_usage kcu
+                 ON tc.constraint_name = kcu.constraint_name
+                 AND tc.table_catalog = kcu.table_catalog
+                 AND tc.table_schema = kcu.table_schema
+               JOIN information_schema.constraint_column_usage ccu
+                 ON tc.constraint_name = ccu.constraint_name
+                 AND tc.table_catalog = ccu.table_catalog
+                 AND tc.table_schema = ccu.table_schema
+               WHERE tc.constraint_type = 'FOREIGN KEY'
+                 AND ccu.table_name = 'users'
+                 AND ccu.column_name = 'uid'`
+            );
+
+            const tempEmail = `relinked_${userByEmail.email.replace(/[@.]/g, '_')}_${crypto.randomUUID().slice(0, 8)}`;
+
             await AppDataSource.manager.transaction(async (manager) => {
-              // 1. CAPTURAR datos del usuario antiguo ANTES de modificar nada
-              const oldRows: Array<Record<string, any>> = await manager.query(
-                `SELECT * FROM "users" WHERE "uid" = $1`,
-                [userByEmail.uid]
-              );
-              const oldData = oldRows[0];
-              if (!oldData) throw new Error("Usuario antiguo no encontrado durante re-link");
-
-              // 2. Descubrir TODAS las FK → users(uid) dinámicamente
-              const fks: Array<{ table_name: string; column_name: string }> = await manager.query(
-                `SELECT tc.table_name::text AS table_name,
-                        kcu.column_name::text AS column_name
-                 FROM information_schema.table_constraints tc
-                 JOIN information_schema.key_column_usage kcu
-                   ON tc.constraint_name = kcu.constraint_name
-                   AND tc.table_catalog = kcu.table_catalog
-                   AND tc.table_schema = kcu.table_schema
-                 JOIN information_schema.constraint_column_usage ccu
-                   ON tc.constraint_name = ccu.constraint_name
-                   AND tc.table_catalog = ccu.table_catalog
-                   AND tc.table_schema = ccu.table_schema
-                 WHERE tc.constraint_type = 'FOREIGN KEY'
-                   AND ccu.table_name = 'users'
-                   AND ccu.column_name = 'uid'`
-              );
-
-              // 3. Liberar email del usuario antiguo (temp único → no choca UNIQUE)
-              const originalEmail = oldData.email;
-              const tempEmail = `relinked_${originalEmail.replace(/[@.]/g, '_')}_${randomUUID().slice(0, 8)}`;
+              // 1. Liberar email del usuario viejo
               await manager.query(
                 `UPDATE "users" SET "email" = $1 WHERE "uid" = $2`,
                 [tempEmail, userByEmail.uid]
               );
 
-              // 4. INSERTAR usando el email ORIGINAL (no el temp)
+              // 2. INSERT nuevo usuario con email ORIGINAL
               await manager.query(
                 `INSERT INTO "users" (
                   "uid", "email", "displayName", "photoURL", "companyId", "role",
@@ -104,17 +97,17 @@ export async function appUserContextMiddleware(
                   $21, $22, true
                 )`,
                 [
-                  firebaseUser.uid, originalEmail,
-                  oldData.displayName, oldData.photoURL, oldData.companyId, oldData.role,
-                  "active", oldData.isTrial, oldData.trialExpiresAt, JSON.stringify(oldData.metadata || {}),
-                  oldData.hasAutoClock, oldData.hasAcceptedTerms, oldData.hourlyRate, oldData.overtimeRate,
-                  oldData.requiresGeolocation, oldData.requiresQR, oldData.subscriptionPlan,
-                  oldData.subscriptionStatus, oldData.authorizedDeviceId, oldData.isAutoClockEnabled,
-                  oldData.invitationToken, oldData.invitationExpiresAt,
+                  firebaseUser.uid, userByEmail.email,
+                  userByEmail.displayName, userByEmail.photoURL, userByEmail.companyId, userByEmail.role,
+                  "active", userByEmail.isTrial, userByEmail.trialExpiresAt, JSON.stringify(userByEmail.metadata || {}),
+                  userByEmail.hasAutoClock, userByEmail.hasAcceptedTerms, userByEmail.hourlyRate, userByEmail.overtimeRate,
+                  userByEmail.requiresGeolocation, userByEmail.requiresQR, userByEmail.subscriptionPlan,
+                  userByEmail.subscriptionStatus, userByEmail.authorizedDeviceId, userByEmail.isAutoClockEnabled,
+                  userByEmail.invitationToken, userByEmail.invitationExpiresAt,
                 ]
               );
 
-              // 5. Re-apuntar todas las referencias hijas al nuevo UID
+              // 3. Re-apuntar hijos al nuevo UID
               for (const fk of fks) {
                 const tbl = `"${fk.table_name.replace(/"/g, '""')}"`;
                 const col = `"${fk.column_name.replace(/"/g, '""')}"`;
@@ -124,16 +117,15 @@ export async function appUserContextMiddleware(
                 );
               }
 
-              // 6. Eliminar el usuario antiguo (ya nadie lo referencia)
+              // 4. Eliminar usuario viejo
               await manager.getRepository(User).delete({ uid: userByEmail.uid });
             });
 
-            // Re-fetch con el nuevo uid
             currentUser = await userRepo.findOne({
               where: { uid: firebaseUser.uid },
             });
           } else {
-            // Mismo uid, solo actualizar metadata
+            // Mismo UID, solo actualizar metadata
             if (firebaseUser.picture) userByEmail.photoURL = firebaseUser.picture;
             if (firebaseUser.name) userByEmail.displayName = firebaseUser.name;
             currentUser = await userRepo.save(userByEmail);
