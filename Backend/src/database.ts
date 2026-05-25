@@ -1,3 +1,5 @@
+import path from "path";
+import { fileURLToPath } from "url";
 import { DataSource } from "typeorm";
 import { User } from "./entities/User.js";
 import { Ficha } from "./entities/Ficha.js";
@@ -20,6 +22,12 @@ if (!dbUrl) {
   );
   throw new Error("DATABASE_URL no definido");
 }
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const useDistMigrations =
+  __dirname.split(path.sep).includes("dist") ||
+  process.env.NODE_ENV !== "development";
 
 // Validación temprana para evitar errores crípticos de pg (SASL: client password must be a string)
 try {
@@ -59,8 +67,7 @@ export const AppDataSource = new DataSource({
     Credential,
     PushSubscription,
   ],
-  migrations:
-    process.env.NODE_ENV === "production"
+  migrations: useDistMigrations
       ? ["dist/migrations/**/*.js"]
       : ["src/migrations/**/*.ts"],
   subscribers: [],
