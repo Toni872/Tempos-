@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getInvitation, registerMe, setClientSession } from '@/lib/api';
-import { signInWithGoogleAndGetIdToken, handleRedirectResult } from '@/lib/firebaseClient';
+import { signUpAndGetIdToken } from '@/lib/firebaseClient';
 import Logo from '@/components/ui/Logo';
 
 export default function AcceptInvitationPage() {
@@ -12,6 +12,8 @@ export default function AcceptInvitationPage() {
   const [invitation, setInvitation] = useState(null);
   const [errorMsg, setErrorMsg] = useState('');
   const [statusMsg, setStatusMsg] = useState('');
+  const [password, setPassword] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (!token) {
@@ -20,26 +22,8 @@ export default function AcceptInvitationPage() {
       return;
     }
 
-    // Primero verificar si venimos de una redirección de Google (mobile)
-    handleRedirectResult().then(async (idToken) => {
-      if (idToken) {
-        // Viniendo de redirect, registrar automáticamente
-        try {
-          setState('registering');
-          setStatusMsg('Completando registro...');
-          const res = await registerMe(idToken, {});
-          if (res?.data) {
-            setClientSession({ token: idToken, ...res.data });
-            navigate('/dashboard', { replace: true });
-          }
-        } catch (err) {
-          setState('error');
-          setErrorMsg(err?.response?.data?.error || err.message || 'Error al completar el registro.');
-        }
-        return;
-      }
-
-      // Validar invitación
+    // Validar invitación
+    (async () => {
       try {
         const res = await getInvitation(token);
         if (res?.valid) {
@@ -61,36 +45,45 @@ export default function AcceptInvitationPage() {
           setErrorMsg(msg || 'Invitación no encontrada.');
         }
       }
-    });
+    })();
   }, [token, navigate]);
 
-  const handleGoogleSignIn = async () => {
+  const handleAccept = async () => {
+    if (!password || password.length < 8) {
+      setErrorMsg('La contraseña debe tener al menos 8 caracteres.');
+      return;
+    }
+    if (!invitation?.email) {
+      setErrorMsg('Error: no se encontró el email de la invitación.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setErrorMsg('');
+
     try {
       setState('registering');
-      setStatusMsg('Conectando con Google...');
+      setStatusMsg('Creando cuenta...');
 
-      const idToken = await signInWithGoogleAndGetIdToken((msg) => {
-        setStatusMsg(msg);
+      const idToken = await signUpAndGetIdToken(invitation.email, password);
+      
+      setStatusMsg('Aceptando invitación...');
+      const res = await registerMe(idToken, {
+        role: invitation.role || 'employee',
+        name: invitation.displayName || undefined,
       });
-
-      if (!idToken) {
-        // En móvil puede ser null si se redirige — el useEffect lo maneja al volver
-        return;
-      }
-
-      setStatusMsg('Completando registro...');
-      const res = await registerMe(idToken, {});
 
       if (res?.data) {
         setClientSession({ token: idToken, ...res.data });
         navigate('/dashboard', { replace: true });
       }
     } catch (err) {
-      setState('error');
-      if (err.message?.toLowerCase().includes('popup') || err.message?.toLowerCase().includes('blocked')) {
-        setErrorMsg('El navegador bloqueó la ventana emergente de Google. Permití popups para este sitio e intentá de nuevo.');
+      setState('valid');
+      setIsSubmitting(false);
+      if (err.code === 'auth/email-already-in-use') {
+        setErrorMsg('Este correo ya tiene una cuenta. Iniciá sesión desde la página de login.');
       } else {
-        setErrorMsg(err?.response?.data?.error || err.message || 'Error al iniciar sesión con Google.');
+        setErrorMsg(err?.response?.data?.error || err.message || 'Error al aceptar la invitación.');
       }
     }
   };
@@ -159,7 +152,7 @@ export default function AcceptInvitationPage() {
             </div>
             <h1 className="text-xl font-bold text-white mb-3">Invitación ya utilizada</h1>
             <p className="text-zinc-400 text-sm leading-relaxed mb-6">
-              Esta invitación ya fue aceptada. Podés iniciar sesión con tu cuenta de Google.
+              Esta invitación ya fue aceptada. Podés iniciar sesión desde la página de login.
             </p>
             <a
               href="/login"
@@ -198,12 +191,12 @@ export default function AcceptInvitationPage() {
             </div>
             <h1 className="text-xl font-bold text-white mb-3">Error al registrarse</h1>
             <p className="text-zinc-400 text-sm leading-relaxed mb-6">{errorMsg}</p>
-            <button
-              onClick={handleGoogleSignIn}
-              className="px-8 py-3.5 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-blue-600/20"
+            <a
+              href={`/invite/${token}`}
+              className="inline-block px-8 py-3.5 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-blue-600/20"
             >
               Reintentar
-            </button>
+            </a>
           </div>
         </div>
       </div>
@@ -244,21 +237,44 @@ export default function AcceptInvitationPage() {
 
             <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5 text-center">
               <p className="text-zinc-400 text-sm leading-relaxed">
-                Para aceptar la invitación y empezar a usar <strong className="text-white">Tempos</strong>, registrate con Google usando este mismo correo electrónico.
+                Para aceptar la invitación y empezar a usar <strong className="text-white">Tempos</strong>, creá una contraseña.
               </p>
             </div>
 
+            <div>
+              <label className="block text-xs text-zinc-500 mb-2 text-left font-medium">Correo electrónico</label>
+              <input
+                type="email"
+                value={invitation?.email || ''}
+                disabled
+                className="w-full px-4 py-3.5 rounded-2xl bg-white/[0.04] border border-white/[0.08] text-zinc-400 text-sm cursor-not-allowed"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="invite-password" className="block text-xs text-zinc-500 mb-2 text-left font-medium">Crear contraseña</label>
+              <input
+                id="invite-password"
+                type="password"
+                value={password}
+                onChange={e => { setPassword(e.target.value); setErrorMsg(''); }}
+                placeholder="Mínimo 8 caracteres"
+                className="w-full px-4 py-3.5 rounded-2xl bg-white/[0.04] border border-white/[0.08] text-white text-sm placeholder-zinc-600 focus:outline-none focus:border-blue-500/50 transition-colors"
+              />
+            </div>
+
+            {errorMsg && (
+              <div className="bg-rose-500/10 border border-rose-500/20 rounded-2xl p-3">
+                <p className="text-rose-400 text-xs text-center">{errorMsg}</p>
+              </div>
+            )}
+
             <button
-              onClick={handleGoogleSignIn}
-              className="w-full py-4 rounded-2xl bg-white hover:bg-zinc-100 text-zinc-900 text-sm font-bold transition-all active:scale-[0.98] flex items-center justify-center gap-3 shadow-xl"
+              onClick={handleAccept}
+              disabled={isSubmitting}
+              className="w-full py-4 rounded-2xl bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-sm font-bold transition-all active:scale-[0.98] shadow-xl shadow-blue-600/20"
             >
-              <svg className="w-5 h-5" viewBox="0 0 24 24">
-                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" />
-                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
-                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
-                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
-              </svg>
-              Registrarse con Google
+              {isSubmitting ? 'Creando cuenta...' : 'Aceptar invitación'}
             </button>
 
             <p className="text-center text-[10px] text-zinc-600">

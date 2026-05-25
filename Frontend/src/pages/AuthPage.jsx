@@ -1,10 +1,8 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { bootstrapLocalSession, getClientSession, registerMe, getMe, setClientSession } from '@/lib/api';
-import { signInAndGetIdToken, signUpAndGetIdToken, signInWithGoogleAndGetIdToken, handleRedirectResult, sendPasswordReset } from '@/lib/firebaseClient';
-import { getDeviceUniqueId } from '@/lib/nativeServices';
+import { signInAndGetIdToken, signUpAndGetIdToken, sendPasswordReset } from '@/lib/firebaseClient';
 import { Capacitor } from '@capacitor/core';
-import api from '@/lib/api';
 import Logo from '@/components/ui/Logo';
 import { z } from 'zod';
 
@@ -72,10 +70,8 @@ export default function AuthPage({ mode }) {
   const [companyName, setCompanyName] = useState(() => trialState?.company || '');
   const [companyDomain, setCompanyDomain] = useState('');
   const [errors, setErrors] = useState({});
-  const [debugStatus, setDebugStatus] = useState('');
   const [formError, setFormError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const submitTimeoutRef = useRef(null);
 
   const pageMode = isLogin ? 'login' : 'register';
   const authBackgrounds = {
@@ -100,69 +96,6 @@ export default function AuthPage({ mode }) {
       navigate(location.pathname, { replace: true, state: null });
     }
   }, [isLogin, location.pathname, location.state, navigate]);
-
-  // Manejar el retorno de la redirección de Google (web y nativo)
-  useEffect(() => {
-    const checkRedirect = async () => {
-      try {
-        setDebugStatus('Comprobando resultado del login...');
-        const idToken = await handleRedirectResult();
-        if (idToken) {
-          setDebugStatus('¡Login detectado! Finalizando...');
-          await finalizeLogin(idToken);
-        } else {
-          setDebugStatus('');
-        }
-      } catch (err) {
-        console.error('Error al volver de Google:', err);
-        setDebugStatus('');
-      }
-    };
-    
-    checkRedirect();
-  }, []);
-
-  const finalizeLogin = async (idToken) => {
-    setIsSubmitting(true);
-    try {
-      let deviceId = undefined;
-      if (Capacitor.isNativePlatform()) {
-        try {
-          deviceId = await getDeviceUniqueId();
-        } catch (e) { console.warn('No se pudo obtener Device ID'); }
-      }
-      
-      try {
-        await registerMe(idToken, {
-          role,
-          companyName: role === 'admin' ? 'Mi Empresa' : undefined,
-          deviceId,
-        });
-      } catch (regErr) { }
-
-      if (deviceId) {
-        try {
-          await api.post('/api/v1/auth/bind-device', JSON.stringify({ deviceId }), { token: idToken });
-        } catch (bindErr) { }
-      }
-
-      const profile = await getMe(idToken);
-      setClientSession({ 
-        token: idToken, 
-        isAdmin: profile.role === 'admin' || profile.role === 'manager', 
-        localMode: false, 
-        profile 
-      });
-      
-      navigate('/dashboard');
-    } catch (err) {
-      console.error('Error finalizando login:', err);
-      setFormError('Error al completar el login. Inténtalo de nuevo.');
-    } finally {
-      setIsSubmitting(false);
-      setDebugStatus('');
-    }
-  };
 
   useEffect(() => {
     const existingSession = getClientSession();
@@ -248,7 +181,6 @@ export default function AuthPage({ mode }) {
     const safetyTimeout = setTimeout(() => {
       setIsSubmitting(false);
       setFormError('El servidor de autenticación no está respondiendo. Verifica tu conexión e intenta de nuevo.');
-      setDebugStatus('');
     }, 30000);
 
     // Entorno real o local con formulario: autenticar con Firebase, registrar usuario en backend si hace falta y obtener perfil
@@ -293,72 +225,6 @@ export default function AuthPage({ mode }) {
   };
 
 
-
-  const handleGoogleSignIn = async () => {
-    if (isSubmitting) return;
-    
-    setFormError('');
-    setIsSubmitting(true);
-    setDebugStatus('Iniciando...');
-
-    // Salvavidas: Si en 10 segundos no ha pasado nada, liberamos el botón
-    const timeoutId = setTimeout(() => {
-      setIsSubmitting(false);
-      setFormError('La conexión con Google está tardando demasiado. Por favor, reintenta.');
-      setDebugStatus('');
-    }, 12000);
-
-    try {
-      setDebugStatus('Conectando con Google...');
-      const idToken = await signInWithGoogleAndGetIdToken(setDebugStatus);
-      clearTimeout(timeoutId);
-      
-      if (!idToken) {
-        setDebugStatus('');
-        setIsSubmitting(false);
-        return;
-      }
-
-      setDebugStatus('Token recibido. Registrando en el sistema...');
-
-      const effectiveRole = role;
-      let deviceId = undefined;
-      if (Capacitor.isNativePlatform()) {
-        try {
-          deviceId = await getDeviceUniqueId();
-        } catch (e) { console.warn('No se pudo obtener Device ID'); }
-      }
-      
-      try {
-        await registerMe(idToken, {
-          role: effectiveRole,
-          companyName: effectiveRole === 'admin' ? 'Mi Empresa' : undefined,
-          deviceId,
-        });
-      } catch (regErr) { }
-
-      if (deviceId) {
-        try {
-          await api.post('/api/v1/auth/bind-device', JSON.stringify({ deviceId }), { token: idToken });
-        } catch (bindErr) { }
-      }
-
-      const profile = await getMe(idToken);
-      setClientSession({ 
-        token: idToken, 
-        isAdmin: profile.role === 'admin' || profile.role === 'manager', 
-        localMode: false, 
-        profile 
-      });
-      
-      navigate('/dashboard', { replace: true });
-    } catch (err) {
-      console.error('❌ Error login Google:', err);
-      setFormError(err.message || 'Error en acceso con Google');
-      setDebugStatus('');
-      setIsSubmitting(false);
-    }
-  };
 
   const handleForgotPassword = async () => {
     if (!email) {
@@ -602,61 +468,7 @@ export default function AuthPage({ mode }) {
                   : (isLogin ? 'Acceder' : 'Empezar prueba gratuita')}
               </button>
 
-              {!Capacitor.isNativePlatform() ? null : (
-                <>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '8px 0' }}>
-                    <div style={{ flex: 1, height: 1, background: 'var(--border)', opacity: 0.5 }} />
-                    <span style={{ fontSize: 13, color: 'var(--t2)', fontWeight: 500 }}>o continúa con</span>
-                    <div style={{ flex: 1, height: 1, background: 'var(--border)', opacity: 0.5 }} />
-                  </div>
 
-                  <button
-                    type="button"
-                    className="tp-btn"
-                    disabled={isSubmitting}
-                    onClick={handleGoogleSignIn}
-                    style={{
-                      padding: '14px',
-                      borderRadius: 10,
-                      fontSize: 14,
-                      height: 52,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      background: 'rgba(255,255,255,0.03)',
-                      border: '1px solid var(--border)',
-                      color: 'var(--t1)',
-                      gap: 12,
-                      width: '100%',
-                      cursor: isSubmitting ? 'not-allowed' : 'pointer'
-                    }}
-                  >
-                    <svg width="20" height="20" viewBox="0 0 24 24">
-                      <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
-                      <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-1 .67-2.28 1.07-3.71 1.07-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
-                      <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05" />
-                      <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
-                    </svg>
-                    Google
-                  </button>
-                </>
-              )}
-
-              {debugStatus && (
-                <div style={{ 
-                  marginTop: 12, 
-                  padding: '8px 12px', 
-                  background: 'rgba(59, 130, 246, 0.1)', 
-                  borderRadius: 8, 
-                  fontSize: 12, 
-                  color: '#3b82f6',
-                  textAlign: 'center',
-                  fontWeight: 500,
-                  border: '1px solid rgba(59, 130, 246, 0.2)'
-                }}>
-                  🔍 {debugStatus}
-                </div>
-              )}
 
 
             </form>
