@@ -67,23 +67,35 @@ export class CreateTimeEntryTables1712500000000 implements MigrationInterface {
     // Índices para time_entries (si falta la columna, ignoramos el índice)
     await queryRunner.query(`
       DO $$ BEGIN
-        CREATE INDEX IF NOT EXISTS idx_time_entries_ficha_type
-        ON time_entries(ficha_id, type);
-      EXCEPTION WHEN undefined_column THEN NULL; END $$;
+        IF EXISTS(
+          SELECT 1 FROM information_schema.columns
+          WHERE table_name='time_entries' AND column_name='ficha_id'
+        ) THEN
+          EXECUTE 'CREATE INDEX IF NOT EXISTS idx_time_entries_ficha_type ON time_entries(ficha_id, type)';
+        END IF;
+      END $$;
     `);
 
     await queryRunner.query(`
       DO $$ BEGIN
-        CREATE INDEX IF NOT EXISTS idx_time_entries_user_timestamp
-        ON time_entries(user_id, timestamp_utc);
-      EXCEPTION WHEN undefined_column THEN NULL; END $$;
+        IF EXISTS(
+          SELECT 1 FROM information_schema.columns
+          WHERE table_name='time_entries' AND column_name='user_id'
+        ) THEN
+          EXECUTE 'CREATE INDEX IF NOT EXISTS idx_time_entries_user_timestamp ON time_entries(user_id, timestamp_utc)';
+        END IF;
+      END $$;
     `);
 
     await queryRunner.query(`
       DO $$ BEGIN
-        CREATE INDEX IF NOT EXISTS idx_time_entries_user_created
-        ON time_entries(user_id, created_at);
-      EXCEPTION WHEN undefined_column THEN NULL; END $$;
+        IF EXISTS(
+          SELECT 1 FROM information_schema.columns
+          WHERE table_name='time_entries' AND column_name='user_id'
+        ) THEN
+          EXECUTE 'CREATE INDEX IF NOT EXISTS idx_time_entries_user_created ON time_entries(user_id, created_at)';
+        END IF;
+      END $$;
     `);
 
     // Crear tabla time_entry_change_logs
