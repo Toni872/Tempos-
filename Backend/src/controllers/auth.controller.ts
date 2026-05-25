@@ -90,12 +90,14 @@ router.post(
           return;
         }
 
-        // UID DISTINTO: eliminar usuario viejo (ON DELETE CASCADE se encarga
-        // de fichas, ausencias, documentos, time_entries, etc.) y crear uno nuevo.
+        // UID DISTINTO: marcamos para re-link (no borramos todavía).
+        // Haremos la eliminación y creación del nuevo usuario dentro de
+        // una transacción más abajo para asegurar atomicidad.
         console.log(
-          `🔄 [AUTH] Re-linking ${user.email}: ${oldUid} → ${firebaseUser.uid}`,
+          `🔄 [AUTH] Re-link requested ${user.email}: ${oldUid} → ${firebaseUser.uid}`,
         );
-        await userRepository.delete({ uid: oldUid });
+        // Guardamos el UID antiguo para procesarlo tras construir el nuevo usuario
+        (req as any).relinkOldUid = oldUid;
         user = null as any; // Cae al flujo de creación de usuario nuevo
       }
     }
@@ -173,6 +175,8 @@ router.post(
       body.name || firebaseUser.name || firebaseUser.email || "Usuario";
 
     // Crear nuevo usuario
+    const relinkOldUid = (req as any).relinkOldUid as string | undefined;
+
     user = userRepository.create({
       uid: firebaseUser.uid,
       email: firebaseUser.email?.toLowerCase() ?? '',
@@ -187,21 +191,44 @@ router.post(
       trialExpiresAt: requestedRole === "admin" ? new Date(Date.now() + 14 * 24 * 60 * 60 * 1000) : undefined,
       metadata: {
         createdAt: new Date().toISOString(),
+        linkedFromUid: relinkOldUid ?? undefined,
         companyName: body.companyName || "",
         phone: body.phone || "",
       },
     });
 
-    try {
-      await userRepository.save(user);
-    } catch (saveErr: unknown) {
-      console.error("❌ [AUTH ERROR] Error crítico al guardar usuario:", saveErr);
-      const err = saveErr as any;
-      if (err?.code === "ER_DUP_ENTRY" || err?.code === "23505") {
-        res.status(409).json({ error: "Este usuario ya está registrado." });
-        return;
+    // Si hay que re-linkear, hacemos la eliminación del UID antiguo y la inserción
+    // del nuevo usuario dentro de una transacción para asegurar atomicidad.
+    if (relinkOldUid) {
+      try {
+        await AppDataSource.manager.transaction(async (manager) => {
+          const txRepo = manager.getRepository(User);
+          // Borramos el usuario antiguo (ON DELETE CASCADE en la BD se encargará)
+          await txRepo.delete({ uid: relinkOldUid });
+          // Insertamos el nuevo usuario
+          await txRepo.save(user);
+        });
+      } catch (saveErr: unknown) {
+        console.error("❌ [AUTH ERROR] Error crítico al re-linkear usuario:", saveErr);
+        const err = saveErr as any;
+        if (err?.code === "ER_DUP_ENTRY" || err?.code === "23505") {
+          res.status(409).json({ error: "Este usuario ya está registrado." });
+          return;
+        }
+        throw saveErr;
       }
-      throw saveErr;
+    } else {
+      try {
+        await userRepository.save(user);
+      } catch (saveErr: unknown) {
+        console.error("❌ [AUTH ERROR] Error crítico al guardar usuario:", saveErr);
+        const err = saveErr as any;
+        if (err?.code === "ER_DUP_ENTRY" || err?.code === "23505") {
+          res.status(409).json({ error: "Este usuario ya está registrado." });
+          return;
+        }
+        throw saveErr;
+      }
     }
 
     // Auto-verificar email para que el dashboard no bloquee con "email_no_verificado"
