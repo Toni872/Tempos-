@@ -14,12 +14,12 @@ import {
 } from 'firebase/auth';
 
 const firebaseConfig = {
-  apiKey: 'AIzaSyB9TxpuAfSpnUh0KB66BheE_5dWTr7w8hU', // Browser Key autorizada para Web/Localhost
-  authDomain: 'tempos-project-f1e77.firebaseapp.com',
-  projectId: 'tempos-project-f1e77',
-  storageBucket: 'tempos-project-f1e77.firebasestorage.app',
-  messagingSenderId: '898534343258',
-  appId: '1:898534343258:web:26e51cefcf0330aa2a4e63',
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || '',
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || '',
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || '',
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || '',
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '',
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || '',
 };
 
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
@@ -44,8 +44,13 @@ export const signInWithGoogleAndGetIdToken = async (onStatusUpdate) => {
       if (onStatusUpdate) onStatusUpdate('Despertando a Google...');
       
       // Intentamos el login nativo con un tiempo de espera interno
+      const webClientId = import.meta.env.VITE_GOOGLE_WEB_CLIENT_ID || import.meta.env.VITE_FIREBASE_WEB_CLIENT_ID || '';
+      if (!webClientId) {
+        console.warn('⚠️ VITE_GOOGLE_WEB_CLIENT_ID no configurado. Revisa .env');
+      }
+
       const nativePromise = FirebaseAuthentication.signInWithGoogle({
-        webClientId: '898534343258-ebk5amiu99gqbm900q8p5duiqg186mfh.apps.googleusercontent.com'
+        webClientId: webClientId
       });
 
       const result = await nativePromise;
