@@ -46,17 +46,55 @@ export async function appUserContextMiddleware(
 
         if (userByEmail) {
           // Vincular Firebase UID al empleado pre-creado
-          // Usamos update() en vez de cambiar uid y save() para evitar conflictos de PK
+          // Usamos UPDATE-based con descubrimiento dinámico de FKs para evitar
+          // violaciones de FK (ON UPDATE NO ACTION en la BD de producción).
           if (userByEmail.uid !== firebaseUser.uid) {
-            await userRepo.update(
-              { uid: userByEmail.uid },
-              {
-                uid: firebaseUser.uid,
-                ...(firebaseUser.picture ? { photoURL: firebaseUser.picture } : {}),
-                ...(firebaseUser.name ? { displayName: firebaseUser.name } : {}),
-                emailVerified: true,
-              },
-            );
+            await AppDataSource.manager.transaction(async (manager) => {
+              // 1. Descubrir TODAS las FK → users(uid) dinámicamente
+              const fks: Array<{ table_name: string; column_name: string }> = await manager.query(
+                `SELECT tc.table_name::text AS table_name,
+                        kcu.column_name::text AS column_name
+                 FROM information_schema.table_constraints tc
+                 JOIN information_schema.key_column_usage kcu
+                   ON tc.constraint_name = kcu.constraint_name
+                   AND tc.table_catalog = kcu.table_catalog
+                   AND tc.table_schema = kcu.table_schema
+                 JOIN information_schema.constraint_column_usage ccu
+                   ON tc.constraint_name = ccu.constraint_name
+                   AND tc.table_catalog = ccu.table_catalog
+                   AND tc.table_schema = ccu.table_schema
+                 WHERE tc.constraint_type = 'FOREIGN KEY'
+                   AND ccu.table_name = 'users'
+                   AND ccu.column_name = 'uid'`
+              );
+
+              // 2. Re-apuntar todas las referencias hijas al nuevo UID
+              for (const fk of fks) {
+                const tbl = `"${fk.table_name.replace(/"/g, '""')}"`;
+                const col = `"${fk.column_name.replace(/"/g, '""')}"`;
+                await manager.query(
+                  `UPDATE ${tbl} SET ${col} = $1 WHERE ${col} = $2`,
+                  [firebaseUser.uid, userByEmail.uid]
+                );
+              }
+
+              // 3. Actualizar UID y metadatos del usuario
+              await manager.query(
+                `UPDATE "users" SET
+                  "uid" = $1,
+                  "emailVerified" = true,
+                  "photoURL" = COALESCE($2, "photoURL"),
+                  "displayName" = COALESCE($3, "displayName")
+                 WHERE "uid" = $4`,
+                [
+                  firebaseUser.uid,
+                  firebaseUser.picture || null,
+                  firebaseUser.name || null,
+                  userByEmail.uid,
+                ]
+              );
+            });
+
             // Re-fetch con el nuevo uid
             currentUser = await userRepo.findOne({
               where: { uid: firebaseUser.uid },
