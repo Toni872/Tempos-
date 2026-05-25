@@ -59,59 +59,11 @@ router.post(
         where: { email: normalizedEmail },
       });
       if (user) {
-        if (!user.uid.startsWith("temp_") && user.uid !== firebaseUser.uid) {
-          // El usuario existe en BD con otro UID (Firebase Auth fue recreado, ej: durante desarrollo).
-          // Re-vincular: mover fichas al nuevo UID y actualizar el usuario.
-          const oldUid = user.uid;
-          console.log(`🔄 [AUTH] Re-linking user ${user.email} from old UID ${oldUid} to new UID ${firebaseUser.uid}`);
+        const oldUid = user.uid;
 
-          const queryRunner = AppDataSource.createQueryRunner();
-          await queryRunner.connect();
-          await queryRunner.startTransaction();
-          try {
-            // 1. Mover todas las fichas al nuevo UID
-            await queryRunner.query(
-              `UPDATE fichas SET "userId" = $1 WHERE "userId" = $2`,
-              [firebaseUser.uid, oldUid]
-            );
-            // 2. Borrar el usuario antiguo (ya sin fichas dependientes)
-            await queryRunner.query(
-              `DELETE FROM users WHERE uid = $1`,
-              [oldUid]
-            );
-            await queryRunner.commitTransaction();
-            console.log(`✅ [AUTH] Re-link transaction committed for ${user.email}`);
-          } catch (txErr) {
-            await queryRunner.rollbackTransaction();
-            console.error("❌ [AUTH] Re-link transaction failed:", txErr);
-            res.status(500).json({ error: "Error interno al re-vincular la cuenta. Inténtalo de nuevo." });
-            return;
-          } finally {
-            await queryRunner.release();
-          }
-
-          // 3. Ahora ya no existe usuario con oldUid — caemos al flujo de creación normal más abajo
-          user = null as any;
-        }
-
-        // Si user sigue existiendo (era temp_ o mismo uid), vinculamos
-        if (user) {
-          const oldUid = user.uid;
-
-          // Vincular el UID de Firebase al registro existente (temp_ o mismo uid)
-          user.uid = firebaseUser.uid;
-          user.emailVerified = firebaseUser.email_verified;
-
-          // Limpiar token de invitación (ya fue usado)
-          user.invitationToken = null as any;
-          user.invitationExpiresAt = null as any;
-
-          // Si estaba "pending" por invitación, pasar a "active"
-          if (user.status === "pending") {
-            user.status = "active";
-          }
-
-          // Mejorar el nombre si venía por defecto o era un email
+        // Si mismo UID, actualizar metadata y devolver
+        if (oldUid === firebaseUser.uid) {
+          user.emailVerified = firebaseUser.email_verified ?? user.emailVerified;
           if (
             firebaseUser.name &&
             (!user.displayName ||
@@ -120,28 +72,12 @@ router.post(
           ) {
             user.displayName = firebaseUser.name;
           }
-
-          // Sincronizar siempre la foto de perfil más reciente de Google
           if (firebaseUser.picture) {
             user.photoURL = firebaseUser.picture;
           }
-
-          // Al ser un cambio de Primary Key (de temp_ a firebase uid), debemos usar update()
-          await userRepository.update(
-            { uid: oldUid },
-            {
-              uid: user.uid,
-              emailVerified: user.emailVerified,
-              invitationToken: user.invitationToken,
-              invitationExpiresAt: user.invitationExpiresAt,
-              status: user.status,
-              displayName: user.displayName,
-              photoURL: user.photoURL,
-            }
-          );
-
+          await userRepository.save(user);
           res.status(200).json({
-            message: "Usuario vinculado correctamente",
+            message: "Usuario ya registrado",
             data: {
               uid: user.uid,
               email: user.email,
@@ -153,6 +89,118 @@ router.post(
           });
           return;
         }
+
+        // UID DISTINTO: re-vincular actualizando TODAS las tablas dependientes
+        // Esto funciona con FK constraints ON UPDATE NO ACTION porque actualizamos
+        // las dependencias PRIMERO y la PK del usuario DESPUÉS.
+        console.log(
+          `🔄 [AUTH] Re-linking ${user.email}: ${oldUid} → ${firebaseUser.uid}`,
+        );
+
+        const queryRunner = AppDataSource.createQueryRunner();
+        await queryRunner.connect();
+        await queryRunner.startTransaction();
+        try {
+          // 1. Actualizar FK en todas las tablas dependientes
+          //    Cada entrada tiene: nombre de tabla y columna FK
+          const depConfigs: { table: string; column: string }[] = [
+            { table: "fichas", column: "userId" },
+            { table: "absences", column: "userId" },
+            { table: "documents", column: "userId" },
+            { table: "audit_logs", column: "userId" },
+            { table: "time_entries", column: "userId" },
+            { table: "time_entries", column: "user_id" }, // variante snake_case
+            { table: "time_entry_change_logs", column: "changedBy" },
+            { table: "time_entry_change_logs", column: "changed_by" }, // variante snake_case
+            { table: "push_subscriptions", column: "userId" },
+            { table: "shifts", column: "userId" },
+            { table: "messages", column: "senderId" },
+            { table: "credentials", column: "userId" },
+          ];
+
+          for (const { table, column } of depConfigs) {
+            try {
+              await queryRunner.query(
+                `UPDATE "${table}" SET "${column}" = $1 WHERE "${column}" = $2`,
+                [firebaseUser.uid, oldUid],
+              );
+            } catch {
+              // Tabla o columna no existe - se omite silenciosamente
+            }
+          }
+
+          // 2. Actualizar PK del usuario (ahora sin dependencias apuntando al oldUid)
+          await queryRunner.query(
+            `UPDATE "users" SET "uid" = $1 WHERE "uid" = $2`,
+            [firebaseUser.uid, oldUid],
+          );
+
+          await queryRunner.commitTransaction();
+          console.log(`✅ [AUTH] UID re-linked: ${oldUid} → ${firebaseUser.uid}`);
+        } catch (txErr) {
+          await queryRunner.rollbackTransaction();
+          console.error("❌ [AUTH] Re-link transaction failed:", txErr);
+          res
+            .status(500)
+            .json({
+              error:
+                "Error al re-vincular la cuenta. Intentá de nuevo.",
+            });
+          return;
+        } finally {
+          await queryRunner.release();
+        }
+
+        // 3. Recuperar usuario actualizado (ahora con el nuevo UID)
+        const updatedUser = await userRepository.findOne({
+          where: { uid: firebaseUser.uid },
+        });
+        if (!updatedUser) {
+          res
+            .status(500)
+            .json({ error: "Error al recuperar la cuenta re-vinculada." });
+          return;
+        }
+        user = updatedUser;
+
+        // 4. Actualizar metadata (nombre, foto, verificación de email)
+        user.emailVerified =
+          firebaseUser.email_verified ?? user.emailVerified;
+        if (
+          firebaseUser.name &&
+          (!user.displayName ||
+            user.displayName === "Usuario" ||
+            user.displayName.includes("@"))
+        ) {
+          user.displayName = firebaseUser.name;
+        }
+        if (firebaseUser.picture) {
+          user.photoURL = firebaseUser.picture;
+        }
+
+        // 5. Si era temp_ (invitación), limpiar campos y activar
+        if (oldUid.startsWith("temp_")) {
+          user.invitationToken = null as any;
+          user.invitationExpiresAt = null as any;
+          if (user.status === "pending") {
+            user.status = "active";
+          }
+        }
+
+        await userRepository.save(user);
+
+        res.status(200).json({
+          message: "Usuario vinculado correctamente",
+          data: {
+            uid: user.uid,
+            email: user.email,
+            role: user.role,
+            companyId: user.companyId,
+            isTrial: user.isTrial,
+            status: user.status,
+          },
+        });
+        return;
       }
     }
 
