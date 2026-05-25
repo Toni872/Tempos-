@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { bootstrapLocalSession, getClientSession, registerMe, getMe, setClientSession } from '@/lib/api';
 import { signInAndGetIdToken, signUpAndGetIdToken, signInWithGoogleAndGetIdToken, handleRedirectResult, sendPasswordReset } from '@/lib/firebaseClient';
@@ -75,6 +75,7 @@ export default function AuthPage({ mode }) {
   const [debugStatus, setDebugStatus] = useState('');
   const [formError, setFormError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const submitTimeoutRef = useRef(null);
 
   const pageMode = isLogin ? 'login' : 'register';
   const authBackgrounds = {
@@ -196,18 +197,22 @@ export default function AuthPage({ mode }) {
   });
 
   const validateForm = () => {
-    const data = { email, password, name, companyName, companyDomain };
-    const schema = isLogin ? loginSchema : registerSchema;
-    
-    const result = schema.safeParse(data);
-    if (!result.success) {
-      const nextErrors = {};
-      result.error.errors.forEach(err => {
-        nextErrors[err.path[0]] = err.message;
-      });
-      return nextErrors;
+    try {
+      const data = { email, password, name, companyName, companyDomain };
+      const schema = isLogin ? loginSchema : registerSchema;
+      
+      const result = schema.safeParse(data);
+      if (!result.success) {
+        const nextErrors = {};
+        (result.error?.errors ?? []).forEach(err => {
+          nextErrors[err.path[0]] = err.message;
+        });
+        return nextErrors;
+      }
+      return {};
+    } catch {
+      return {};
     }
-    return {};
   };
 
 
@@ -239,6 +244,13 @@ export default function AuthPage({ mode }) {
     setFormError('');
     setIsSubmitting(true);
 
+    // Safety timeout: si Firebase no responde en 30s, liberamos el botón
+    const safetyTimeout = setTimeout(() => {
+      setIsSubmitting(false);
+      setFormError('El servidor de autenticación no está respondiendo. Verifica tu conexión e intenta de nuevo.');
+      setDebugStatus('');
+    }, 30000);
+
     // Entorno real o local con formulario: autenticar con Firebase, registrar usuario en backend si hace falta y obtener perfil
     try {
       let idToken;
@@ -261,6 +273,7 @@ export default function AuthPage({ mode }) {
       }
 
       const profile = await getMe(idToken);
+      clearTimeout(safetyTimeout);
       const session = { 
         token: idToken, 
         isAdmin: profile.role === 'admin' || profile.role === 'manager', 
@@ -271,6 +284,7 @@ export default function AuthPage({ mode }) {
       navigate('/dashboard');
       return;
     } catch (err) {
+      clearTimeout(safetyTimeout);
       const msg = err instanceof Error ? err.message : 'No se pudo autenticar';
       setFormError(msg.includes('Failed to fetch') || msg.includes('NetworkError') ? 'No se pudo conectar con la API. Comprueba CORS y que la API esté disponible.' : msg);
       setIsSubmitting(false);
