@@ -39,6 +39,15 @@ export async function appUserContextMiddleware(
         }
       }
 
+      // Auto-activar usuarios "pending" con sesión Firebase válida
+      // El status "pending" queda cuando el admin se registra sin dominio corporativo,
+      // pero si ya tiene un token Firebase válido, es un usuario legítimo.
+      if (currentUser && currentUser.status === "pending") {
+        currentUser.status = "active";
+        await userRepo.save(currentUser);
+        console.log(`✅ [MIDDLEWARE] Usuario ${currentUser.email} auto-activado (pending→active)`);
+      }
+
       // Si NO existe por UID, buscamos por email (UID cambió → re-link)
       if (!currentUser && firebaseUser.email) {
         const userByEmail = await userRepo.findOne({
