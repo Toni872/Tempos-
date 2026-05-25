@@ -106,7 +106,7 @@ export async function appUserContextMiddleware(
                 [
                   firebaseUser.uid, originalEmail,
                   oldData.displayName, oldData.photoURL, oldData.companyId, oldData.role,
-                  oldData.status, oldData.isTrial, oldData.trialExpiresAt, JSON.stringify(oldData.metadata || {}),
+                  "active", oldData.isTrial, oldData.trialExpiresAt, JSON.stringify(oldData.metadata || {}),
                   oldData.hasAutoClock, oldData.hasAcceptedTerms, oldData.hourlyRate, oldData.overtimeRate,
                   oldData.requiresGeolocation, oldData.requiresQR, oldData.subscriptionPlan,
                   oldData.subscriptionStatus, oldData.authorizedDeviceId, oldData.isAutoClockEnabled,
