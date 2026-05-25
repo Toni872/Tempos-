@@ -118,20 +118,38 @@ export class CreateTimeEntryTables1712500000000 implements MigrationInterface {
       );
     `);
 
-    // Índices para time_entry_change_logs
+    // Índices para time_entry_change_logs (safe)
     await queryRunner.query(`
-      CREATE INDEX IF NOT EXISTS idx_change_logs_time_entry_created
-      ON time_entry_change_logs(time_entry_id, created_at);
+      DO $$ BEGIN
+        IF EXISTS(
+          SELECT 1 FROM information_schema.columns
+          WHERE table_name='time_entry_change_logs' AND column_name='time_entry_id'
+        ) THEN
+          EXECUTE 'CREATE INDEX IF NOT EXISTS idx_change_logs_time_entry_created ON time_entry_change_logs(time_entry_id, created_at)';
+        END IF;
+      END $$;
     `);
 
     await queryRunner.query(`
-      CREATE INDEX IF NOT EXISTS idx_change_logs_user_created
-      ON time_entry_change_logs(changed_by, created_at);
+      DO $$ BEGIN
+        IF EXISTS(
+          SELECT 1 FROM information_schema.columns
+          WHERE table_name='time_entry_change_logs' AND column_name='changed_by'
+        ) THEN
+          EXECUTE 'CREATE INDEX IF NOT EXISTS idx_change_logs_user_created ON time_entry_change_logs(changed_by, created_at)';
+        END IF;
+      END $$;
     `);
 
     await queryRunner.query(`
-      CREATE INDEX IF NOT EXISTS idx_change_logs_action_created
-      ON time_entry_change_logs(action, created_at);
+      DO $$ BEGIN
+        IF EXISTS(
+          SELECT 1 FROM information_schema.columns
+          WHERE table_name='time_entry_change_logs' AND column_name='action'
+        ) THEN
+          EXECUTE 'CREATE INDEX IF NOT EXISTS idx_change_logs_action_created ON time_entry_change_logs(action, created_at)';
+        END IF;
+      END $$;
     `);
   }
 
