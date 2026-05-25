@@ -12,6 +12,8 @@
     "migration:generate": "typeorm migration:generate",
     "migration:run": "typeorm migration:run",
     "migration:revert": "typeorm migration:revert",
+    "migrations:list-user-fks": "tsx src/scripts/list-user-fks.ts",
+    "migrations:apply-now": "tsx src/scripts/apply-migrations-now.ts",
     "seed": "tsx src/scripts/seed.ts",
     "gdpr:purge": "tsx src/scripts/gdpr-purge.ts",
     "gcp:secrets": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/setup_secret_manager.ps1",
