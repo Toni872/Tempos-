@@ -46,8 +46,9 @@ export async function appUserContextMiddleware(
 
         if (userByEmail) {
           // Vincular Firebase UID al empleado pre-creado
-          // Usamos UPDATE-based con descubrimiento dinámico de FKs para evitar
-          // violaciones de FK (ON UPDATE NO ACTION en la BD de producción).
+          // Estrategia: INSERT new user → UPDATE children → DELETE old user.
+          // Así la FK constraint siempre se cumple: newUid existe en users
+          // antes de que las tablas hijas lo referencien.
           if (userByEmail.uid !== firebaseUser.uid) {
             await AppDataSource.manager.transaction(async (manager) => {
               // 1. Descubrir TODAS las FK → users(uid) dinámicamente
@@ -68,7 +69,23 @@ export async function appUserContextMiddleware(
                    AND ccu.column_name = 'uid'`
               );
 
-              // 2. Re-apuntar todas las referencias hijas al nuevo UID
+              // 2. INSERTAR copia del usuario con el nuevo UID (newUid en users → FK válida)
+              const cols = [
+                `"email"`, `"displayName"`, `"photoURL"`, `"companyId"`, `"role"`,
+                `"status"`, `"isTrial"`, `"trialExpiresAt"`, `"metadata"`,
+                `"hasAutoClock"`, `"hasAcceptedTerms"`, `"hourlyRate"`, `"overtimeRate"`,
+                `"requiresGeolocation"`, `"requiresQR"`, `"subscriptionPlan"`,
+                `"subscriptionStatus"`, `"authorizedDeviceId"`, `"isAutoClockEnabled"`,
+                `"invitationToken"`, `"invitationExpiresAt"`,
+              ];
+              await manager.query(
+                `INSERT INTO "users" ("uid", ${cols.join(", ")}, "emailVerified")
+                 SELECT $1, ${cols.join(", ")}, true
+                 FROM "users" WHERE "uid" = $2`,
+                [firebaseUser.uid, userByEmail.uid]
+              );
+
+              // 3. Re-apuntar todas las referencias hijas al nuevo UID
               for (const fk of fks) {
                 const tbl = `"${fk.table_name.replace(/"/g, '""')}"`;
                 const col = `"${fk.column_name.replace(/"/g, '""')}"`;
@@ -78,21 +95,8 @@ export async function appUserContextMiddleware(
                 );
               }
 
-              // 3. Actualizar UID y metadatos del usuario
-              await manager.query(
-                `UPDATE "users" SET
-                  "uid" = $1,
-                  "emailVerified" = true,
-                  "photoURL" = COALESCE($2, "photoURL"),
-                  "displayName" = COALESCE($3, "displayName")
-                 WHERE "uid" = $4`,
-                [
-                  firebaseUser.uid,
-                  firebaseUser.picture || null,
-                  firebaseUser.name || null,
-                  userByEmail.uid,
-                ]
-              );
+              // 4. Eliminar el usuario antiguo (ya nadie lo referencia)
+              await manager.getRepository(User).delete({ uid: userByEmail.uid });
             });
 
             // Re-fetch con el nuevo uid
