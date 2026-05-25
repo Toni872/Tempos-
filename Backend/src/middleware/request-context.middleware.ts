@@ -1,3 +1,4 @@
+import { randomUUID } from "crypto";
 import { Request, Response, NextFunction } from "express";
 import { AppDataSource } from "../database.js";
 import { User, type UserRole } from "../entities/User.js";
@@ -69,7 +70,15 @@ export async function appUserContextMiddleware(
                    AND ccu.column_name = 'uid'`
               );
 
-              // 2. INSERTAR copia del usuario con el nuevo UID (newUid en users → FK válida)
+              // 2. Liberar email del usuario antiguo (temp único → no choca UNIQUE)
+              const tempEmail = `relinked_${userByEmail.email.replace(/[@.]/g, '_')}_${randomUUID().slice(0, 8)}`;
+              await manager.query(
+                `UPDATE "users" SET "email" = $1 WHERE "uid" = $2`,
+                [tempEmail, userByEmail.uid]
+              );
+
+              // 3. INSERTAR copia del usuario con el nuevo UID
+              //    (newUid + email original → UNIQUE ok, el viejo ya lo liberó)
               const cols = [
                 `"email"`, `"displayName"`, `"photoURL"`, `"companyId"`, `"role"`,
                 `"status"`, `"isTrial"`, `"trialExpiresAt"`, `"metadata"`,
@@ -85,7 +94,7 @@ export async function appUserContextMiddleware(
                 [firebaseUser.uid, userByEmail.uid]
               );
 
-              // 3. Re-apuntar todas las referencias hijas al nuevo UID
+              // 4. Re-apuntar todas las referencias hijas al nuevo UID
               for (const fk of fks) {
                 const tbl = `"${fk.table_name.replace(/"/g, '""')}"`;
                 const col = `"${fk.column_name.replace(/"/g, '""')}"`;
@@ -95,7 +104,7 @@ export async function appUserContextMiddleware(
                 );
               }
 
-              // 4. Eliminar el usuario antiguo (ya nadie lo referencia)
+              // 5. Eliminar el usuario antiguo (ya nadie lo referencia)
               await manager.getRepository(User).delete({ uid: userByEmail.uid });
             });
 

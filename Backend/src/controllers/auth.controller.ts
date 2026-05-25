@@ -221,16 +221,22 @@ router.post(
                AND ccu.column_name = 'uid'`
           );
 
-          // ORDEN CORRECTO: 1) INSERT new user  2) UPDATE children  3) DELETE old user
-          // Así la FK constraint siempre se cumple: newUid existe en users antes de que
-          // las tablas hijas lo referencien, y oldUid se borra DESPUÉS de re-apuntar.
-
-          // 2. INSERTAR el nuevo usuario (newUid ya existe en users → FK válida)
+          // ORDEN: 1) liberar email UNIQUE  2) INSERT new user  3) UPDATE children  4) DELETE old user
+          // El viejo user tiene el mismo email → hay que liberarlo ANTES del INSERT.
           const txRepo = manager.getRepository(User);
           if (!user) throw new Error("Estado inválido: user es null durante re-link");
+          const tempEmail = `relinked_${user.email.replace(/[@.]/g, '_')}_${randomUUID().slice(0, 8)}`;
+
+          // 2. Liberar el email del usuario antiguo (temp único → no choca UNIQUE)
+          await manager.query(
+            `UPDATE "users" SET "email" = $1 WHERE "uid" = $2`,
+            [tempEmail, relinkOldUid]
+          );
+
+          // 3. INSERTAR el nuevo usuario (el email original ya está libre → UNIQUE ok)
           await txRepo.save(user);
 
-          // 3. Re-apuntar TODAS las referencias hijas al nuevo UID
+          // 4. Re-apuntar TODAS las referencias hijas al nuevo UID
           for (const fk of fks) {
             const tbl = `"${fk.table_name.replace(/"/g, '""')}"`;
             const col = `"${fk.column_name.replace(/"/g, '""')}"`;
@@ -240,7 +246,7 @@ router.post(
             );
           }
 
-          // 4. Eliminar el usuario antiguo (ya nadie lo referencia → FK ok)
+          // 5. Eliminar el usuario antiguo (ya nadie lo referencia, email liberado)
           await txRepo.delete({ uid: relinkOldUid });
         });
 
