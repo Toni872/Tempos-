@@ -197,6 +197,39 @@ router.post(
       },
     });
 
+    // Si es re-link, preservar propiedades del usuario antiguo (no crear desde cero)
+    if (relinkOldUid) {
+      const oldUser = await userRepository.findOne({ where: { uid: relinkOldUid } });
+      if (oldUser) {
+        user.companyId = oldUser.companyId;
+        user.role = oldUser.role;
+        user.status = oldUser.status;
+        user.isTrial = oldUser.isTrial;
+        user.trialExpiresAt = oldUser.trialExpiresAt;
+        user.stripeCustomerId = oldUser.stripeCustomerId;
+        user.stripeSubscriptionId = oldUser.stripeSubscriptionId;
+        user.subscriptionPlan = oldUser.subscriptionPlan;
+        user.subscriptionStatus = oldUser.subscriptionStatus;
+        user.hasAcceptedTerms = oldUser.hasAcceptedTerms;
+        user.acceptedTermsAt = oldUser.acceptedTermsAt;
+        user.hasAutoClock = oldUser.hasAutoClock;
+        user.isAutoClockEnabled = oldUser.isAutoClockEnabled;
+        user.hourlyRate = oldUser.hourlyRate;
+        user.overtimeRate = oldUser.overtimeRate;
+        user.requiresGeolocation = oldUser.requiresGeolocation;
+        user.requiresQR = oldUser.requiresQR;
+        user.kioskPin = oldUser.kioskPin;
+        user.authorizedDeviceId = oldUser.authorizedDeviceId;
+        user.metadata = {
+          ...(oldUser.metadata || {}),
+          createdAt: oldUser.metadata?.createdAt ?? new Date().toISOString(),
+          linkedFromUid: relinkOldUid,
+          companyName: body.companyName || oldUser.metadata?.companyName || "",
+          phone: body.phone || oldUser.metadata?.phone || "",
+        };
+      }
+    }
+
     // --- RE-LINK: UPDATE-based en lugar de DELETE + re-create ---
     // Descubre FKs dinámicamente via information_schema y re-apunta TODAS
     // las referencias al nuevo UID. NO depende de ON DELETE CASCADE en la BD.
