@@ -52,7 +52,15 @@ export async function appUserContextMiddleware(
           // antes de que las tablas hijas lo referencien.
           if (userByEmail.uid !== firebaseUser.uid) {
             await AppDataSource.manager.transaction(async (manager) => {
-              // 1. Descubrir TODAS las FK → users(uid) dinámicamente
+              // 1. CAPTURAR datos del usuario antiguo ANTES de modificar nada
+              const oldRows: Array<Record<string, any>> = await manager.query(
+                `SELECT * FROM "users" WHERE "uid" = $1`,
+                [userByEmail.uid]
+              );
+              const oldData = oldRows[0];
+              if (!oldData) throw new Error("Usuario antiguo no encontrado durante re-link");
+
+              // 2. Descubrir TODAS las FK → users(uid) dinámicamente
               const fks: Array<{ table_name: string; column_name: string }> = await manager.query(
                 `SELECT tc.table_name::text AS table_name,
                         kcu.column_name::text AS column_name
@@ -70,31 +78,43 @@ export async function appUserContextMiddleware(
                    AND ccu.column_name = 'uid'`
               );
 
-              // 2. Liberar email del usuario antiguo (temp único → no choca UNIQUE)
-              const tempEmail = `relinked_${userByEmail.email.replace(/[@.]/g, '_')}_${randomUUID().slice(0, 8)}`;
+              // 3. Liberar email del usuario antiguo (temp único → no choca UNIQUE)
+              const originalEmail = oldData.email;
+              const tempEmail = `relinked_${originalEmail.replace(/[@.]/g, '_')}_${randomUUID().slice(0, 8)}`;
               await manager.query(
                 `UPDATE "users" SET "email" = $1 WHERE "uid" = $2`,
                 [tempEmail, userByEmail.uid]
               );
 
-              // 3. INSERTAR copia del usuario con el nuevo UID
-              //    (newUid + email original → UNIQUE ok, el viejo ya lo liberó)
-              const cols = [
-                `"email"`, `"displayName"`, `"photoURL"`, `"companyId"`, `"role"`,
-                `"status"`, `"isTrial"`, `"trialExpiresAt"`, `"metadata"`,
-                `"hasAutoClock"`, `"hasAcceptedTerms"`, `"hourlyRate"`, `"overtimeRate"`,
-                `"requiresGeolocation"`, `"requiresQR"`, `"subscriptionPlan"`,
-                `"subscriptionStatus"`, `"authorizedDeviceId"`, `"isAutoClockEnabled"`,
-                `"invitationToken"`, `"invitationExpiresAt"`,
-              ];
+              // 4. INSERTAR usando el email ORIGINAL (no el temp)
               await manager.query(
-                `INSERT INTO "users" ("uid", ${cols.join(", ")}, "emailVerified")
-                 SELECT $1, ${cols.join(", ")}, true
-                 FROM "users" WHERE "uid" = $2`,
-                [firebaseUser.uid, userByEmail.uid]
+                `INSERT INTO "users" (
+                  "uid", "email", "displayName", "photoURL", "companyId", "role",
+                  "status", "isTrial", "trialExpiresAt", "metadata",
+                  "hasAutoClock", "hasAcceptedTerms", "hourlyRate", "overtimeRate",
+                  "requiresGeolocation", "requiresQR", "subscriptionPlan",
+                  "subscriptionStatus", "authorizedDeviceId", "isAutoClockEnabled",
+                  "invitationToken", "invitationExpiresAt", "emailVerified"
+                ) VALUES (
+                  $1, $2, $3, $4, $5, $6,
+                  $7, $8, $9, $10::jsonb,
+                  $11, $12, $13, $14,
+                  $15, $16, $17,
+                  $18, $19, $20,
+                  $21, $22, true
+                )`,
+                [
+                  firebaseUser.uid, originalEmail,
+                  oldData.displayName, oldData.photoURL, oldData.companyId, oldData.role,
+                  oldData.status, oldData.isTrial, oldData.trialExpiresAt, JSON.stringify(oldData.metadata || {}),
+                  oldData.hasAutoClock, oldData.hasAcceptedTerms, oldData.hourlyRate, oldData.overtimeRate,
+                  oldData.requiresGeolocation, oldData.requiresQR, oldData.subscriptionPlan,
+                  oldData.subscriptionStatus, oldData.authorizedDeviceId, oldData.isAutoClockEnabled,
+                  oldData.invitationToken, oldData.invitationExpiresAt,
+                ]
               );
 
-              // 4. Re-apuntar todas las referencias hijas al nuevo UID
+              // 5. Re-apuntar todas las referencias hijas al nuevo UID
               for (const fk of fks) {
                 const tbl = `"${fk.table_name.replace(/"/g, '""')}"`;
                 const col = `"${fk.column_name.replace(/"/g, '""')}"`;
@@ -104,7 +124,7 @@ export async function appUserContextMiddleware(
                 );
               }
 
-              // 5. Eliminar el usuario antiguo (ya nadie lo referencia)
+              // 6. Eliminar el usuario antiguo (ya nadie lo referencia)
               await manager.getRepository(User).delete({ uid: userByEmail.uid });
             });
 
