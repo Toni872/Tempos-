@@ -64,20 +64,26 @@ export class CreateTimeEntryTables1712500000000 implements MigrationInterface {
       );
     `);
 
-    // Índices para time_entries
+    // Índices para time_entries (si falta la columna, ignoramos el índice)
     await queryRunner.query(`
-      CREATE INDEX IF NOT EXISTS idx_time_entries_ficha_type
-      ON time_entries(ficha_id, type);
+      DO $$ BEGIN
+        CREATE INDEX IF NOT EXISTS idx_time_entries_ficha_type
+        ON time_entries(ficha_id, type);
+      EXCEPTION WHEN undefined_column THEN NULL; END $$;
     `);
 
     await queryRunner.query(`
-      CREATE INDEX IF NOT EXISTS idx_time_entries_user_timestamp
-      ON time_entries(user_id, timestamp_utc);
+      DO $$ BEGIN
+        CREATE INDEX IF NOT EXISTS idx_time_entries_user_timestamp
+        ON time_entries(user_id, timestamp_utc);
+      EXCEPTION WHEN undefined_column THEN NULL; END $$;
     `);
 
     await queryRunner.query(`
-      CREATE INDEX IF NOT EXISTS idx_time_entries_user_created
-      ON time_entries(user_id, created_at);
+      DO $$ BEGIN
+        CREATE INDEX IF NOT EXISTS idx_time_entries_user_created
+        ON time_entries(user_id, created_at);
+      EXCEPTION WHEN undefined_column THEN NULL; END $$;
     `);
 
     // Crear tabla time_entry_change_logs
