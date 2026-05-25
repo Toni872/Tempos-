@@ -199,6 +199,21 @@ router.post(
 
         await userRepository.save(user);
 
+        // Si es admin trial, enviar email de bienvenida (como en registro nuevo)
+        if (user.role === "admin" && user.isTrial) {
+          try {
+            await EmailService.sendTrialWelcome(
+              user.email,
+              user.displayName || "",
+            );
+          } catch (emailErr) {
+            console.error(
+              "⚠️ [AUTH] Error al enviar email de bienvenida (re-link):",
+              emailErr,
+            );
+          }
+        }
+
         res.status(200).json({
           message: "Usuario vinculado correctamente",
           data: {
