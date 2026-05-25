@@ -171,6 +171,14 @@ async function request(path, options = {}, retryCount = 0) {
     }
 
     if (!responseOk) {
+      // ── 401: sesión inválida o UID cambió → redirigir a login ──
+      if (responseStatus === 401) {
+        clearClientSession();
+        if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/auth')) {
+          window.location.href = '/auth';
+        }
+      }
+
       const errorData = responseData || {};
       // Manejar múltiples formatos de error del backend:
       // - { error: "string" } ← plano
