@@ -97,39 +97,49 @@ router.post(
           `🔄 [AUTH] Re-linking ${user.email}: ${oldUid} → ${firebaseUser.uid}`,
         );
 
+        // Paso 1: Verificar qué tablas/columnas existen realmente en la DB
+        // (para evitar errores "relation does not exist" que abortan la transacción)
+        const candidates: { table: string; column: string }[] = [
+          { table: "fichas", column: "userId" },
+          { table: "absences", column: "userId" },
+          { table: "documents", column: "userId" },
+          { table: "audit_logs", column: "userId" },
+          { table: "time_entries", column: "userId" },
+          { table: "time_entries", column: "user_id" },
+          { table: "time_entry_change_logs", column: "changedBy" },
+          { table: "time_entry_change_logs", column: "changed_by" },
+          { table: "push_subscriptions", column: "userId" },
+          { table: "shifts", column: "userId" },
+          { table: "messages", column: "senderId" },
+          { table: "credentials", column: "userId" },
+        ];
+
+        const existingDeps: { table: string; column: string }[] = [];
+        for (const { table, column } of candidates) {
+          try {
+            const chk = await AppDataSource.query(
+              `SELECT column_name FROM information_schema.columns WHERE table_name = '${table}' AND column_name = '${column}' LIMIT 1`,
+            );
+            if (chk?.length > 0) {
+              existingDeps.push({ table, column });
+            }
+          } catch {
+            // Si la consulta al information_schema falla, omitimos esta candidata
+          }
+        }
+
+        // Paso 2: En una transacción, actualizar dependencias y luego la PK del usuario
         const queryRunner = AppDataSource.createQueryRunner();
         await queryRunner.connect();
         await queryRunner.startTransaction();
         try {
-          // 1. Actualizar FK en todas las tablas dependientes
-          //    Cada entrada tiene: nombre de tabla y columna FK
-          const depConfigs: { table: string; column: string }[] = [
-            { table: "fichas", column: "userId" },
-            { table: "absences", column: "userId" },
-            { table: "documents", column: "userId" },
-            { table: "audit_logs", column: "userId" },
-            { table: "time_entries", column: "userId" },
-            { table: "time_entries", column: "user_id" }, // variante snake_case
-            { table: "time_entry_change_logs", column: "changedBy" },
-            { table: "time_entry_change_logs", column: "changed_by" }, // variante snake_case
-            { table: "push_subscriptions", column: "userId" },
-            { table: "shifts", column: "userId" },
-            { table: "messages", column: "senderId" },
-            { table: "credentials", column: "userId" },
-          ];
-
-          for (const { table, column } of depConfigs) {
-            try {
-              await queryRunner.query(
-                `UPDATE "${table}" SET "${column}" = $1 WHERE "${column}" = $2`,
-                [firebaseUser.uid, oldUid],
-              );
-            } catch {
-              // Tabla o columna no existe - se omite silenciosamente
-            }
+          for (const { table, column } of existingDeps) {
+            await queryRunner.query(
+              `UPDATE "${table}" SET "${column}" = $1 WHERE "${column}" = $2`,
+              [firebaseUser.uid, oldUid],
+            );
           }
 
-          // 2. Actualizar PK del usuario (ahora sin dependencias apuntando al oldUid)
           await queryRunner.query(
             `UPDATE "users" SET "uid" = $1 WHERE "uid" = $2`,
             [firebaseUser.uid, oldUid],
