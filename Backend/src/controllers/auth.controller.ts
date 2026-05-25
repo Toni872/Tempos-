@@ -221,7 +221,16 @@ router.post(
                AND ccu.column_name = 'uid'`
           );
 
-          // 2. Re-apuntar todas las referencias hijas al nuevo UID
+          // ORDEN CORRECTO: 1) INSERT new user  2) UPDATE children  3) DELETE old user
+          // Así la FK constraint siempre se cumple: newUid existe en users antes de que
+          // las tablas hijas lo referencien, y oldUid se borra DESPUÉS de re-apuntar.
+
+          // 2. INSERTAR el nuevo usuario (newUid ya existe en users → FK válida)
+          const txRepo = manager.getRepository(User);
+          if (!user) throw new Error("Estado inválido: user es null durante re-link");
+          await txRepo.save(user);
+
+          // 3. Re-apuntar TODAS las referencias hijas al nuevo UID
           for (const fk of fks) {
             const tbl = `"${fk.table_name.replace(/"/g, '""')}"`;
             const col = `"${fk.column_name.replace(/"/g, '""')}"`;
@@ -231,44 +240,8 @@ router.post(
             );
           }
 
-          // 3. Actualizar el registro del usuario (PK + metadatos)
-          //    Ya no hay referencias al oldUid, así que no hay conflicto de FK.
-          await manager.query(
-            `UPDATE "users" SET
-              "uid" = $1,
-              "displayName" = $2,
-              "photoURL" = $3,
-              "emailVerified" = $4,
-              "companyId" = $5,
-              "role" = $6,
-              "status" = $7,
-              "authorizedDeviceId" = $8,
-              "isTrial" = $9,
-              "trialExpiresAt" = $10,
-              "metadata" = $11
-             WHERE "uid" = $12`,
-            [
-              firebaseUser.uid,
-              finalDisplayName,
-              firebaseUser.picture || null,
-              firebaseUser.email_verified ?? true,
-              companyId,
-              requestedRole,
-              registrationStatus,
-              deviceId || null,
-              requestedRole === "admin",
-              requestedRole === "admin"
-                ? new Date(Date.now() + 14 * 24 * 60 * 60 * 1000)
-                : null,
-              JSON.stringify({
-                createdAt: new Date().toISOString(),
-                linkedFromUid: relinkOldUid,
-                companyName: body.companyName || "",
-                phone: body.phone || "",
-              }),
-              relinkOldUid,
-            ]
-          );
+          // 4. Eliminar el usuario antiguo (ya nadie lo referencia → FK ok)
+          await txRepo.delete({ uid: relinkOldUid });
         });
 
         // Recargar el usuario actualizado desde la BD para el resto del flujo
