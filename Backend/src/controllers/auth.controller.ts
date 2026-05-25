@@ -203,7 +203,8 @@ router.post(
       if (oldUser) {
         user.companyId = oldUser.companyId;
         user.role = oldUser.role;
-        user.status = oldUser.status;
+        user.status = "active"; // Re-link: el usuario ya pasó el registro, forzar activo
+        user.isTrial = oldUser.isTrial;
         user.isTrial = oldUser.isTrial;
         user.trialExpiresAt = oldUser.trialExpiresAt;
         user.stripeCustomerId = oldUser.stripeCustomerId;
