@@ -1,17 +1,22 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { bootstrapLocalSession, getClientSession, registerMe, getMe, setClientSession, clearClientSession } from '@/lib/api';
-import { signInAndGetIdToken, signUpAndGetIdToken, sendPasswordReset } from '@/lib/firebaseClient';
+import { signInAndGetIdToken, signUpAndGetIdToken, sendPasswordReset, signInWithGoogle } from '@/lib/firebaseClient';
 import { Capacitor } from '@capacitor/core';
 import Logo from '@/components/ui/Logo';
+import ErrorText from '@/components/ui/ErrorText';
+import { Eye, EyeSlash, SpinnerGap } from '@phosphor-icons/react';
 import { z } from 'zod';
 
 const MIN_PASSWORD_LENGTH = 8;
+const FREE_EMAIL_DOMAINS = ['gmail.com', 'hotmail.com', 'outlook.com', 'live.com', 'yahoo.com', 'proton.me', 'protonmail.com', 'icloud.com', 'aol.com', 'mail.com'];
+const CIF_REGEX = /^[a-zA-Z][0-9]{7}[a-zA-Z0-9]$|^[0-9]{8}[a-zA-Z]$|^[XYZxyz][0-9]{7}[a-zA-Z]$/;
 const AUTH_FIELD_IDS = {
   companyName: 'auth-companyName',
   name: 'auth-name',
   email: 'auth-email',
-  password: 'auth-password'
+  password: 'auth-password',
+  cif: 'auth-cif'
 };
 
 const inputBaseStyle = {
@@ -32,18 +37,6 @@ function getInputStyle(hasError) {
     border: hasError ? '1px solid #ef4444' : inputBaseStyle.border,
     boxShadow: hasError ? '0 0 0 1px rgba(239,68,68,0.35)' : 'none'
   };
-}
-
-function ErrorText({ id, message }) {
-  if (!message) {
-    return null;
-  }
-
-  return (
-    <p id={id} role="alert" aria-live="polite" style={{ marginTop: 6, fontSize: 12.5, color: '#ef4444', fontWeight: 500 }}>
-      {message}
-    </p>
-  );
 }
 
 export default function AuthPage({ mode }) {
@@ -69,9 +62,15 @@ export default function AuthPage({ mode }) {
   const role = Capacitor.isNativePlatform() ? 'employee' : 'admin';
   const [companyName, setCompanyName] = useState(() => trialState?.company || '');
   const [companyDomain, setCompanyDomain] = useState('');
+  const [cif, setCif] = useState('');
+  const companyDomainManuallyEdited = useRef(false);
+  const [freeEmailWarning, setFreeEmailWarning] = useState('');
   const [errors, setErrors] = useState({});
   const [formError, setFormError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
+  const [returnUrl, setReturnUrl] = useState(null);
 
   const pageMode = isLogin ? 'login' : 'register';
   const authBackgrounds = {
@@ -118,6 +117,14 @@ export default function AuthPage({ mode }) {
     }
   }, [isLogin, navigate]);
 
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const redirect = params.get('redirect');
+    if (redirect) {
+      setReturnUrl(redirect);
+    }
+  }, [location.search]);
+
   const clearFieldError = (field) => {
     setErrors(prev => {
       if (!prev[field]) {
@@ -138,6 +145,7 @@ export default function AuthPage({ mode }) {
   const registerSchema = z.object({
     companyName: z.string().min(2, "El nombre de la empresa debe tener al menos 2 caracteres."),
     companyDomain: z.string().optional(),
+    cif: z.string().optional().refine(val => !val || CIF_REGEX.test(val), "El formato del CIF/NIF no es válido."),
     name: z.string().min(2, "El nombre completo debe tener al menos 2 caracteres."),
     email: z.string().min(1, "El correo electrónico es obligatorio.").email("Introduce un correo electrónico válido."),
     password: z.string().min(1, "La contraseña es obligatoria.").min(MIN_PASSWORD_LENGTH, `La contraseña debe tener al menos ${MIN_PASSWORD_LENGTH} caracteres.`)
@@ -145,7 +153,7 @@ export default function AuthPage({ mode }) {
 
   const validateForm = () => {
     try {
-      const data = { email, password, name, companyName, companyDomain };
+      const data = { email, password, name, companyName, companyDomain, cif };
       const schema = isLogin ? loginSchema : registerSchema;
       
       const result = schema.safeParse(data);
@@ -206,16 +214,19 @@ export default function AuthPage({ mode }) {
         idToken = await signUpAndGetIdToken(email.trim(), password.trim());
       }
 
-      // Intentar registrar en backend (si existe devolverá 409 y continuamos)
-      try {
-        await registerMe(idToken, { 
-          role, 
-          companyName: role === 'admin' ? companyName.trim() || undefined : undefined,
-          companyDomain: role === 'admin' ? companyDomain.trim() || undefined : undefined,
-          name: name || undefined 
-        });
-      } catch (err) {
-        // ignorar 409 usuario ya registrado u otros errores no fatales
+      // Solo registrar en backend si es un registro nuevo, no en login
+      if (!isLogin) {
+        try {
+          await registerMe(idToken, { 
+            role, 
+            companyName: role === 'admin' ? companyName.trim() || undefined : undefined,
+            companyDomain: role === 'admin' ? companyDomain.trim() || undefined : undefined,
+            cif: role === 'admin' ? cif.trim() || undefined : undefined,
+            name: name || undefined 
+          });
+        } catch (err) {
+          // ignorar 409 usuario ya registrado u otros errores no fatales
+        }
       }
 
       const profile = await getMe(idToken);
@@ -227,7 +238,8 @@ export default function AuthPage({ mode }) {
         profile 
       };
       setClientSession(session);
-      navigate('/dashboard');
+      localStorage.setItem('tempos.remember', rememberMe ? 'true' : 'false');
+      navigate(returnUrl || '/dashboard');
       return;
     } catch (err) {
       clearTimeout(safetyTimeout);
@@ -238,7 +250,40 @@ export default function AuthPage({ mode }) {
     }
   };
 
+  const handleGoogleSignIn = async () => {
+    if (isSubmitting) return;
 
+    setFormError('');
+    setIsSubmitting(true);
+
+    try {
+      const { idToken, user } = await signInWithGoogle();
+
+      try {
+        await registerMe(idToken, { role: 'employee', name: user.displayName || '' });
+      } catch (registerErr) {
+        if (registerErr.status === 404) {
+          setFormError('No tienes una cuenta registrada. Contactá a tu administrador.');
+          setIsSubmitting(false);
+          return;
+        }
+        if (registerErr.status !== 409) {
+          throw registerErr;
+        }
+      }
+
+      const profile = await getMe(idToken);
+      setClientSession({ token: idToken, isAdmin: false, profile });
+      navigate('/dashboard');
+    } catch (err) {
+      if (err.code === 'auth/popup-blocked') {
+        setFormError('El navegador bloqueó la ventana emergente. Permití popups para este sitio.');
+      } else if (err.code !== 'auth/popup-closed-by-user' && err.code !== 'auth/cancelled-popup-request') {
+        setFormError(err.message || 'Error al iniciar sesión con Google');
+      }
+      setIsSubmitting(false);
+    }
+  };
 
   const handleForgotPassword = async () => {
     if (!email) {
@@ -292,6 +337,7 @@ export default function AuthPage({ mode }) {
         @media(min-width: 900px) {
           .tp-auth-right { display: block; }
         }
+        @keyframes spin { to { transform: rotate(360deg); } }
       `}</style>
       <div className="tp-root" style={{ display: 'flex', minHeight: '100vh', background: 'var(--bg0)', color: 'var(--t0)', fontFamily: 'var(--ff-body)' }}>
         
@@ -341,6 +387,32 @@ export default function AuthPage({ mode }) {
                 </div>
               )}
 
+              {isLogin && (
+                <>
+                  <button
+                    type="button"
+                    onClick={handleGoogleSignIn}
+                    disabled={isSubmitting}
+                    className="w-full flex items-center justify-center gap-3 px-4 py-3 rounded-xl border border-white/[0.08] bg-white/[0.02] hover:bg-white/[0.04] text-zinc-200 font-semibold text-[13px] transition-all"
+                    style={{ cursor: isSubmitting ? 'not-allowed' : 'pointer', opacity: isSubmitting ? 0.7 : 1 }}
+                  >
+                    <svg width="18" height="18" viewBox="0 0 24 24">
+                      <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/>
+                      <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                      <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                      <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                    </svg>
+                    Continuar con Google
+                  </button>
+
+                  <div className="flex items-center gap-3 my-4">
+                    <div className="flex-1 h-px bg-white/[0.06]" />
+                    <span className="text-[11px] text-zinc-600 font-medium">o</span>
+                    <div className="flex-1 h-px bg-white/[0.06]" />
+                  </div>
+                </>
+              )}
+
               {!isLogin && role === 'admin' && (
                 <div>
                   <label style={{ display: 'block', fontSize: 13, color: 'var(--t2)', marginBottom: 6, fontWeight: 500 }}>Nombre de la Empresa</label>
@@ -368,12 +440,31 @@ export default function AuthPage({ mode }) {
                     value={companyDomain}
                     onChange={e => {
                       setCompanyDomain(e.target.value);
+                      companyDomainManuallyEdited.current = true;
                       setFormError('');
                     }}
                     autoComplete="url"
                     placeholder="miempresa.com"
                     style={getInputStyle(false)}
                   />
+
+                  <label style={{ display: 'block', fontSize: 13, color: 'var(--t2)', marginBottom: 6, fontWeight: 500, marginTop: 16 }}>CIF/NIF <span style={{ color: 'var(--t3)', fontWeight: 400 }}>(opcional)</span></label>
+                  <input
+                    id={AUTH_FIELD_IDS.cif}
+                    type="text"
+                    value={cif}
+                    onChange={e => {
+                      setCif(e.target.value);
+                      clearFieldError('cif');
+                      setFormError('');
+                    }}
+                    autoComplete="off"
+                    aria-invalid={!!errors.cif}
+                    aria-describedby={errors.cif ? 'cif-error' : undefined}
+                    placeholder="B12345678"
+                    style={getInputStyle(!!errors.cif)}
+                  />
+                  <ErrorText id="cif-error" message={errors.cif} />
                 </div>
               )}
 
@@ -406,9 +497,33 @@ export default function AuthPage({ mode }) {
                   type="email"
                   value={email}
                   onChange={e => {
-                    setEmail(e.target.value);
+                    const value = e.target.value;
+                    setEmail(value);
                     clearFieldError('email');
                     setFormError('');
+
+                    if (!isLogin) {
+                      if (!companyDomainManuallyEdited.current) {
+                        const atIndex = value.indexOf('@');
+                        if (atIndex !== -1) {
+                          setCompanyDomain(value.slice(atIndex + 1).toLowerCase());
+                        } else {
+                          setCompanyDomain('');
+                        }
+                      }
+
+                      const atIndex = value.indexOf('@');
+                      if (atIndex !== -1) {
+                        const domain = value.slice(atIndex + 1).toLowerCase();
+                        setFreeEmailWarning(
+                          FREE_EMAIL_DOMAINS.includes(domain)
+                            ? 'Usa un email corporativo. Los emails gratuitos no están permitidos para registrar una empresa.'
+                            : ''
+                        );
+                      } else {
+                        setFreeEmailWarning('');
+                      }
+                    }
                   }}
                   autoComplete="email"
                   aria-invalid={!!errors.email}
@@ -417,6 +532,12 @@ export default function AuthPage({ mode }) {
                   style={getInputStyle(!!errors.email)}
                 />
                 <ErrorText id="email-error" message={errors.email} />
+                {!isLogin && freeEmailWarning && (
+                  <div style={{ marginTop: 6, fontSize: 12, color: '#f59e0b', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                    <span>{freeEmailWarning}</span>
+                  </div>
+                )}
               </div>
 
               <div>
@@ -441,22 +562,61 @@ export default function AuthPage({ mode }) {
                     </button>
                   )}
                 </div>
-                <input 
-                  id={AUTH_FIELD_IDS.password}
-                  type="password"
-                  value={password}
-                  onChange={e => {
-                    setPassword(e.target.value);
-                    clearFieldError('password');
-                    setFormError('');
-                  }}
-                  autoComplete={isLogin ? 'current-password' : 'new-password'}
-                  aria-invalid={!!errors.password}
-                  aria-describedby={errors.password ? 'password-error' : undefined}
-                  placeholder="••••••••"
-                  style={getInputStyle(!!errors.password)}
-                />
+                <div style={{ position: 'relative' }}>
+                  <input 
+                    id={AUTH_FIELD_IDS.password}
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                    onChange={e => {
+                      setPassword(e.target.value);
+                      clearFieldError('password');
+                      setFormError('');
+                    }}
+                    autoComplete={isLogin ? 'current-password' : 'new-password'}
+                    aria-invalid={!!errors.password}
+                    aria-describedby={errors.password ? 'password-error' : undefined}
+                    placeholder="••••••••"
+                    style={{ ...getInputStyle(!!errors.password), paddingRight: 44 }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(prev => !prev)}
+                    tabIndex={-1}
+                    style={{
+                      position: 'absolute',
+                      right: 12,
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      color: 'var(--t2)',
+                      opacity: 0.5,
+                      padding: 4,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      transition: 'opacity 0.2s'
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.opacity = '1'}
+                    onMouseLeave={e => e.currentTarget.style.opacity = '0.5'}
+                  >
+                    {showPassword ? <EyeSlash size={20} /> : <Eye size={20} />}
+                  </button>
+                </div>
                 <ErrorText id="password-error" message={errors.password} />
+
+                {isLogin && (
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', marginTop: 4 }}>
+                    <input
+                      type="checkbox"
+                      checked={rememberMe}
+                      onChange={e => setRememberMe(e.target.checked)}
+                      style={{ width: 16, height: 16, accentColor: 'var(--accent)', cursor: 'pointer' }}
+                    />
+                    <span style={{ fontSize: 13, color: 'var(--t1)', userSelect: 'none' }}>Recordar mi sesión</span>
+                  </label>
+                )}
               </div>
 
 
@@ -478,7 +638,12 @@ export default function AuthPage({ mode }) {
                 }}
               >
                 {isSubmitting
-                  ? 'Procesando...'
+                  ? (
+                    <>
+                      <SpinnerGap size={20} style={{ marginRight: 8, animation: 'spin 1s linear infinite' }} />
+                      {isLogin ? 'Iniciando sesión...' : 'Creando cuenta...'}
+                    </>
+                  )
                   : (isLogin ? 'Acceder' : 'Empezar prueba gratuita')}
               </button>
 

@@ -27,7 +27,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '../../lib/utils';
 import Badge from '../ui/Badge';
-import { getAiInsights } from '../../lib/api';
+import api, { getClientSession } from '../../lib/api';
 
 const dataWeekly = [
   { day: 'LUN', val: 45 },
@@ -62,8 +62,9 @@ export default function AnalisisTab() {
   const fetchAI = async () => {
     setIsLoadingAI(true);
     try {
-      const data = await getAiInsights();
-      setInsights(data);
+      const session = getClientSession();
+      const data = await api.get('/api/v1/reports/ai-predictive-analysis', { token: session?.token });
+      setInsights(data?.data || data || []);
     } catch (error) {
       console.error("Error fetching AI insights:", error);
     } finally {

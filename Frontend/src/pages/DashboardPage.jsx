@@ -1,40 +1,6 @@
-import React, { useCallback, useEffect, useMemo, useState, lazy, Suspense } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import React, { useCallback, useMemo, useState, lazy, Suspense } from 'react';
 import { useDashboardData } from '@/hooks/useDashboardData';
-import api, { 
-  getClientSession,
-  getMe,
-  getActiveFicha,
-  listEmployees,
-  createEmployee,
-  updateEmployee,
-  deleteEmployee,
-  listWorkCenters,
-  createWorkCenter,
-  updateWorkCenter,
-  deleteWorkCenter,
-  listDocuments,
-  uploadDocument,
-  downloadDocument,
-  signDocument,
-  listAbsences,
-  requestAbsence,
-  approveAbsence,
-  rejectAbsence,
-  listFichas,
-  getDashboardStats,
-  exportReport,
-  exportAuditLog,
-  listAuditLog,
-  acceptTerms,
-  clockIn,
-  clockOut,
-  breakStart,
-  breakEnd,
-  assignShift,
-  createSchedule,
-  listSchedules
-} from '@/lib/api';
+import { getClientSession, acceptTerms, clockIn, clockOut } from '@/lib/api';
 import { z } from 'zod';
 
 // Icons
@@ -85,19 +51,22 @@ import GeolocationConsentModal from '@/components/GeolocationConsentModal';
 import { useGeolocation } from '@/hooks/useGeolocation';
 import { useClockTimer } from '@/hooks/useClockTimer';
 import { useAutoClock } from '@/hooks/useAutoClock';
+import { FeedbackProvider, useFeedback } from '@/context/FeedbackContext';
+import { useModalManager } from '@/hooks/useModalManager';
+import { useEmployeeMutations } from '@/hooks/useEmployeeMutations';
+import { useWorkCenterMutations } from '@/hooks/useWorkCenterMutations';
+import { useScheduleMutations } from '@/hooks/useScheduleMutations';
+import { useDocumentMutations } from '@/hooks/useDocumentMutations';
+import { useAbsenceMutations } from '@/hooks/useAbsenceMutations';
+import { useFichaMutations } from '@/hooks/useFichaMutations';
+import { useClockMutations } from '@/hooks/useClockMutations';
+import { useExportActions } from '@/hooks/useExportActions';
 import Loader from '@/components/dashboard/Loader';
-import Success from '@/components/dashboard/Success';
 import ErrorComponent from '@/components/dashboard/Error';
 import TabErrorBoundary from '@/components/TabErrorBoundary';
 import EmployeeDashboard from '@/components/dashboard/EmployeeDashboard';
 
-function cn(...classes) {
-  return classes.filter(Boolean).join(' ');
-}
-
-export default function DashboardPage() {
-  const navigate = useNavigate();
-
+function DashboardPageInner() {
   // Esquema de validación para Empleados (Producción)
   const employeeSchema = z.object({
     displayName: z.string().min(3, "El nombre debe tener al menos 3 caracteres"),
@@ -127,6 +96,8 @@ export default function DashboardPage() {
     registros, setRegistros,
     workCenters, setWorkCenters,
     dashboardStats, setDashboardStats,
+    schedules, setSchedules,
+    shiftAssignments, setShiftAssignments,
     loading,
     setLoading,
     isTrialExpired,
@@ -141,31 +112,46 @@ export default function DashboardPage() {
 
   const isMobile = useMemo(() => Capacitor.isNativePlatform(), []);
   const isAdmin = useMemo(() => profile?.role === 'admin' || profile?.role === 'manager', [profile]);
-  
+
+  const [welcomeDismissed, setWelcomeDismissed] = useState(
+    () => !!localStorage.getItem('tempos.onboarding_welcome_dismissed')
+  );
+
+  const showWelcome = useMemo(() =>
+    isAdmin && employees.length === 0 && workCenters.length === 0 && !welcomeDismissed && !loading,
+    [isAdmin, employees, workCenters, welcomeDismissed, loading]
+  );
+
   // UI States
   const [stats, setStats] = useState({ activeEmployees: 0, presentNow: 0, totalHoursMonth: 0, pendingAbsences: 0 });
   const [dailyStats, setDailyStats] = useState([]);
-  const [schedules, setSchedules] = useState([]);
-  const [shiftAssignments, setShiftAssignments] = useState([]);
   const [auditLogRows, setAuditLogRows] = useState([]);
   const [auditFilters, setAuditFilters] = useState({ action: '', userId: '', startDate: '', endDate: '' });
-  const [auditModalOpen, setAuditModalOpen] = useState(false);
-  const [selectedAuditFichaId, setSelectedAuditFichaId] = useState(null);
-
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
-
-  const [modal, setModal] = useState(null);
-  const [modalMode, setModalMode] = useState('create');
-  const [modalData, setModalData] = useState(null);
-  const [selectedEmployee, setSelectedEmployee] = useState(null);
-  const [hasAcceptedLocal, setHasAcceptedLocal] = useState(false);
-
-  const [showGeolocationConsent, setShowGeolocationConsent] = useState(false);
-  const [geolocationModalMode, setGeolocationModalMode] = useState('consent'); 
   const { location: geoLocation, error: geoError, loading: geoLoading, consentGiven, requestLocation, revokeConsent } = useGeolocation();
 
   const elapsedWorkingTime = useClockTimer(activeFicha, clockedIn, isOnBreak);
+
+  const { showFeedback } = useFeedback();
+  const modalManager = useModalManager();
+
+  const employeeMutations = useEmployeeMutations({ showFeedback, refreshAllData });
+  const workCenterMutations = useWorkCenterMutations({ showFeedback, refreshAllData });
+  const scheduleMutations = useScheduleMutations({ showFeedback, refreshAllData });
+  const documentMutations = useDocumentMutations({ showFeedback, refreshAllData });
+  const absenceMutations = useAbsenceMutations({ showFeedback, refreshAllData });
+  const fichaMutations = useFichaMutations({ showFeedback, refreshAllData });
+  const clockMutations = useClockMutations({ showFeedback, refreshAllData, setClockedIn, setIsOnBreak, setActiveFicha });
+  const exportActions = useExportActions({ showFeedback, auditFilters, setAuditFilters, setAuditLogRows });
+
+  const checklistSteps = useMemo(() => {
+    if (!isAdmin) return null;
+    return {
+      employees: employees.length > 0,
+      workCenters: workCenters.length > 0,
+      schedules: schedules.length > 0,
+      clock: activeFicha !== null
+    };
+  }, [isAdmin, employees, workCenters, schedules, activeFicha]);
 
   // 🔔 Sistema de Notificaciones Reales
   const realNotifications = useMemo(() => {
@@ -239,34 +225,16 @@ export default function DashboardPage() {
     },
   });
 
-  const showFeedback = (type, message) => {
-    if (type === 'error') {
-      setError(message);
-      setTimeout(() => setError(''), 4000);
-    } else if (type === 'success') {
-      setSuccess(message);
-      setTimeout(() => setSuccess(''), 4000);
-    }
-  };
+  const closeModal = modalManager.closeModal;
 
-  const closeModal = () => {
-    setModal(null);
-    setModalData(null);
-    setModalMode('create');
-  };
-
-  const openModal = (type, mode = 'create', data = null) => {
-    setModal(type);
-    setModalMode(mode);
-    setModalData(data);
-  };
+  const openModal = modalManager.openModal;
 
   const handleAcceptTerms = async () => {
     setLoading(true);
     try {
       const session = getClientSession();
       await acceptTerms(session.token);
-      setHasAcceptedLocal(true);
+      modalManager.setAcceptedTerms(true);
       setProfile(prev => ({ ...prev, hasAcceptedTerms: true }));
       showFeedback('success', 'Términos aceptados correctamente.');
     } catch (err) {
@@ -276,357 +244,128 @@ export default function DashboardPage() {
     }
   };
 
-  const handleClockToggle = async () => {
-    const session = getClientSession();
-    if (!session?.token) return;
+  const handleDismissWelcome = useCallback(() => {
+    localStorage.setItem('tempos.onboarding_welcome_dismissed', 'true');
+    setWelcomeDismissed(true);
+  }, []);
 
-    // Check if user requires geolocation
-    const requiresGeo = profile?.requiresGeolocation;
+  const handleWelcomeAction = useCallback((type) => {
+    localStorage.setItem('tempos.onboarding_welcome_dismissed', 'true');
+    setWelcomeDismissed(true);
+    if (type === 'employees') setActiveTab('Equipo');
+    if (type === 'workCenters') setActiveTab('Sedes');
+  }, []);
 
-    if (requiresGeo && !consentGiven) {
-      setShowGeolocationConsent(true);
-      return;
+  const handleChecklistNavigate = useCallback((tab) => {
+    setActiveTab(tab);
+  }, []);
+
+  const onClockToggle = useCallback(async () => {
+    const result = await clockMutations.handleClockToggle({
+      requestLocation,
+      consentGiven,
+      requiresGeo: profile?.requiresGeolocation,
+      isCurrentlyClockedIn: clockedIn,
+    });
+    if (result === 'requires_consent') {
+      modalManager.setGeolocationConsent(true);
     }
+  }, [clockMutations, requestLocation, consentGiven, profile, clockedIn, modalManager]);
 
+  const onBreakToggle = useCallback(async () => {
+    await clockMutations.handleBreakToggle({ isCurrentlyOnBreak: isOnBreak });
+  }, [clockMutations, isOnBreak]);
+
+
+
+  const onEmployeeSubmit = useCallback(async (values) => {
+    setLoading(true);
     try {
-      let payload = {};
-
-      if (requiresGeo && consentGiven) {
-        // Request location if needed
-        const coords = await requestLocation();
-        if (coords) {
-          payload = {
-            location: {
-              lat: coords.latitude,
-              lng: coords.longitude,
-            }
-          };
-        }
-      }
-
-      if (clockedIn) {
-        await clockOut(session.token, { ...payload, authMethod: 'password' });
-        setClockedIn(false);
-        setIsOnBreak(false);
-        setActiveFicha(null);
-        showFeedback('success', 'Turno finalizado.');
-      } else {
-        const res = await clockIn(session.token, { ...payload, authMethod: 'password' });
-        const newFicha = res?.data ?? res?.ficha ?? res;
-        setActiveFicha(newFicha);
-        setClockedIn(true);
-        setIsOnBreak(false);
-        showFeedback('success', 'Turno iniciado.');
-      }
-      await loadData('core');
-    } catch (err) {
-      const msg = err.response?.data?.error || err.message || 'Error en fichaje.';
-      console.log('DEBUG: Error en fichaje:', msg);
-      showFeedback('error', msg);
-    }
-  };
-
-  const handleBreakToggle = async () => {
-    const session = getClientSession();
-    if (!session?.token) return;
-
-    try {
-      if (isOnBreak) {
-        await breakEnd(session.token);
-        setIsOnBreak(false);
-        showFeedback('success', 'Pausa finalizada. Reanudando jornada.');
-      } else {
-        await breakStart(session.token);
-        setIsOnBreak(true);
-        showFeedback('success', 'Pausa iniciada.');
-      }
-      // Actualizar ficha activa para tener el último evento sincronizado
-      const ficha = await getActiveFicha(session.token);
-      const extractFicha = (res) => {
-        if (!res) return null;
-        if (res.data !== undefined) return res.data;
-        if (res.ficha) return res.ficha;
-        if (res.id) return res;
-        return null;
-      };
-      setActiveFicha(extractFicha(ficha));
-    } catch (err) {
-      const msg = err.response?.data?.error || err.message || 'Error al cambiar estado de pausa.';
-      showFeedback('error', msg);
-    }
-  };
-
-  const handleEmployeeSubmit = async (values) => {
-    const session = getClientSession();
-    if (!session?.token) return;
-
-    try {
-      // Validación técnica Zod antes de enviar a API
-      const validatedData = employeeSchema.parse(values);
-      
-      setLoading(true);
-      if (modalMode === 'edit') {
-        await api.put(`/api/v1/employees/${modalData.id}`, validatedData, { token: session?.token });
-      } else {
-        const res = await createEmployee(session.token, validatedData);
-        showFeedback('success', res?.message || `Invitación enviada a ${validatedData.email}.`);
-        await refreshAllData();
-        closeModal();
-        return;
-      }
-      
-      await refreshAllData();
+      await employeeMutations.handleEmployeeSubmit(values, modalManager.modalMode, modalManager.modalData);
       closeModal();
-      showFeedback('success', `Usuario ${validatedData.displayName} actualizado correctamente.`);
-    } catch (err) {
-      if (err instanceof z.ZodError) {
-        const firstError = err.errors[0].message;
-        showFeedback('error', `Dato inválido: ${firstError}`);
-      } else {
-        const msg = err.response?.data?.error || err.message || 'Error al guardar empleado.';
-        showFeedback('error', msg);
-      }
     } finally {
       setLoading(false);
     }
-  };
+  }, [employeeMutations, modalManager.modalMode, modalManager.modalData, closeModal, setLoading]);
 
   const handleGeolocationConsentAccept = async () => {
-    setShowGeolocationConsent(false);
-    setGeolocationModalMode('consent');
-    // Now proceed with clock toggle
-    await handleClockToggle();
+    modalManager.setGeolocationConsent(false);
+    modalManager.setGeolocationMode('consent');
+    await onClockToggle();
   };
 
   const handleGeolocationConsentDeny = () => {
-    setShowGeolocationConsent(false);
-    setGeolocationModalMode('consent');
+    modalManager.setGeolocationConsent(false);
+    modalManager.setGeolocationMode('consent');
     showFeedback('error', 'Se requiere consentimiento de geolocalización para fichar.');
   };
 
   const handleGeolocationConsentRevoke = () => {
     revokeConsent();
-    setShowGeolocationConsent(false);
-    setGeolocationModalMode('consent');
+    modalManager.setGeolocationConsent(false);
+    modalManager.setGeolocationMode('consent');
     showFeedback('success', 'Consentimiento de geolocalización revocado. Ya no se recopilarán datos de ubicación.');
   };
 
   const openRevokeModal = () => {
-    setGeolocationModalMode('revoke');
-    setShowGeolocationConsent(true);
+    modalManager.setGeolocationMode('revoke');
+    modalManager.setGeolocationConsent(true);
   };
 
-  const handleFichaSubmit = async (data) => {
+  const onFichaSubmit = useCallback(async (data) => {
     setLoading(true);
     try {
-      const session = getClientSession();
-      if (modalMode === 'edit') {
-        await api.put(`/api/v1/fichas/${modalData.id}`, data, { token: session.token });
-        showFeedback('success', 'Fichaje actualizado.');
-      }
-      await refreshAllData();
+      await fichaMutations.handleFichaSubmit(data, modalManager.modalMode, modalManager.modalData);
       closeModal();
-    } catch (err) {
-      showFeedback('error', 'Error al guardar fichaje.');
     } finally {
       setLoading(false);
     }
-  };
+  }, [fichaMutations, modalManager.modalMode, modalManager.modalData, closeModal, setLoading]);
 
-  const handleWorkCenterSubmit = async (values) => {
-    const session = getClientSession();
-    try {
-      if (modalMode === 'edit') {
-        await api.put(`/api/v1/work-centers/${modalData.id}`, values, { token: session?.token });
-      } else {
-        await api.post('/api/v1/work-centers', values, { token: session?.token });
-      }
-      await refreshAllData();
-      closeModal();
-    } catch (err) {
-      showFeedback('error', 'Error al guardar centro.');
-    }
-  };
+  const onWorkCenterSubmit = useCallback(async (values) => {
+    await workCenterMutations.handleWorkCenterSubmit(values, modalManager.modalMode, modalManager.modalData);
+    closeModal();
+  }, [workCenterMutations, modalManager.modalMode, modalManager.modalData, closeModal]);
 
-  const handleCorrectionSubmit = async (values) => {
+  const onCorrectionSubmit = useCallback(async (values) => {
     setLoading(true);
     try {
-      const session = getClientSession();
-      await api.post(`/api/v1/fichas/${modalData.id}/request-correction`, values, { token: session.token });
-      showFeedback('success', 'Solicitud de corrección enviada al administrador.');
-      await refreshAllData();
+      await fichaMutations.handleCorrectionSubmit(values, modalManager.modalMode, modalManager.modalData);
       closeModal();
-    } catch (err) {
-      showFeedback('error', 'Error al enviar solicitud de corrección.');
     } finally {
       setLoading(false);
     }
-  };
+  }, [fichaMutations, modalManager.modalMode, modalManager.modalData, closeModal, setLoading]);
 
-  const handleReviewCorrection = async (decision, comment) => {
+  const onReviewCorrection = useCallback(async (decision, comment) => {
     setLoading(true);
     try {
-      const session = getClientSession();
-      await api.post(`/api/v1/fichas/${modalData.id}/review-correction`, { decision, comment }, { token: session.token });
-      showFeedback('success', decision === 'approved' ? 'Corrección aprobada y aplicada.' : 'Corrección rechazada.');
-      await refreshAllData();
+      await fichaMutations.handleReviewCorrection(decision, comment, modalManager.modalData);
       closeModal();
-    } catch (err) {
-      showFeedback('error', 'Error al procesar la revisión.');
     } finally {
       setLoading(false);
     }
-  };
+  }, [fichaMutations, modalManager.modalData, closeModal, setLoading]);
 
-  const handleWorkCenterDelete = async (wc) => {
-    if (!confirm(`¿Estás seguro de que deseas eliminar la sede "${wc.name}"?`)) return;
-    try {
-      const session = getClientSession();
-      await api.delete(`/api/v1/work-centers/${wc.id}`, { token: session?.token });
-      await refreshAllData();
-      showFeedback('success', 'Sede eliminada correctamente.');
-    } catch (err) {
-      showFeedback('error', 'Error al eliminar centro.');
-    }
-  };
-
-  const handleScheduleSubmit = async (data) => {
+  const onScheduleSubmit = useCallback(async (data) => {
     setLoading(true);
     try {
-      const session = getClientSession();
-      if (modalMode === 'edit') {
-        await api.put(`/api/v1/schedules/${modalData.id}`, data, { token: session?.token });
-        showFeedback('success', 'Plantilla actualizada.');
-      } else {
-        await createSchedule(session.token, data);
-        showFeedback('success', 'Nueva plantilla creada.');
-      }
-      await refreshAllData();
+      await scheduleMutations.handleScheduleSubmit(data, modalManager.modalMode, modalManager.modalData);
       closeModal();
-    } catch (err) {
-      showFeedback('error', 'Error al guardar horario.');
     } finally {
       setLoading(false);
     }
-  };
+  }, [scheduleMutations, modalManager.modalMode, modalManager.modalData, closeModal, setLoading]);
 
-  const handleEmployeeDelete = async (emp) => {
-    const name = emp.displayName || emp.name || emp.email || 'este empleado';
-    if (!confirm(`¿Dar de baja a ${name}?`)) return;
-    try {
-      const session = getClientSession();
-      const uid = emp.uid || emp.id;
-      if (!uid) throw new Error('UID no encontrado');
-      await api.delete(`/api/v1/employees/${uid}`, { token: session?.token });
-      await refreshAllData();
-      showFeedback('success', `${name} dado de baja correctamente.`);
-    } catch (err) {
-      const msg = err?.response?.data?.error || err.message || 'Error al dar de baja.';
-      showFeedback('error', msg);
-    }
-  };
+  const onDocumentSubmit = useCallback(async (values) => {
+    await documentMutations.handleDocumentSubmit(values);
+    closeModal();
+  }, [documentMutations, closeModal]);
 
-  const handleDownloadDocument = async (doc) => {
-    showFeedback('success', `Descargando ${doc.title}...`);
-    // Placeholder logic for downloading the document URL
-    if (doc.url) window.open(doc.url, '_blank');
-  };
-
-  const handleSignDocument = async (doc) => {
-    showFeedback('success', `Iniciando flujo de firma para ${doc.title}...`);
-    // Placeholder logic for signing
-  };
-
-  const handleScheduleDelete = async (sch) => {
-    if (!confirm(`¿Borrar plantilla de horario "${sch.name}"?`)) return;
-    try {
-      const session = getClientSession();
-      await api.delete(`/api/v1/schedules/${sch.id}`, { token: session?.token });
-      await refreshAllData();
-      showFeedback('success', 'Plantilla eliminada.');
-    } catch (err) {
-      showFeedback('error', 'Error al eliminar horario.');
-    }
-  };
-
-  const handleDocumentSubmit = async (values) => {
-    const session = getClientSession();
-    try {
-      const fd = new FormData();
-      fd.append('title', values.title);
-      fd.append('type', values.type || 'other');
-      if (values.file) fd.append('file', values.file);
-      await uploadDocument(session.token, fd);
-      await refreshAllData();
-      closeModal();
-    } catch (err) {
-      showFeedback('error', 'Error al subir documento.');
-    }
-  };
-
-  const handleAbsenceSubmit = async (values) => {
-    const session = getClientSession();
-    try {
-      await requestAbsence(session.token, values);
-      await refreshAllData();
-      closeModal();
-    } catch (err) {
-      showFeedback('error', 'Error al solicitar ausencia.');
-    }
-  };
-
-  const actOnAbsence = async (id, action) => {
-    const session = getClientSession();
-    try {
-      if (action === 'approve') await approveAbsence(session.token, id);
-      else await rejectAbsence(session.token, id);
-      await refreshAllData();
-    } catch (err) {
-      showFeedback('error', 'Error al procesar ausencia.');
-    }
-  };
-
-  const handleExportReport = async (format = 'pdf') => {
-    const session = getClientSession();
-    try {
-      const blob = await exportReport(session.token, { format });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `informe_jornada.${format === 'csv' ? 'csv' : 'pdf'}`;
-      a.click();
-    } catch (err) {
-      showFeedback('error', 'Error al exportar.');
-    }
-  };
-
-  const handleExportAudit = async (format) => {
-    const session = getClientSession();
-    try {
-      const blob = await exportAuditLog(session.token, { ...auditFilters, format });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `auditoria.${format}`;
-      a.click();
-    } catch (err) {
-      showFeedback('error', 'Error al exportar auditoria.');
-    }
-  };
-
-  const handleApplyAuditFilters = async () => {
-    const session = getClientSession();
-    try {
-      const logs = await listAuditLog(session.token, auditFilters);
-      setAuditLogRows(logs);
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const handleResetAuditFilters = () => {
-    setAuditFilters({ action: '', userId: '', startDate: '', endDate: '' });
-  };
+  const onAbsenceSubmit = useCallback(async (values) => {
+    await absenceMutations.handleAbsenceSubmit(values);
+    closeModal();
+  }, [absenceMutations, closeModal]);
 
   const pendingAbsences = useMemo(
     () => (Array.isArray(absences) ? absences : []).filter((item) => item.status === 'pending'),
@@ -659,15 +398,14 @@ export default function DashboardPage() {
         registros={registros}
         absences={absences}
         workCenters={workCenters}
-        onClockToggle={handleClockToggle}
-        onBreakToggle={handleBreakToggle}
+        onClockToggle={onClockToggle}
+        onBreakToggle={onBreakToggle}
         onRequestAbsence={() => openModal('ausencia')}
         onLogout={handleLogout}
         autoClockStatus={autoClockStatus}
         autoClockCenter={autoClockCenter}
         autoClockDistance={autoClockDistance}
-        error={error}
-        success={success}
+        onRefresh={refreshAllData}
       />
     );
   }
@@ -680,14 +418,19 @@ export default function DashboardPage() {
       onLogout={handleLogout}
       profile={profile}
       notifications={realNotifications}
+      showWelcome={showWelcome}
+      onDismissWelcome={handleDismissWelcome}
+      onWelcomeAction={handleWelcomeAction}
+      checklistSteps={checklistSteps}
+      onChecklistNavigate={handleChecklistNavigate}
     >
       {!isMobile && (
         <div className="mb-10">
           <QuickClock 
             clockedIn={clockedIn}
             isOnBreak={isOnBreak}
-            onClockToggle={handleClockToggle}
-            onBreakToggle={handleBreakToggle}
+            onClockToggle={onClockToggle}
+            onBreakToggle={onBreakToggle}
             elapsedTime={elapsedWorkingTime}
           />
         </div>
@@ -698,7 +441,7 @@ export default function DashboardPage() {
           {isMobile && !isAdmin && activeTab === 'Inicio' ? (
             <MobileQuickClock
               clockedIn={clockedIn}
-              onClockToggle={handleClockToggle}
+              onClockToggle={onClockToggle}
               elapsedTime={elapsedWorkingTime}
             />
           ) : (
@@ -721,8 +464,8 @@ export default function DashboardPage() {
                   employees={employees}
                   onAddEmployee={() => openModal('empleado')}
                   onEditEmployee={(emp) => openModal('empleado', 'edit', emp)}
-                  onDeleteEmployee={handleEmployeeDelete}
-                  onViewExpediente={setSelectedEmployee}
+                  onDeleteEmployee={employeeMutations.handleEmployeeDelete}
+                  onViewExpediente={modalManager.setSelectedEmployee}
                 />
               )}
 
@@ -739,7 +482,7 @@ export default function DashboardPage() {
                   registros={registros} 
                   filters={registrosFilters}
                   setFilters={setRegistrosFilters}
-                  onExport={handleExportReport}
+                  onExport={exportActions.handleExportReport}
                   employees={employees}
                   workCenters={workCenters}
                   profile={profile}
@@ -751,7 +494,7 @@ export default function DashboardPage() {
                       openModal('correction', 'edit', row);
                     }
                   }}
-                  onViewAudit={(row) => { setSelectedAuditFichaId(row.id); setAuditModalOpen(true); }}
+                  onViewAudit={(row) => { modalManager.openAudit(row.id); }}
                 />
               )}
 
@@ -765,7 +508,7 @@ export default function DashboardPage() {
                   onAssign={(emp, date) => openModal('assign_shift', 'create', { userId: emp.id, startDate: date.toISOString().split('T')[0] })}
                   onAddTemplate={() => openModal('schedule')}
                   onEditTemplate={(sch) => openModal('schedule', 'edit', sch)}
-                  onDeleteTemplate={handleScheduleDelete}
+                  onDeleteTemplate={scheduleMutations.handleScheduleDelete}
                 />
               )}
 
@@ -775,12 +518,12 @@ export default function DashboardPage() {
                   profile={profile}
                   onAdd={() => openModal('workcenter')}
                   onEdit={(wc) => openModal('workcenter', 'edit', wc)}
-                  onDelete={handleWorkCenterDelete}
+                  onDelete={workCenterMutations.handleWorkCenterDelete}
                 />
               )}
 
               {activeTab === 'Legal' && (
-                <ComplianceTab onExportInspection={handleExportReport} />
+                <ComplianceTab onExportInspection={exportActions.handleExportReport} />
               )}
 
               {activeTab === 'Ausencias' && (
@@ -789,7 +532,7 @@ export default function DashboardPage() {
                   isAdmin={isAdmin}
                   profile={profile}
                   onRequestAbsence={() => openModal('ausencia')}
-                  onActOnAbsence={actOnAbsence}
+                  onActOnAbsence={absenceMutations.actOnAbsence}
                 />
               )}
 
@@ -797,9 +540,10 @@ export default function DashboardPage() {
                 <DocumentosTab
                   documents={documents}
                   isAdmin={isAdmin}
-                  onUploadDocument={() => openModal('documento')}
-                  onDownloadDocument={handleDownloadDocument}
-                  onSignDocument={handleSignDocument}
+                  onUpload={() => openModal('documento')}
+                  onView={documentMutations.handleDownloadDocument}
+                  onSign={documentMutations.handleSignDocument}
+                  onDelete={documentMutations.handleDocumentDelete}
                 />
               )}
 
@@ -814,9 +558,9 @@ export default function DashboardPage() {
               {activeTab === 'Informes' && (
                 <InformesTab 
                   auditLogs={auditLogRows}
-                  onExportAudit={handleExportAudit}
-                  onExportInspection={handleExportReport}
-                  onResetFilters={handleResetAuditFilters}
+                  onExportAudit={exportActions.handleExportAudit}
+                  onExportInspection={exportActions.handleExportReport}
+                  onResetFilters={exportActions.handleResetAuditFilters}
                   registros={registros}
                   workCenters={workCenters}
                   employees={employees}
@@ -860,47 +604,47 @@ export default function DashboardPage() {
       </TabErrorBoundary>
 
 
-      <ModalBase open={!!modal} onClose={closeModal} title={modal}>
+      <ModalBase open={!!modalManager.modal} onClose={closeModal} title={modalManager.modal}>
         <Suspense fallback={<Loader />}>
-          {modal === 'empleado' && (
+          {modalManager.modal === 'empleado' && (
             <EmpleadoForm 
-              mode={modalMode} 
-              initialValues={modalData} 
-              onSubmit={handleEmployeeSubmit}
+              mode={modalManager.modalMode} 
+              initialValues={modalManager.modalData} 
+              onSubmit={onEmployeeSubmit}
               onCancel={closeModal}
               loading={loading}
             />
           )}
-          {modal === 'registros' && (
+          {modalManager.modal === 'registros' && (
             <FichaForm 
-              initialData={modalData}
-              onSubmit={handleFichaSubmit}
+              initialData={modalManager.modalData}
+              onSubmit={onFichaSubmit}
               onCancel={closeModal}
               loading={loading}
             />
           )}
-          {modal === 'correction' && (
+          {modalManager.modal === 'correction' && (
             <CorrectionRequestForm 
-              initialData={modalData}
-              onSubmit={handleCorrectionSubmit}
+              initialData={modalManager.modalData}
+              onSubmit={onCorrectionSubmit}
               onCancel={closeModal}
               loading={loading}
             />
           )}
-          {modal === 'review_correction' && (
+          {modalManager.modal === 'review_correction' && (
             <div className="space-y-6">
               <div className="p-4 rounded-2xl bg-amber-500/5 border border-amber-500/10 space-y-3">
                 <h4 className="text-xs font-black uppercase tracking-widest text-amber-500">Solicitud de Corrección</h4>
-                <p className="text-[13px] text-zinc-300"><strong>Motivo:</strong> {modalData?.metadata?.correctionRequest?.reason}</p>
+                <p className="text-[13px] text-zinc-300"><strong>Motivo:</strong> {modalManager.modalData?.metadata?.correctionRequest?.reason}</p>
                 <div className="grid grid-cols-2 gap-4 pt-2">
                   <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.04]">
                     <p className="text-[10px] text-zinc-600 font-bold uppercase">Anterior</p>
-                    <p className="text-xs text-zinc-400">{modalData?.startTime} - {modalData?.endTime}</p>
+                    <p className="text-xs text-zinc-400">{modalManager.modalData?.startTime} - {modalManager.modalData?.endTime}</p>
                   </div>
                   <div className="p-3 rounded-xl bg-blue-500/5 border border-blue-500/10">
                     <p className="text-[10px] text-blue-500 font-bold uppercase">Propuesto</p>
                     <p className="text-xs text-blue-400">
-                      {modalData?.metadata?.correctionRequest?.proposedChanges?.startTime || modalData?.startTime} - {modalData?.metadata?.correctionRequest?.proposedChanges?.endTime || modalData?.endTime}
+                      {modalManager.modalData?.metadata?.correctionRequest?.proposedChanges?.startTime || modalManager.modalData?.startTime} - {modalManager.modalData?.metadata?.correctionRequest?.proposedChanges?.endTime || modalManager.modalData?.endTime}
                     </p>
                   </div>
                 </div>
@@ -915,14 +659,14 @@ export default function DashboardPage() {
               </div>
               <div className="flex items-center gap-3 pt-4">
                 <button
-                  onClick={() => handleReviewCorrection('rejected', document.getElementById('reviewComment').value)}
+                  onClick={() => onReviewCorrection('rejected', document.getElementById('reviewComment').value)}
                   className="flex-1 px-6 py-4 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-500 text-[11px] font-black uppercase tracking-widest hover:bg-rose-500/20 transition-all"
                   disabled={loading}
                 >
                   Rechazar
                 </button>
                 <button
-                  onClick={() => handleReviewCorrection('approved', document.getElementById('reviewComment').value)}
+                  onClick={() => onReviewCorrection('approved', document.getElementById('reviewComment').value)}
                   className="flex-[2] px-6 py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-black uppercase tracking-widest transition-all shadow-lg shadow-emerald-600/20"
                   disabled={loading}
                 >
@@ -931,40 +675,41 @@ export default function DashboardPage() {
               </div>
             </div>
           )}
-          {modal === 'workcenter' && (
+          {modalManager.modal === 'workcenter' && (
             <WorkCenterForm 
-              initialData={modalData} 
-              onSubmit={handleWorkCenterSubmit} 
+              initialData={modalManager.modalData} 
+              onSubmit={onWorkCenterSubmit} 
               onCancel={closeModal} 
               loading={loading}
               profile={profile} 
             />
           )}
-          {modal === 'ausencia' && <AusenciaForm onSubmit={handleAbsenceSubmit} onCancel={closeModal} loading={loading} />}
-          {modal === 'documento' && <DocumentoForm onSubmit={handleDocumentSubmit} onCancel={closeModal} loading={loading} />}
-          {modal === 'schedule' && (
+          {modalManager.modal === 'ausencia' && <AusenciaForm onSubmit={onAbsenceSubmit} onCancel={closeModal} loading={loading} />}
+          {modalManager.modal === 'documento' && <DocumentoForm onSubmit={onDocumentSubmit} onCancel={closeModal} loading={loading} />}
+          {modalManager.modal === 'schedule' && (
             <ScheduleForm 
-              mode={modalMode}
-              initialValues={modalData}
-              onSubmit={handleScheduleSubmit} 
+              mode={modalManager.modalMode}
+              initialValues={modalManager.modalData}
+              onSubmit={onScheduleSubmit} 
               onCancel={closeModal} 
               loading={loading}
             />
           )}
-          {modal === 'assign_shift' && <ShiftAssignForm initialValues={modalData} employees={employees} schedules={schedules} onSubmit={async (data) => { 
-            try { 
-              const session = getClientSession();
-              await assignShift(session.token, data); 
+          {modalManager.modal === 'assign_shift' && <ShiftAssignForm 
+            initialValues={modalManager.modalData} 
+            employees={employees} 
+            schedules={schedules} 
+            onSubmit={async (data) => { 
+              await scheduleMutations.handleAssignShift(data); 
               closeModal(); 
-              refreshAllData(); 
-              showFeedback('success', 'Turno asignado.');
-            } catch (err) { showFeedback('error', 'Error al asignar turno.'); } 
-          }} onCancel={closeModal} />}
+            }} 
+            onCancel={closeModal} 
+          />}
         </Suspense>
       </ModalBase>
 
       {/* MODAL DE CONSENTIMIENTO LEGAL OBLIGATORIO */}
-      {profile && !profile.hasAcceptedTerms && !hasAcceptedLocal && (
+      {profile && !profile.hasAcceptedTerms && !modalManager.hasAcceptedLocal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
           <div className="absolute inset-0 bg-black/80 backdrop-blur-md" />
           <div className="relative w-full max-w-xl bg-[#0d0d0f] border border-white/[0.08] rounded-[32px] p-8 shadow-2xl space-y-6">
@@ -1003,32 +748,29 @@ export default function DashboardPage() {
       )}
 
       <Suspense fallback={null}>
-        {selectedEmployee && (
+        {modalManager.selectedEmployee && (
           <ExpedienteEmpleado 
-            employee={selectedEmployee} 
-            onClose={() => setSelectedEmployee(null)} 
+            employee={modalManager.selectedEmployee} 
+            onClose={() => modalManager.setSelectedEmployee(null)} 
             fichas={[]}
             onUpdate={refreshAllData}
           />
         )}
       </Suspense>
 
-      {success && <Success message={success} onClose={() => setSuccess('')} />}
-      {error && <ErrorComponent message={error} onClose={() => setError('')} />}
-
       <GeolocationConsentModal
-        isOpen={showGeolocationConsent}
+        isOpen={modalManager.showGeolocationConsent}
         onAccept={handleGeolocationConsentAccept}
         onDeny={handleGeolocationConsentDeny}
-        showRevokeOption={geolocationModalMode === 'revoke'}
+        showRevokeOption={modalManager.geolocationModalMode === 'revoke'}
         onRevoke={handleGeolocationConsentRevoke}
       />
 
       <Suspense fallback={null}>
         <AuditTrailModal 
-          open={auditModalOpen}
-          onClose={() => setAuditModalOpen(false)}
-          fichaId={selectedAuditFichaId}
+          open={modalManager.auditModalOpen}
+          onClose={modalManager.closeAudit}
+          fichaId={modalManager.selectedAuditFichaId}
         />
 
         {isTrialExpired && (
@@ -1036,5 +778,13 @@ export default function DashboardPage() {
         )}
       </Suspense>
     </DashboardShell>
+  );
+}
+
+export default function DashboardPage() {
+  return (
+    <FeedbackProvider>
+      <DashboardPageInner />
+    </FeedbackProvider>
   );
 }

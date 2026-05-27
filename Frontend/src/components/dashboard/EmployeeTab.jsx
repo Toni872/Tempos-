@@ -17,6 +17,7 @@ import {
   Warning
 } from '@phosphor-icons/react';
 import SectionHeader from '@/components/ui/SectionHeader';
+import EmptyState from '@/components/ui/EmptyState';
 import Badge from '@/components/ui/Badge';
 import { cn } from '@/lib/utils';
 import {
@@ -172,6 +173,18 @@ export default function EmployeeTab({
     link.click();
     document.body.removeChild(link);
   };
+
+  if (employees.length === 0 && searchTerm === '' && roleFilter === 'all' && statusFilter === 'all') {
+    return (
+      <EmptyState
+        icon={UsersThree}
+        title="No hay empleados todavía"
+        subtitle="Invita a tu equipo para empezar a registrar las jornadas laborales."
+        actionLabel="Invitar empleado"
+        onAction={onAddEmployee}
+      />
+    );
+  }
 
   return (
     <div className="space-y-8 animate-in fade-in duration-700">

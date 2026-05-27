@@ -16,9 +16,6 @@ export default class ErrorBoundary extends React.Component {
 
   componentDidCatch(error, errorInfo) {
     console.error('[ErrorBoundary] Error capturado:', error, errorInfo);
-    if (typeof window !== 'undefined' && window.Sentry) {
-      window.Sentry.captureException(error, { extra: errorInfo });
-    }
   }
 
   render() {

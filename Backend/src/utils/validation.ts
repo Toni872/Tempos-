@@ -320,6 +320,11 @@ export const registerSchema = z.object({
     .refine(val => !val || /^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)*\.[a-zA-Z]{2,}$/.test(val), {
       message: "El dominio de la empresa no es válido"
     }),
+  cif: z.string()
+    .optional()
+    .refine(val => !val || validateCIF(val), {
+      message: "El CIF/NIF no tiene un formato válido"
+    }),
   phone: z.string().optional(),
   deviceId: z.string().optional(),
 });
@@ -343,6 +348,7 @@ export const createEmployeeSchema = z.object({
     .regex(/^\d{4,10}$/, "El PIN debe tener entre 4 y 10 dígitos")
     .or(z.literal(""))
     .optional(),
+  isGoogleOnly: z.boolean().optional().default(false),
 });
 
 export const updateEmployeeSchema = z
@@ -465,6 +471,56 @@ export const verifyPeriodSchema = z
     message: "startDate debe ser anterior o igual a endDate",
     path: ["endDate"],
   });
+
+const CIF_REGEX = /^[ABCDEFGHJNPQRSUVW]\d{7}[0-9A-J]$/;
+
+export function validateCIF(cif: string): boolean {
+  if (!cif || typeof cif !== "string") return false;
+
+  const normalized = cif.toUpperCase().trim();
+  if (!CIF_REGEX.test(normalized)) return false;
+
+  const digits = normalized.slice(1, 8);
+  const controlChar = normalized[8];
+
+  let evenSum = 0;
+  let oddSum = 0;
+
+  for (let i = 0; i < 7; i++) {
+    const digit = parseInt(digits[i], 10);
+    if (i % 2 === 0) {
+      oddSum += digit;
+    } else {
+      const doubled = digit * 2;
+      evenSum += Math.floor(doubled / 10) + (doubled % 10);
+    }
+  }
+
+  const total = evenSum + oddSum;
+  const controlDigit = (10 - (total % 10)) % 10;
+
+  const letterEntities = ["P", "Q", "S", "R", "W", "N"];
+  if (letterEntities.includes(normalized[0])) {
+    const controlLetter = String.fromCharCode(64 + controlDigit);
+    return controlChar === controlLetter;
+  }
+
+  return parseInt(controlChar, 10) === controlDigit;
+}
+
+const FREE_EMAIL_DOMAINS = new Set([
+  "gmail.com", "hotmail.com", "outlook.com", "live.com",
+  "yahoo.com", "proton.me", "protonmail.com", "icloud.com",
+  "aol.com", "mail.com", "msn.com", "zoho.com",
+  "yandex.com", "tutanota.com", "gmx.com",
+]);
+
+export function isFreeEmail(email: string): boolean {
+  if (!email || typeof email !== "string") return false;
+  const domain = email.split("@")[1]?.toLowerCase();
+  if (!domain) return false;
+  return FREE_EMAIL_DOMAINS.has(domain);
+}
 
 export function buildValidationError(error: z.ZodError): {
   error: string;

@@ -28,6 +28,12 @@ export class User {
   @Column({ type: "boolean", default: false })
   emailVerified!: boolean;
 
+  @Column({ type: "varchar", length: 12, nullable: true })
+  cif?: string;
+
+  @Column({ type: "varchar", length: 255, nullable: true })
+  companyDomain?: string;
+
   @Column({ type: "varchar", default: "tempos-demo" })
   companyId!: string;
 

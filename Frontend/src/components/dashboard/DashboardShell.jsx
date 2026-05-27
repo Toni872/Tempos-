@@ -22,11 +22,13 @@ import {
   Clock,
   CalendarX,
   CreditCard,
+  Circle,
 } from '@phosphor-icons/react';
 import UserMenu from '@/components/UserMenu';
 import Logo from '@/components/ui/Logo';
 import { cn } from '@/lib/utils';
 import ManualUsuarioModal from '@/components/dashboard/ManualUsuarioModal';
+import OnboardingWelcome from '@/components/dashboard/OnboardingWelcome';
 
 const sidebarItems = [
   { group: 'General', items: [
@@ -53,19 +55,8 @@ const sidebarItems = [
   ] }
 ];
 
-export default function DashboardShell({ 
-  activeTab, 
-  setActiveTab, 
-  onLogout, 
-  profile, 
-  notifications = [],
-  children 
-}) {
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [isManualOpen, setIsManualOpen] = useState(false);
-  const [showNotifications, setShowNotifications] = useState(false);
-
-  const SidebarContent = ({ isMobile = false }) => (
+function SidebarContent({ activeTab, setActiveTab, isMobile, setIsMobileMenuOpen, showTutorial, setShowTutorial, setIsManualOpen }) {
+  return (
     <>
       <nav className={cn("flex-1 overflow-y-auto scrollbar-hide", isMobile ? "p-4 py-2" : "p-4 py-6")}>
         {sidebarItems.map((group) => {
@@ -111,7 +102,43 @@ export default function DashboardShell({
             </div>
           );
         })}
-        <div className={cn("px-4 mt-2", isMobile ? "mb-6" : "mb-8")}>
+        <div className={cn("px-4 mt-2 space-y-2", isMobile ? "mb-6" : "mb-8")}>
+          <button
+            onClick={() => setShowTutorial(!showTutorial)}
+            className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-zinc-800/50 hover:bg-zinc-700/50 text-zinc-300 font-bold text-[12px] uppercase tracking-wider transition-all border border-white/[0.06]"
+          >
+            <List className="w-[18px] h-[18px]" weight="bold" />
+            TUTORIAL RÁPIDO: PRIMEROS PASOS
+          </button>
+
+          {showTutorial && (
+            <motion.div
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.06] space-y-1"
+            >
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">
+                  Progreso
+                </span>
+                <span className="text-[10px] font-bold text-zinc-600">0/4</span>
+              </div>
+              {[
+                { label: 'Crear primer empleado', icon: UsersThree },
+                { label: 'Configurar centro de trabajo', icon: Buildings },
+                { label: 'Definir horarios', icon: ClockCountdown },
+                { label: 'Hacer un fichaje de prueba', icon: Clock },
+              ].map((step, i) => (
+                <div key={i} className="flex items-center gap-3 px-3 py-2 rounded-xl">
+                  <div className="w-5 h-5 rounded-full border border-zinc-600 flex items-center justify-center flex-shrink-0">
+                    <Circle className="w-2 h-2 text-zinc-600" weight="fill" />
+                  </div>
+                  <span className="text-[12px] font-semibold text-zinc-300">{step.label}</span>
+                </div>
+              ))}
+            </motion.div>
+          )}
+
           <button
             onClick={() => setIsManualOpen(true)}
             className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-[12px] uppercase tracking-wider transition-all shadow-[0_0_15px_rgba(37,99,235,0.3)] hover:shadow-[0_0_20px_rgba(37,99,235,0.5)] border border-blue-400/20"
@@ -121,33 +148,25 @@ export default function DashboardShell({
           </button>
         </div>
       </nav>
-
-      <div className={cn("border-t border-white/[0.04]", isMobile ? "p-6" : "p-4")}>
-        <button 
-          onClick={onLogout}
-          className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-[13px] font-semibold text-zinc-600 hover:text-rose-400 hover:bg-rose-500/[0.06] transition-all duration-200 mb-6"
-        >
-          <SignOut className="w-[18px] h-[18px]" weight="regular" />
-          Cerrar Sesión
-        </button>
-
-        {/* Firma de Autoría Script-9 */}
-        <div className="px-4 py-4 bg-gradient-to-br from-white/[0.02] to-transparent rounded-[20px] border border-white/5">
-          <p className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.3em] mb-1.5">POWERED BY</p>
-          <a 
-            href="https://www.script-9.com" 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="flex items-center gap-2 group"
-          >
-            <span className="text-[13px] font-bold text-zinc-400 group-hover:text-blue-400 transition-colors tracking-tight">Script-9</span>
-            <div className="w-1 h-1 rounded-full bg-blue-500 animate-pulse" />
-            <NavigationArrow size={10} weight="fill" className="text-zinc-600 group-hover:text-blue-400 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all" />
-          </a>
-        </div>
-      </div>
     </>
   );
+}
+
+export default function DashboardShell({ 
+  activeTab, 
+  setActiveTab, 
+  onLogout, 
+  profile, 
+  notifications = [],
+  showWelcome = false,
+  onDismissWelcome = () => {},
+  onWelcomeAction = () => {},
+  children 
+}) {
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isManualOpen, setIsManualOpen] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [showTutorial, setShowTutorial] = useState(false);
 
   return (
     <div className="min-h-screen bg-[#0a0a0c] text-white font-sans flex overflow-hidden">
@@ -162,7 +181,15 @@ export default function DashboardShell({
         <div className="p-8 pb-4">
           <Logo />
         </div>
-        <SidebarContent />
+        <SidebarContent 
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          isMobile={false}
+          setIsMobileMenuOpen={setIsMobileMenuOpen}
+          showTutorial={showTutorial}
+          setShowTutorial={setShowTutorial}
+          setIsManualOpen={setIsManualOpen}
+        />
       </aside>
 
       {/* Main Content */}
@@ -352,11 +379,30 @@ export default function DashboardShell({
                   <X className="w-4 h-4" weight="bold" />
                 </button>
               </div>
-              <SidebarContent isMobile />
+              <SidebarContent 
+                activeTab={activeTab}
+                setActiveTab={setActiveTab}
+                isMobile
+                setIsMobileMenuOpen={setIsMobileMenuOpen}
+                showTutorial={showTutorial}
+                setShowTutorial={setShowTutorial}
+                setIsManualOpen={setIsManualOpen}
+              />
             </motion.div>
           </>
         )}
       </AnimatePresence>
+
+      <OnboardingWelcome 
+        isOpen={showWelcome}
+        onDismiss={onDismissWelcome}
+        onAction={(type) => {
+          if (type === 'manual') {
+            setIsManualOpen(true);
+          }
+          onWelcomeAction(type);
+        }}
+      />
 
       <ManualUsuarioModal 
         isOpen={isManualOpen} 

@@ -129,9 +129,14 @@ router.post(
       return;
     }
 
-    // Generar token de invitación (expira en 7 días)
-    const invitationToken = randomUUID();
-    const invitationExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    // Generar token de invitación (expira en 7 días) — solo si no es Google-only
+    let invitationToken: string | undefined;
+    let invitationExpiresAt: Date | undefined;
+
+    if (!parsed.data.isGoogleOnly) {
+      invitationToken = randomUUID();
+      invitationExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    }
 
     // Obtener datos del admin para el email de invitación
     let adminName = "Tu administrador";
@@ -171,25 +176,28 @@ router.post(
 
     await userRepository.save(employee);
 
-    // Enviar email de invitación
+    // Enviar email de invitación — solo si no es Google-only
     let emailSent = false;
-    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
-    const inviteLink = `${frontendUrl}/invite/${invitationToken}`;
 
-    try {
-      await EmailService.sendEmployeeInvite(
-        employee.email,
-        employee.displayName || "Usuario",
-        companyName,
-        adminName,
-        inviteLink,
-      );
-      emailSent = true;
-    } catch (emailErr) {
-      console.error(
-        `⚠️ [Employees] Failed to send invitation email to ${employee.email}:`,
-        emailErr,
-      );
+    if (!parsed.data.isGoogleOnly) {
+      const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+      const inviteLink = `${frontendUrl}/invite/${invitationToken}`;
+
+      try {
+        await EmailService.sendEmployeeInvite(
+          employee.email,
+          employee.displayName || "Usuario",
+          companyName,
+          adminName,
+          inviteLink,
+        );
+        emailSent = true;
+      } catch (emailErr) {
+        console.error(
+          `⚠️ [Employees] Failed to send invitation email to ${employee.email}:`,
+          emailErr,
+        );
+      }
     }
 
     await logAction({
@@ -200,15 +208,20 @@ router.post(
         employeeUid: employee.uid,
         email: employee.email,
         invitationSent: emailSent,
+        isGoogleOnly: parsed.data.isGoogleOnly,
       },
       ip: req.ip,
       userAgent: req.get("user-agent"),
     });
 
-    res.status(201).json({
-      message: emailSent
+    const message = parsed.data.isGoogleOnly
+      ? `Empleado creado. Accederá con Google.`
+      : emailSent
         ? `Empleado creado. Se ha enviado una invitación a ${employee.email}.`
-        : `Empleado creado. No se pudo enviar el email de invitación a ${employee.email}. Podés reenviarla manualmente.`,
+        : `Empleado creado. No se pudo enviar el email de invitación a ${employee.email}. Podés reenviarla manualmente.`;
+
+    res.status(201).json({
+      message,
       employee: {
         uid: employee.uid,
         email: employee.email,

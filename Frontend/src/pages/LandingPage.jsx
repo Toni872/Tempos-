@@ -1225,13 +1225,13 @@ export default function LandingPage() {
                   </div>
                 ))}
               </div>
-              <button onClick={() => navigateWithTransition('/contacto')} className="tp-btn" style={{
+              <button onClick={() => navigateWithTransition('/trial')} className="tp-btn" style={{
                 width: '100%', padding: '14px', borderRadius: 13,
                 background: 'rgba(255,255,255,0.05)',
                 border: '1px solid var(--border)',
                 color: 'var(--t0)', fontSize: 14.5, cursor: 'pointer',
               }}>
-                Contactar Ventas
+                Probar gratis
               </button>
             </motion.div>
           </div>
@@ -1243,7 +1243,7 @@ export default function LandingPage() {
             style={{ textAlign: 'center', marginTop: 40, fontSize: 13, color: 'var(--t3)' }}
           >
             ¿Necesitas una solución personalizada?{' '}
-            <Link to="/contacto" style={{ color: 'var(--mg)', textDecoration: 'none', fontWeight: 600 }}>Habla con nuestros consultores de RRHH</Link>
+            <Link to="/trial" style={{ color: 'var(--mg)', textDecoration: 'none', fontWeight: 600 }}>Prueba gratis 14 días</Link>
           </motion.p>
         </div>
       </section>
@@ -1331,7 +1331,6 @@ export default function LandingPage() {
               <div style={{ display: 'flex', gap: 24, marginBottom: 16 }}>
                 <Link to="/legal/terminos" className="tp-foot-link">Términos</Link>
                 <Link to="/legal/privacidad" className="tp-foot-link">Privacidad</Link>
-                <Link to="/contacto" className="tp-foot-link">Contacto</Link>
               </div>
               <p style={{ fontSize: 11, color: 'var(--t3)', fontWeight: 500 }}>
                 © 2026 Tempos · Todos los derechos reservados.

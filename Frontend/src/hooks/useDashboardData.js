@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { z } from 'zod';
 import api, { 
   getClientSession, 
   getMe, 
@@ -10,8 +11,20 @@ import api, {
   getDashboardStats, 
   listEmployees, 
   listWorkCenters,
+  listSchedules,
+  listShiftAssignments,
   clearClientSession
 } from '@/lib/api';
+
+const FichaListSchema = z.array(z.object({
+  id: z.string(),
+  employeeId: z.string().optional(),
+  startTime: z.string().optional(),
+  endTime: z.string().nullable().optional(),
+  status: z.string().optional(),
+  metadata: z.any().optional(),
+  employeeName: z.string().optional(),
+})).optional().default([]);
 
 /**
  * Hook Senior para gestionar toda la carga de datos del Dashboard.
@@ -31,6 +44,8 @@ export function useDashboardData(registrosFilters, isAdmin) {
   const [registros, setRegistros] = useState([]);
   const [workCenters, setWorkCenters] = useState([]);
   const [dashboardStats, setDashboardStats] = useState(null);
+  const [schedules, setSchedules] = useState([]);
+  const [shiftAssignments, setShiftAssignments] = useState([]);
   
   const [loading, setLoading] = useState(true);
   const [isTrialExpired, setIsTrialExpired] = useState(false);
@@ -50,7 +65,7 @@ export function useDashboardData(registrosFilters, isAdmin) {
       // Carga de núcleo (Me y Ficha Activa)
       let currentUser = profile;
       if (type === 'all' || type === 'core') {
-        const [user, ficha] = await Promise.all([getMe(token), getActiveFicha(token)]);
+        const [user] = await Promise.all([getMe(token)]);
         if (user) {
           setProfile(user);
           currentUser = user;
@@ -59,7 +74,15 @@ export function useDashboardData(registrosFilters, isAdmin) {
           }
         }
         
-        const currentFicha = ficha?.data ?? ficha?.ficha ?? (ficha?.id ? ficha : null);
+        let ficha = null;
+        try {
+          const fichaRes = await getActiveFicha(token);
+          ficha = fichaRes?.data ?? fichaRes?.ficha ?? (fichaRes?.id ? fichaRes : null);
+        } catch (e) {
+          console.warn('Soft error loading active ficha:', e.message);
+        }
+        
+        const currentFicha = ficha;
         setActiveFicha(currentFicha);
         setClockedIn(!!currentFicha);
         setIsOnBreak(currentFicha?.lastEvent?.type === 'BREAK_START' || currentFicha?.status === 'on_break');
@@ -85,6 +108,8 @@ export function useDashboardData(registrosFilters, isAdmin) {
         if (type === 'all' || type === 'employees') promises.push(safeCall(listEmployees(token), 'emp'));
         if (type === 'all' || type === 'workCenters') promises.push(safeCall(listWorkCenters(token), 'wcs'));
         if (type === 'all' || type === 'dashboard') promises.push(safeCall(getDashboardStats(token), 'dbStats'));
+        if (type === 'all' || type === 'schedules') promises.push(safeCall(listSchedules(token), 'sch'));
+        if (type === 'all' || type === 'schedules') promises.push(safeCall(listShiftAssignments(token), 'shifts'));
       }
 
       const results = await Promise.all(promises);
@@ -93,10 +118,16 @@ export function useDashboardData(registrosFilters, isAdmin) {
 
       if (data.docs) setDocuments(Array.isArray(data.docs) ? data.docs : []);
       if (data.abs) setAbsences(Array.isArray(data.abs) ? data.abs : []);
-      if (data.fxs) setRegistros(Array.isArray(data.fxs) ? data.fxs : (data.fxs?.data || []));
+      if (data.fxs) {
+        const rawFichas = Array.isArray(data.fxs) ? data.fxs : (data.fxs?.data || []);
+        const parsedFichas = FichaListSchema.parse(rawFichas);
+        setRegistros(parsedFichas);
+      }
       if (data.emp) setEmployees(data.emp?.data || []);
       if (data.wcs) setWorkCenters(data.wcs?.data || data.wcs || []);
       if (data.dbStats) setDashboardStats(data.dbStats);
+      if (data.sch) setSchedules(data.sch?.data || data.sch || []);
+      if (data.shifts) setShiftAssignments(data.shifts?.data || data.shifts || []);
 
     } catch (err) {
       console.error('Error loading data:', err);
@@ -141,6 +172,8 @@ export function useDashboardData(registrosFilters, isAdmin) {
     registros, setRegistros,
     workCenters, setWorkCenters,
     dashboardStats, setDashboardStats,
+    schedules, setSchedules,
+    shiftAssignments, setShiftAssignments,
     loading,
     setLoading,
     isTrialExpired,

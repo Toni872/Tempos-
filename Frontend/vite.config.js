@@ -4,6 +4,14 @@ import path from 'path'
 import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
+  test: {
+    globals: true,
+    environment: 'jsdom',
+    setupFiles: './src/test/setup.js',
+    css: true,
+    include: ['src/**/*.{test,spec}.{js,ts,jsx,tsx}'],
+    exclude: ['node_modules', 'dist', 'tests'],
+  },
   plugins: [
     react(),
     VitePWA({
@@ -61,7 +69,6 @@ export default defineConfig({
           if (packageName === 'react-router-dom') return 'vendor-router';
           if (packageName === 'recharts') return 'vendor-recharts';
           if (packageName.includes('firebase')) return 'vendor-firebase';
-          if (packageName === 'mapbox-gl') return 'vendor-maps';
           if (packageName === 'leaflet' || packageName === 'react-leaflet') return 'vendor-maps';
           if (packageName === 'lucide-react' || packageName.includes('phosphor-icons')) return 'vendor-icons';
           if (packageName.includes('react-pdf')) return 'vendor-pdf';

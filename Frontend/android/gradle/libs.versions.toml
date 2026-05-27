@@ -1,0 +1,31 @@
+[versions]
+appcompat = "1.7.1"
+coordinatorlayout = "1.3.0"
+cordovaAndroidVersion = "15.0.0"
+coreSplashscreen = "1.2.0"
+credentials = "1.6.0"
+espressoCore = "3.7.0"
+googleServices = "4.4.4"
+googleid = "1.2.0"
+agp = "9.2.1"
+gradleToolchainsFoojayResolverConvention = "1.0.0"
+junit = "1.3.0"
+junitVersion = "4.13.2"
+compileSdk = "37"
+
+[libraries]
+androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
+androidx-coordinatorlayout = { group = "androidx.coordinatorlayout", name = "coordinatorlayout", version.ref = "coordinatorlayout" }
+androidx-core-splashscreen = { group = "androidx.core", name = "core-splashscreen", version.ref = "coreSplashscreen" }
+androidx-credentials = { group = "androidx.credentials", name = "credentials", version.ref = "credentials" }
+androidx-credentials-play-services-auth = { group = "androidx.credentials", name = "credentials-play-services-auth", version.ref = "credentials" }
+androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }
+androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junit" }
+framework = { module = "org.apache.cordova:framework", version.ref = "cordovaAndroidVersion" }
+google-services = { group = "com.google.gms", name = "google-services", version.ref = "googleServices" }
+googleid = { group = "com.google.android.libraries.identity.googleid", name = "googleid", version.ref = "googleid" }
+agp = { group = "com.android.tools.build", name = "gradle", version.ref = "agp" }
+junit = { group = "junit", name = "junit", version.ref = "junitVersion" }
+
+[plugins]
+foojay = { id = "org.gradle.toolchains.foojay-resolver-convention", version.ref = "gradleToolchainsFoojayResolverConvention" }
