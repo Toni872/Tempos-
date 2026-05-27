@@ -5,7 +5,6 @@ import {
   ShieldCheck, 
   IdentificationCard, 
   Phone, 
-  MapPin, 
   CurrencyCircleDollar,
   Briefcase,
   Buildings,
@@ -18,15 +17,13 @@ import { cn } from '@/lib/utils';
 
 export default function EmpleadoForm({ initialValues, onSubmit, onCancel, isSubmitting }) {
   const [activeTab, setActiveTab] = useState('personal');
+  const isCreate = !initialValues?.id;
+
   const [formData, setFormData] = useState(initialValues ?? {
     displayName: '',
     email: '',
     role: 'employee',
-    dni: '',
-    phone: '',
     hourlyRate: 0,
-    status: 'active',
-    workCenterId: ''
   });
 
   const handleChange = (e) => {
@@ -66,6 +63,15 @@ export default function EmpleadoForm({ initialValues, onSubmit, onCancel, isSubm
         ))}
       </div>
 
+      {isCreate && (
+        <div className="p-4 rounded-2xl bg-blue-600/5 border border-blue-600/10 flex items-center gap-3">
+          <ShieldCheck weight="duotone" className="w-5 h-5 text-blue-500" />
+          <span className="text-[11px] font-semibold text-zinc-300">
+            Sin contraseña — solo acceso con Google
+          </span>
+        </div>
+      )}
+
       <div className="min-h-[320px]">
         {activeTab === 'personal' && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-in fade-in slide-in-from-bottom-2">
@@ -77,14 +83,16 @@ export default function EmpleadoForm({ initialValues, onSubmit, onCancel, isSubm
               icon={User} 
               placeholder="Juan Pérez" 
             />
-            <FormInput 
-              label="DNI / NIE" 
-              name="dni" 
-              value={formData.dni} 
-              onChange={handleChange} 
-              icon={IdentificationCard} 
-              placeholder="12345678X" 
-            />
+            {!isCreate && (
+              <FormInput 
+                label="DNI / NIE" 
+                name="dni" 
+                value={formData.dni} 
+                onChange={handleChange} 
+                icon={IdentificationCard} 
+                placeholder="12345678X" 
+              />
+            )}
             <FormInput 
               label="Email Personal" 
               name="email" 
@@ -94,36 +102,40 @@ export default function EmpleadoForm({ initialValues, onSubmit, onCancel, isSubm
               placeholder="juan@email.com" 
               type="email" 
             />
-            <FormInput 
-              label="Teléfono" 
-              name="phone" 
-              value={formData.phone} 
-              onChange={handleChange} 
-              icon={Phone} 
-              placeholder="+34 600..." 
-            />
+            {!isCreate && (
+              <FormInput 
+                label="Teléfono" 
+                name="phone" 
+                value={formData.phone} 
+                onChange={handleChange} 
+                icon={Phone} 
+                placeholder="+34 600..." 
+              />
+            )}
           </div>
         )}
 
         {activeTab === 'laboral' && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-in fade-in slide-in-from-bottom-2">
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-zinc-600 uppercase tracking-widest ml-1">Sede Asignada</label>
-              <div className="relative group">
-                <Buildings className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-600 group-focus-within:text-blue-500 transition-colors" weight="bold" />
-                <select 
-                  name="workCenterId" 
-                  value={formData.workCenterId} 
-                  onChange={handleChange}
-                  className="w-full bg-[#111114] border border-white/[0.06] rounded-2xl py-3.5 pl-11 pr-4 text-sm font-semibold text-zinc-300 focus:outline-none focus:border-blue-500/40 transition-all appearance-none"
-                  style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' fill=\'none\' viewBox=\'0 0 24 24\' stroke=\'rgba(255,255,255,0.3)\'%3E%3Cpath stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'2\' d=\'M19 9l-7 7-7-7\'%3E%3C/path%3E%3C/svg%3E")', backgroundRepeat: 'no-repeat', backgroundPosition: 'right 1rem center', backgroundSize: '1.2em' }}
-                >
-                  <option value="" style={{ background: '#111114', color: '#71717a' }}>Seleccionar sede...</option>
-                  <option value="main" style={{ background: '#111114', color: '#f4f4f5' }}>Sede Principal</option>
-                  <option value="madrid" style={{ background: '#111114', color: '#f4f4f5' }}>Delegación Madrid</option>
-                </select>
+            {!isCreate && (
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-zinc-600 uppercase tracking-widest ml-1">Sede Asignada</label>
+                <div className="relative group">
+                  <Buildings className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-600 group-focus-within:text-blue-500 transition-colors" weight="bold" />
+                  <select 
+                    name="workCenterId" 
+                    value={formData.workCenterId} 
+                    onChange={handleChange}
+                    className="w-full bg-[#111114] border border-white/[0.06] rounded-2xl py-3.5 pl-11 pr-4 text-sm font-semibold text-zinc-300 focus:outline-none focus:border-blue-500/40 transition-all appearance-none"
+                    style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' fill=\'none\' viewBox=\'0 0 24 24\' stroke=\'rgba(255,255,255,0.3)\'%3E%3Cpath stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'2\' d=\'M19 9l-7 7-7-7\'%3E%3C/path%3E%3C/svg%3E")', backgroundRepeat: 'no-repeat', backgroundPosition: 'right 1rem center', backgroundSize: '1.2em' }}
+                  >
+                    <option value="" style={{ background: '#111114', color: '#71717a' }}>Seleccionar sede...</option>
+                    <option value="main" style={{ background: '#111114', color: '#f4f4f5' }}>Sede Principal</option>
+                    <option value="madrid" style={{ background: '#111114', color: '#f4f4f5' }}>Delegación Madrid</option>
+                  </select>
+                </div>
               </div>
-            </div>
+            )}
             <FormInput 
               label="Tarifa Hora (€)" 
               name="hourlyRate" 
@@ -133,27 +145,29 @@ export default function EmpleadoForm({ initialValues, onSubmit, onCancel, isSubm
               placeholder="0.00" 
               type="number" 
             />
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-zinc-600 uppercase tracking-widest ml-1">Estado Contractual</label>
-              <div className="flex gap-2">
-                {['active', 'suspended'].map(s => (
-                  <button
-                    key={s}
-                    type="button"
-                    onClick={() => setFormData(p => ({ ...p, status: s }))}
-                    className={cn(
-                      "flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl border text-[11px] font-black uppercase tracking-wider transition-all",
-                      formData.status === s 
-                        ? (s === 'active' ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-500" : "bg-rose-500/10 border-rose-500/30 text-rose-500") 
-                        : "bg-white/[0.02] border-white/[0.06] text-zinc-600 hover:text-zinc-400"
-                    )}
-                  >
-                    {s === 'active' ? <CheckCircle className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
-                    {s === 'active' ? 'Vigente' : 'Baja'}
-                  </button>
-                ))}
+            {!isCreate && (
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-zinc-600 uppercase tracking-widest ml-1">Estado Contractual</label>
+                <div className="flex gap-2">
+                  {['active', 'suspended'].map(s => (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => setFormData(p => ({ ...p, status: s }))}
+                      className={cn(
+                        "flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl border text-[11px] font-black uppercase tracking-wider transition-all",
+                        formData.status === s 
+                          ? (s === 'active' ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-500" : "bg-rose-500/10 border-rose-500/30 text-rose-500") 
+                          : "bg-white/[0.02] border-white/[0.06] text-zinc-600 hover:text-zinc-400"
+                      )}
+                    >
+                      {s === 'active' ? <CheckCircle className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
+                      {s === 'active' ? 'Vigente' : 'Baja'}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
           </div>
         )}
 

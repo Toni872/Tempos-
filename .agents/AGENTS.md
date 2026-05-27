@@ -44,14 +44,16 @@ Tempos/
 └── docs/                        ← Documentación técnica y legal
 ```
 
-## Reglas de Código Críticas (AGENTS.md)
+## Reglas de Código Críticas (AGENTS.md) — ZERO TOLERANCIA
 
 1. **Análisis Post-Edición**: Después de cada cambio, lectura completa del área afectada para asegurar integridad.
-2. **Validación Técnica Obligatoria**: Ejecutar `npm run lint` o validación de tipos tras editar. No se aceptan warnings en rojo.
+2. **Build Obligatorio (ZERO TOLERANCIA)**: Tras CADA cambio, ejecutar `npm run build` en el frontend. NO se aceptan errores NI warnings. Si el build falla, el cambio no está completo. No hay excepciones.
 3. **Sincronización de Puertos**: El backend SIEMPRE corre en el puerto **8081**.
 4. **Validación de Datos**: Usar SIEMPRE **Zod** para validar entradas de API en el frontend.
 5. **Estilo Visual Premium**: Mantener Dark Mode, Framer Motion, Glassmorphism y estética de alto nivel.
 6. **ESM Compatibility**: En el Backend, los imports de archivos locales deben incluir la extensión `.js` para compatibilidad con el entorno de ejecución Node.js (ESM).
+7. **Orden de Declaraciones (React)**: Las `const` en componentes React NO se hoistean. Estados declarados después de useMemo/useCallback que los referencian causan `ReferenceError`. Mantener orden descendente: estados primero, derivados después.
+8. **Imports sin usar**: Después de refactorizar componentes, verificar y limpiar imports muertos. Cero imports fantasmas.
 
 ## Gestión de Periodo de Prueba (Trial)
 - Duración: 14 días desde el registro.

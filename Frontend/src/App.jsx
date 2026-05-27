@@ -73,7 +73,6 @@ function App() {
               <Route path="/funcionalidades" element={<PageWrapper><MarketingPage kind="funcionalidades" /></PageWrapper>} />
               <Route path="/faqs" element={<PageWrapper><MarketingPage kind="faqs" /></PageWrapper>} />
               <Route path="/blog" element={<PageWrapper><MarketingPage kind="blog" /></PageWrapper>} />
-              <Route path="/contacto" element={<PageWrapper><MarketingPage kind="contacto" /></PageWrapper>} />
               <Route path="/login" element={<PageWrapper><AuthPage mode="login" /></PageWrapper>} />
               <Route path="/register" element={<PageWrapper><AuthPage mode="register" /></PageWrapper>} />
               <Route path="/dashboard" element={<PageWrapper><DashboardPage /></PageWrapper>} />

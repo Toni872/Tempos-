@@ -12,13 +12,14 @@ import {
 import { asyncHandler } from "../middleware/errorHandler.js";
 import {
   buildValidationError,
+  isFreeEmail,
   registerSchema,
   updateAuthProfileSchema,
 } from "../utils/validation.js";
+import { Like } from "typeorm";
 import { randomUUID } from "crypto";
 import { EmailService } from "../services/EmailService.js";
 import { registerRateLimiter } from "../middleware/rate-limit.middleware.js";
-import admin from "firebase-admin";
 
 const router = Router();
 
@@ -110,13 +111,27 @@ router.post(
     }
     const body = parsed.data;
 
-    // Si no existe en BD ni por UID ni por email, solo admins pueden auto-registrarse
+    // Si no existe en BD ni por UID ni por email, solo admins pueden auto-registrarse.
+    // Si es employee, verificar si fue creado por un admin (temp_ UID + status pending)
     if (!user && firebaseUser.email) {
       const isAdmin = body.role === "admin" || (firebaseUser as any).admin === true;
 
       if (!isAdmin) {
-        res.status(404).json({ error: "No tienes una cuenta registrada. Contactá a tu administrador." });
-        return;
+        const tempPendingUser = await userRepository.findOne({
+          where: {
+            email: firebaseUser.email.toLowerCase(),
+            status: "pending",
+            uid: Like("temp_%"),
+          },
+        });
+
+        if (tempPendingUser) {
+          (req as any).relinkOldUid = tempPendingUser.uid;
+          user = null as any;
+        } else {
+          res.status(404).json({ error: "No tienes una cuenta registrada. Contactá a tu administrador." });
+          return;
+        }
       }
     }
 
@@ -143,10 +158,31 @@ router.post(
       typeof body.companyDomain === "string"
         ? body.companyDomain.trim()
         : "";
+    const cif =
+      typeof body.cif === "string"
+        ? body.cif.trim()
+        : "";
 
     if (requestedRole === "admin" && !skipDomainCheck) {
-      const emailDomain = firebaseUser.email?.split("@")[1]?.toLowerCase();
-      if (!companyDomain) {
+      // Free email domains are not allowed for admin registration
+      const email = firebaseUser.email ?? "";
+      if (isFreeEmail(email)) {
+        res.status(400).json({
+          error: "free_email_not_allowed",
+          message: "No puedes registrarte con un email gratuito. Usá un email corporativo.",
+        });
+        return;
+      }
+
+      const emailDomain = email.split("@")[1]?.toLowerCase();
+
+      if (cif) {
+        if (emailDomain && companyDomain && emailDomain === companyDomain.toLowerCase()) {
+          registrationStatus = "active";
+        } else {
+          registrationStatus = "pending";
+        }
+      } else if (!companyDomain) {
         registrationStatus = "pending";
       } else if (emailDomain && emailDomain !== companyDomain.toLowerCase()) {
         registrationStatus = "pending";
@@ -187,6 +223,8 @@ router.post(
       role: requestedRole,
       status: registrationStatus,
       authorizedDeviceId: deviceId,
+      cif: cif || undefined,
+      companyDomain: companyDomain || undefined,
       isTrial: requestedRole === "admin",
       trialExpiresAt: requestedRole === "admin" ? new Date(Date.now() + 14 * 24 * 60 * 60 * 1000) : undefined,
       metadata: {
@@ -313,25 +351,6 @@ router.post(
       }
     }
 
-    // Auto-verificar email para que el dashboard no bloquee con "email_no_verificado"
-    if (!user.emailVerified) {
-      // Firebase update es "best-effort" — si falla (permisos, red), no bloquea el flujo
-      try {
-        await admin.auth().updateUser(firebaseUser.uid, { emailVerified: true });
-        console.log(`✅ [AUTH] Email verificado en Firebase para ${user.email}`);
-      } catch (verifyErr) {
-        console.error("⚠️ [AUTH] No se pudo verificar email en Firebase:", verifyErr);
-      }
-      // La BD SIEMPRE se actualiza a true para que el middleware requireEmailVerified pase
-      try {
-        await userRepository.update({ uid: firebaseUser.uid }, { emailVerified: true });
-        user.emailVerified = true;
-        console.log(`✅ [AUTH] emailVerified=true en BD para ${user.email}`);
-      } catch (dbErr) {
-        console.error("⚠️ [AUTH] No se pudo actualizar emailVerified en BD:", dbErr);
-      }
-    }
-
     // Si el registro quedó pendiente, notificar al equipo de Tempos
     if (registrationStatus === "pending") {
       try {
@@ -433,6 +452,7 @@ router.get(
       emailVerified: user.emailVerified,
       role: user.role,
       companyId: user.companyId,
+      companyName: user.metadata?.companyName || user.companyId,
       status: user.status,
       photoURL: user.photoURL,
       createdAt: user.createdAt,

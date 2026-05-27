@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import Logo from '@/components/ui/Logo';
+import ErrorText from '@/components/ui/ErrorText';
 import { signUpAndGetIdToken } from '@/lib/firebaseClient';
 import { registerMe, getMe, setClientSession } from '@/lib/api';
 import { z } from 'zod';
@@ -8,6 +9,7 @@ import { z } from 'zod';
 const PHONE_REGEX = /^[+]?[(]?[0-9\s-]{6,20}$/;
 const TRIAL_FIELD_IDS = {
   company: 'trial-company',
+  cif: 'trial-cif',
   phone: 'trial-phone',
   firstName: 'trial-firstName',
   lastName: 'trial-lastName',
@@ -37,22 +39,11 @@ function getTrialInputStyle(hasError) {
   };
 }
 
-function ErrorText({ id, message }) {
-  if (!message) {
-    return null;
-  }
-
-  return (
-    <p id={id} role="alert" aria-live="polite" style={{ marginTop: 6, fontSize: 12.5, color: '#ef4444', fontWeight: 500 }}>
-      {message}
-    </p>
-  );
-}
-
 export default function TrialPage() {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
     company: '',
+    cif: '',
     firstName: '',
     lastName: '',
     email: '',
@@ -155,6 +146,7 @@ export default function TrialPage() {
       await registerMe(idToken, {
         role: 'admin',
         companyName: formData.company.trim(),
+        cif: formData.cif.trim() || undefined,
         name: `${formData.firstName.trim()} ${formData.lastName.trim()}`,
         phone: formData.phone.trim(),
       });
@@ -238,6 +230,11 @@ export default function TrialPage() {
                 </div>
               </div>
               
+              <div>
+                <label style={{ display: 'block', fontSize: 13, color: 'var(--t2)', marginBottom: 8 }}>CIF/NIF <span style={{ color: 'var(--t3)', fontWeight: 400 }}>(opcional)</span></label>
+                <input id={TRIAL_FIELD_IDS.cif} name="cif" value={formData.cif} onChange={handleChange} type="text" autoComplete="off" placeholder="B12345678" style={getTrialInputStyle(false)} />
+              </div>
+
               <div style={{ 
                 display: 'grid', 
                 gridTemplateColumns: window.innerWidth < 640 ? '1fr' : '1fr 1fr', 

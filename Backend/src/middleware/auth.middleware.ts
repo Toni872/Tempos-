@@ -223,30 +223,26 @@ export function requireEmailVerified(
     return;
   }
 
-  // Si el usuario existe en BD pero emailVerified=false, lo corregimos al vuelo
-  // (cubre TODOS los caminos de registro, incluso los que el controller no cubre)
   if (currentUser?.uid && !currentUser.emailVerified) {
-    AppDataSource.getRepository(User)
-      .update({ uid: currentUser.uid }, { emailVerified: true })
-      .then(() => {
-        currentUser.emailVerified = true;
-        console.log(`✅ [AUTH] emailVerified corregido en BD para ${currentUser.email}`);
-      })
-      .catch((dbErr) =>
-        console.error("⚠️ [AUTH] Error corrigiendo emailVerified:", dbErr),
-      );
-    // Dejamos pasar aunque la corrección async todavía no haya terminado
-    next();
+    if (firebaseUser?.email_verified) {
+      AppDataSource.getRepository(User)
+        .update({ uid: currentUser.uid }, { emailVerified: true })
+        .then(() => {
+          currentUser.emailVerified = true;
+          console.log(`✅ [AUTH] emailVerified sincronizado desde Firebase para ${currentUser.email}`);
+        })
+        .catch((dbErr) =>
+          console.error("⚠️ [AUTH] Error sincronizando emailVerified:", dbErr),
+        );
+      next();
+      return;
+    }
+
+    res.status(403).json({ error: "email_no_verificado", blocked: true });
     return;
   }
 
-  // Si la BD ya tiene emailVerified=true, pasar directamente
-  if (currentUser?.emailVerified === true) {
-    next();
-    return;
-  }
-
-  if (!firebaseUser?.email_verified) {
+  if (!firebaseUser?.email_verified && currentUser?.emailVerified !== true) {
     res.status(403).json({ error: "email_no_verificado", blocked: true });
     return;
   }

@@ -24,6 +24,7 @@ import {
   CaretRight,
   Fingerprint,
   SquaresFour,
+  ArrowsClockwise,
 } from '@phosphor-icons/react';
 import { Capacitor } from '@capacitor/core';
 import Logo from '@/components/ui/Logo';
@@ -59,6 +60,7 @@ export default function EmployeeDashboard({
   autoClockStatus = 'idle',
   autoClockCenter = null,
   autoClockDistance = null,
+  onRefresh,
   error = '',
   success = '',
 }) {
@@ -315,9 +317,9 @@ export default function EmployeeDashboard({
                   <p className="text-sm font-bold text-white">{hours}h</p>
                   <p className={cn(
                     'text-[9px] font-bold uppercase tracking-wider',
-                    ficha.status === 'active' ? 'text-emerald-400' : 'text-zinc-600'
+                    !ficha.endTime ? 'text-emerald-400' : 'text-zinc-600'
                   )}>
-                    {ficha.status === 'active' ? 'Activo' : 'Completado'}
+                    {!ficha.endTime ? 'En curso' : 'Completado'}
                   </p>
                 </div>
               </motion.div>
@@ -414,7 +416,7 @@ export default function EmployeeDashboard({
         <div className="grid grid-cols-2 gap-3">
           <div className="bg-white/[0.03] rounded-xl p-3">
             <p className="text-[9px] font-bold text-zinc-600 uppercase tracking-wider">Empresa</p>
-            <p className="text-sm font-bold text-white mt-1 truncate">{profile?.companyId || '—'}</p>
+            <p className="text-sm font-bold text-white mt-1 truncate">{profile?.companyName || profile?.companyId || '—'}</p>
           </div>
           <div className="bg-white/[0.03] rounded-xl p-3">
             <p className="text-[9px] font-bold text-zinc-600 uppercase tracking-wider">Estado</p>
@@ -512,8 +514,20 @@ export default function EmployeeDashboard({
               <p className="text-sm font-bold text-white">{displayName}</p>
             </div>
           </div>
-            <Logo size="xs" />
-        </div>
+            <div className="flex items-center gap-2">
+              {onRefresh && (
+                <motion.button
+                  whileTap={{ scale: 0.9 }}
+                  onClick={onRefresh}
+                  className="w-9 h-9 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.06] flex items-center justify-center text-zinc-500 hover:text-blue-400 transition-all"
+                  title="Actualizar datos"
+                >
+                  <ArrowsClockwise size={16} weight="bold" />
+                </motion.button>
+              )}
+              <Logo size="xs" />
+            </div>
+          </div>
       </header>
 
       {/* Main Content */}

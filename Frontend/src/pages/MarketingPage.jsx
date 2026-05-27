@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
-import { submitContact } from '@/lib/api'
+
 import '../styles/marketing.css'
 
 const PAGE_CONTENT = {
@@ -123,25 +123,6 @@ const PAGE_CONTENT = {
       }
     ]
   },
-  contacto: {
-    chip: 'Contacto',
-    title: 'Solicita información o una demo del sistema',
-    subtitle:
-      'Comparte el contexto de tu empresa y te ayudaremos a definir el flujo de implantación más adecuado, con enfoque práctico y orientado a cumplimiento.',
-    heroImage: '/auth_login_admin_4k.jpg',
-    heroImagePosition: 'center 34%',
-    contactMedia: '/auth_register_admin_4k.jpg',
-    contactMediaPosition: 'center 50%',
-    contactItems: [
-      { label: 'Dirección', value: 'Calle Alemania 34, Alicante · Atención online para toda España' },
-      { label: 'Correo', value: 'equipo@tempos.es' },
-      { label: 'Teléfono', value: '+34 900 000 000' },
-      { label: 'Horario', value: 'Lunes a viernes · 09:00 a 18:00' },
-      { label: 'Respuesta', value: 'Normalmente en menos de 24 horas laborables' }
-    ],
-    formIntro:
-      'Envíanos tu contexto y te ayudaremos a valorar el mejor flujo de implantación según el tamaño del equipo, la operativa y el tipo de fichaje.'
-  }
 }
 
 function SectionNav() {
@@ -175,7 +156,7 @@ function SectionNav() {
           <NavLink to="/funcionalidades" className={({ isActive }) => `tp-nav-link ${isActive ? 'active' : ''}`}>Funcionalidades</NavLink>
           <NavLink to="/faqs" className={({ isActive }) => `tp-nav-link ${isActive ? 'active' : ''}`}>FAQs</NavLink>
           <NavLink to="/blog" className={({ isActive }) => `tp-nav-link ${isActive ? 'active' : ''}`}>Blog</NavLink>
-          <NavLink to="/contacto" className={({ isActive }) => `tp-nav-link ${isActive ? 'active' : ''}`}>Contacto</NavLink>
+
         </div>
 
         {/* Desktop CTAs */}
@@ -210,7 +191,7 @@ function SectionNav() {
         <NavLink to="/funcionalidades" className={({ isActive }) => `tp-mob-nav-link ${isActive ? 'active' : ''}`} onClick={close}>Funcionalidades</NavLink>
         <NavLink to="/faqs" className={({ isActive }) => `tp-mob-nav-link ${isActive ? 'active' : ''}`} onClick={close}>FAQs</NavLink>
         <NavLink to="/blog" className={({ isActive }) => `tp-mob-nav-link ${isActive ? 'active' : ''}`} onClick={close}>Blog</NavLink>
-        <NavLink to="/contacto" className={({ isActive }) => `tp-mob-nav-link ${isActive ? 'active' : ''}`} onClick={close}>Contacto</NavLink>
+
         <div className="tp-mob-nav-actions">
           <button onClick={() => { close(); navigate('/login'); }} className="tp-btn tp-btn-ghost" style={{ borderRadius: 12, padding: 13, fontSize: 15 }}>
             Iniciar sesión
@@ -279,8 +260,8 @@ function FunctionalitiesView({ content, navigate }) {
         <h3>{content.ctaTitle}</h3>
         <p>{content.ctaText}</p>
         <div className="tp-marketing-actions">
-          <button onClick={() => navigate('/contacto')} className="tp-btn tp-btn-primary" style={{ borderRadius: 12, padding: '13px 18px', fontSize: 14 }}>
-            Contáctanos
+          <button onClick={() => navigate('/trial')} className="tp-btn tp-btn-primary" style={{ borderRadius: 12, padding: '13px 18px', fontSize: 14 }}>
+            Probar gratis
           </button>
           <button onClick={() => navigate('/trial')} className="tp-btn tp-btn-ghost" style={{ borderRadius: 12, padding: '13px 18px', fontSize: 14 }}>
             Solicitar demo
@@ -423,8 +404,8 @@ function FaqsView({ content, navigate }) {
         <h3>{content.ctaTitle}</h3>
         <p>{content.ctaText}</p>
         <div className="tp-marketing-actions">
-          <button onClick={() => navigate('/contacto')} className="tp-btn tp-btn-primary" style={{ borderRadius: 12, padding: '13px 18px', fontSize: 14 }}>
-            Ir a contacto
+          <button onClick={() => navigate('/trial')} className="tp-btn tp-btn-primary" style={{ borderRadius: 12, padding: '13px 18px', fontSize: 14 }}>
+            Probar gratis
           </button>
         </div>
       </section>
@@ -564,93 +545,6 @@ function BlogView({ content }) {
   )
 }
 
-function ContactView({ content }) {
-  const [form, setForm] = useState({ name: '', email: '', phone: '', message: '' });
-  const [status, setStatus] = useState('idle'); // idle | sending | ok | error
-  const [errorMsg, setErrorMsg] = useState('');
-
-  const handleChange = (e) => {
-    setForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
-    if (status === 'error') { setStatus('idle'); setErrorMsg(''); }
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (status === 'sending') return;
-    setStatus('sending');
-    setErrorMsg('');
-    try {
-      await submitContact({
-        name: form.name.trim(),
-        email: form.email.trim(),
-        phone: form.phone.trim(),
-        message: form.message.trim(),
-      });
-      setStatus('ok');
-    } catch (err) {
-      setStatus('error');
-      setErrorMsg(err instanceof Error ? err.message : 'No se pudo enviar el formulario.');
-    }
-  };
-
-  return (
-    <section className="tp-marketing-contact-layout" style={{ alignItems: 'stretch', gap: 32 }}>
-      <article className="tp-marketing-contact-box" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: 420 }}>
-        <div className="tp-marketing-contact-media" style={{ borderRadius: 18, overflow: 'hidden', marginBottom: 18 }}>
-          <img
-            src={content.contactMedia || '/landing_team_collab.jpg'}
-            alt="Equipo de Tempos"
-            loading="lazy"
-            style={{ objectPosition: content.contactMediaPosition || 'center', width: '100%', height: '100%' }}
-          />
-        </div>
-        <div className="tp-marketing-contact-body" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-          <h3 style={{ fontFamily: 'var(--ff-head)', fontSize: 24, marginBottom: 10, textAlign: 'center' }}>Habla con un especialista en control horario</h3>
-          <p style={{ color: 'var(--t1)', fontSize: 15, marginBottom: 18, textAlign: 'center', maxWidth: 340 }}>
-            Solicita información o una demo y te orientaremos sobre el flujo más adecuado para tu empresa, con un enfoque claro, práctico y alineado con la normativa.
-          </p>
-          <div className="tp-marketing-contact-list" style={{ width: '100%', maxWidth: 340, display: 'grid', gap: 10 }}>
-            {content.contactItems.map((item) => (
-              <div key={item.label} className="tp-marketing-contact-item" style={{ borderRadius: 14, padding: '13px 14px', background: 'rgba(255,255,255,0.015)' }}>
-                <span style={{ color: 'var(--t2)', fontSize: 12 }}>{item.label}</span>
-                <span style={{ color: 'var(--t0)', fontSize: 14, fontWeight: 600 }}>{item.value}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </article>
-
-      <article className="tp-marketing-form-box" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: 420 }}>
-        <div className="tp-marketing-form-body" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-          <h3 style={{ fontFamily: 'var(--ff-head)', fontSize: 24, marginBottom: 10, textAlign: 'center' }}>Escríbenos</h3>
-          <p style={{ color: 'var(--t1)', fontSize: 15, marginBottom: 18, textAlign: 'center', maxWidth: 340 }}>{content.formIntro}</p>
-
-          {status === 'ok' ? (
-            <div style={{ textAlign: 'center', padding: '28px 0' }}>
-              <p style={{ fontSize: 18, fontWeight: 600, color: 'var(--mg)', marginBottom: 8 }}>¡Mensaje enviado!</p>
-              <p style={{ color: 'var(--t1)', fontSize: 14 }}>Te responderemos en breve.</p>
-            </div>
-          ) : (
-            <form onSubmit={handleSubmit} className="tp-marketing-form" style={{ width: '100%', maxWidth: 340, display: 'grid', gap: 12 }}>
-              <input type="text" name="name" value={form.name} onChange={handleChange} placeholder="Nombre y apellidos" required />
-              <input type="email" name="email" value={form.email} onChange={handleChange} placeholder="Correo profesional" required />
-              <input type="tel" name="phone" value={form.phone} onChange={handleChange} placeholder="Teléfono de contacto" />
-              <textarea name="message" value={form.message} onChange={handleChange} placeholder="Cuéntanos tu caso (equipo, operativa y objetivos)" required />
-              {errorMsg && <p style={{ color: '#ef4444', fontSize: 13, margin: 0 }}>{errorMsg}</p>}
-              <div className="tp-marketing-form-note" style={{ color: 'var(--t2)', fontSize: 12, lineHeight: 1.6 }}>
-                Al enviar el formulario aceptas la política de privacidad y el tratamiento de tus datos para responder a tu solicitud.
-              </div>
-              <button type="submit" className="tp-btn tp-btn-primary" disabled={status === 'sending'} style={{ borderRadius: 12, padding: '14px 18px', fontSize: 14.5, opacity: status === 'sending' ? 0.7 : 1 }}>
-                {status === 'sending' ? 'Enviando…' : 'Enviar formulario'}
-              </button>
-            </form>
-          )}
-        </div>
-      </article>
-    </section>
-  );
-}
-
 export default function MarketingPage({ kind }) {
   const navigate = useNavigate()
   const content = PAGE_CONTENT[kind] || PAGE_CONTENT.funcionalidades
@@ -662,7 +556,6 @@ export default function MarketingPage({ kind }) {
       funcionalidades: 'Tempos | Funcionalidades del software de control horario',
       faqs: 'Tempos | FAQs sobre control horario y registro de jornada',
       blog: 'Tempos | Blog sobre control horario, legalidad y gestión laboral',
-      contacto: 'Tempos | Contacto y demo para empresas y autónomos'
     }
 
     document.title = titles[kind] || titles.funcionalidades
@@ -681,17 +574,11 @@ export default function MarketingPage({ kind }) {
               Probar gratis
             </button>
           }
-          secondaryAction={
-            <button onClick={() => navigate('/contacto')} className="tp-btn tp-btn-ghost" style={{ borderRadius: 12, padding: '14px 18px', fontSize: 14.5 }}>
-              Solicitar información
-            </button>
-          }
         />
 
         {kind === 'funcionalidades' && <FunctionalitiesView content={content} navigate={navigate} />}
         {kind === 'faqs' && <FaqsView content={content} navigate={navigate} />}
         {kind === 'blog' && <BlogView content={content} />}
-        {kind === 'contacto' && <ContactView content={content} />}
       </main>
 
       <footer className="tp-marketing-footer">

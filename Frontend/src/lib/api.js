@@ -13,10 +13,10 @@ import {
 } from './schemas';
 
 import { Capacitor, CapacitorHttp } from '@capacitor/core';
+import { getClientSession, setClientSession, clearClientSession, getDeviceId } from './api/session';
 
 const DEFAULT_LOCAL_API = 'http://127.0.0.1:8081';
 const PROD_API = 'https://tempos-production.up.railway.app';
-const SESSION_STORAGE_KEY = 'tempos.session';
 const OFFLINE_QUEUE_KEY = 'tempos.offline_queue';
 
 let currentCsrfToken = generateCSRFToken();
@@ -28,14 +28,9 @@ function getApiBaseUrl() {
   }
   
   if (Capacitor.isNativePlatform()) {
-    // En desarrollo, usamos la IP local de tu PC para que el móvil pueda conectar
-    const LOCAL_IP = '192.168.1.14'; 
-    const isDev = !PROD_API.includes('railway.app'); // Simplificado para detectar entorno
-    
-    // Si estamos en desarrollo (o queremos probar local en el móvil), usamos la IP
-    const target = import.meta.env.PROD ? PROD_API : `http://${LOCAL_IP}:8081`;
-    
-    return target;
+    // En desarrollo nativo (móvil), necesitamos la IP local del PC
+    const LOCAL_IP = import.meta.env.VITE_LOCAL_API_IP || '192.168.1.14';
+    return import.meta.env.PROD ? PROD_API : `http://${LOCAL_IP}:8081`;
   }
   
   return DEFAULT_LOCAL_API;
@@ -237,42 +232,7 @@ async function requestBlob(path, options = {}) {
 	return blob;
 }
 
-export function getClientSession() {
-  try {
-    const raw = localStorage.getItem(SESSION_STORAGE_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
-}
-
-export function setClientSession(session) {
-  localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
-}
-
-export function clearClientSession() {
-  localStorage.removeItem(SESSION_STORAGE_KEY);
-}
-
-export function getDeviceId() {
-  // Prioridad: Hardware ID nativo > UUID generado
-  const HARDWARE_KEY = 'tempos.hardware_device_id';
-  const DEVICE_ID_KEY = 'tempos.device_id';
-  
-  // Si hay un ID de hardware (vinculado por nativeServices), usarlo
-  const hardwareId = localStorage.getItem(HARDWARE_KEY);
-  if (hardwareId) return hardwareId;
-  
-  // Fallback: UUID generado (web)
-  let deviceId = localStorage.getItem(DEVICE_ID_KEY);
-  
-  if (!deviceId) {
-    deviceId = crypto.randomUUID?.() || `dev_${Math.random().toString(36).substring(2)}_${Date.now()}`;
-    localStorage.setItem(DEVICE_ID_KEY, deviceId);
-  }
-  
-  return deviceId;
-}
+export { getClientSession, setClientSession, clearClientSession, getDeviceId } from './api/session';
 
 export async function registerMe(token, data = {}) {
   if (!authRateLimiter.canMakeRequest()) throw new Error("Tasa de auth excedida. Por favor, espera.");
@@ -321,25 +281,6 @@ export async function submitContact({ name, email, phone, message }) {
     body: JSON.stringify({ name, email, phone, message }),
   });
 }
-
-export async function getDailyStats(token, startDate, endDate) {
-  const params = new URLSearchParams();
-  if (startDate) {
-    params.set('startDate', startDate);
-  }
-  if (endDate) {
-    params.set('endDate', endDate);
-  }
-
-  const query = params.toString();
-  const path = `/api/v1/fichas/stats/daily${query ? `?${query}` : ''}`;
-
-  return request(path, {
-    method: 'GET',
-    token,
-  });
-}
-
 
 export async function listEmployees(token) {
   try {
@@ -480,6 +421,10 @@ export async function signDocument(token, id, data = {}) {
   });
 }
 
+export async function deleteDocument(token, id) {
+  return request(`/api/v1/documents/${id}`, { method: 'DELETE', token });
+}
+
 export async function acceptTerms(token) {
   return request('/api/v1/auth/accept-terms', { method: 'POST', token });
 }
@@ -507,22 +452,14 @@ export async function getDashboardStats(token) {
   return request('/api/v1/reports/dashboard-stats', { method: 'GET', token });
 }
 
-export async function getReportSummary(token) {
-  return request('/api/v1/reports/summary', { method: 'GET', token });
+export async function getAnomalies(token) {
+  return request('/api/v1/reports/anomalies', { method: 'GET', token });
 }
 
 export async function listAuditLog(token, params = {}) {
   const qs = toQueryString(params);
   const path = `/api/v1/reports/audit-log${qs ? `?${qs}` : ''}`;
   return request(path, { method: 'GET', token });
-}
-
-export async function getAiInsights(token) {
-  return request('/api/v1/reports/ai-predictive-analysis', { method: 'GET', token });
-}
-
-export async function getAnomalies(token) {
-  return request('/api/v1/reports/anomalies', { method: 'GET', token });
 }
 
 export async function exportAuditLog(token, params = {}) {

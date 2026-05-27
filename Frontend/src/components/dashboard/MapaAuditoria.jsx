@@ -1,7 +1,7 @@
 import React, { useMemo, useEffect, useState, memo, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import mapboxgl from 'mapbox-gl';
-import 'mapbox-gl/dist/mapbox-gl.css';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 import { 
   ArrowsOutCardinal, 
   X, 
@@ -22,9 +22,17 @@ import Badge from '@/components/ui/Badge';
 import { cn } from '@/lib/utils';
 import { exportAuditPDF, exportInspectionPDF, getClientSession } from '@/lib/api';
 
-const DEFAULT_CENTER = [-3.7038, 40.4168]; // [lng, lat]
+const DEFAULT_CENTER = [40.4168, -3.7038]; // [lat, lng]
 const MIN_ZOOM = 3;
 const MAX_ZOOM = 18;
+
+// Fix Leaflet default icon (webpack/vite issue)
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+});
 
 const parseLocation = (ficha) => {
   if (!ficha) return null;
@@ -43,23 +51,6 @@ const parseLocation = (ficha) => {
 };
 
 const formatTime = (v) => (v ? String(v).slice(0, 5) : '--:--');
-
-function createGeoJSONCircle(center, radiusInKm, points = 64) {
-  const coords = { latitude: center[1], longitude: center[0] };
-  const km = radiusInKm;
-  const ret = [];
-  const distanceX = km / (111.32 * Math.cos((coords.latitude * Math.PI) / 180));
-  const distanceY = km / 110.574;
-  let theta, x, y;
-  for (let i = 0; i < points; i++) {
-    theta = (i / points) * (2 * Math.PI);
-    x = distanceX * Math.cos(theta);
-    y = distanceY * Math.sin(theta);
-    ret.push([coords.longitude + x, coords.latitude + y]);
-  }
-  ret.push(ret[0]);
-  return { type: 'FeatureCollection', features: [{ type: 'Feature', geometry: { type: 'Polygon', coordinates: [ret] } }] };
-}
 
 export default function MapaAuditoria({ fichas = [], workCenters = [], employees = [] }) {
   const mapContainer = useRef(null);
@@ -88,25 +79,25 @@ export default function MapaAuditoria({ fichas = [], workCenters = [], employees
   }, [fichas, employees, timeFilter]);
 
   const center = useMemo(() => {
-    if (markers.length > 0) return [markers[0].pos.lng, markers[0].pos.lat];
+    if (markers.length > 0) return [markers[0].pos.lat, markers[0].pos.lng];
     return DEFAULT_CENTER;
   }, [markers]);
 
-  // Initialization of Mapbox
+  // Initialization of Leaflet map
   useEffect(() => {
-    if (!mapboxgl.accessToken) {
-      mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN || '';
-    }
-    if (!mapboxgl.accessToken || !mapContainer.current || map.current) return;
+    if (!mapContainer.current || map.current) return;
 
-    map.current = new mapboxgl.Map({
-      container: mapContainer.current,
-      style: 'mapbox://styles/mapbox/streets-v12',
+    map.current = L.map(mapContainer.current, {
       center: center,
       zoom: zoom,
-      pitch: 45,
-      antialias: true
+      zoomControl: false,
+      attributionControl: false,
     });
+
+    // Dark tile layer (CartoDB dark, no API key needed)
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      maxZoom: 19,
+    }).addTo(map.current);
 
     map.current.on('zoomend', () => {
       setZoom(Math.round(map.current.getZoom()));
@@ -123,7 +114,7 @@ export default function MapaAuditoria({ fichas = [], workCenters = [], employees
   // Update center when changed significantly
   const handleRecenter = useCallback(() => {
     if (map.current && markers.length > 0) {
-      map.current.flyTo({ center: [markers[0].pos.lng, markers[0].pos.lat], zoom: 16, essential: true, duration: 1500 });
+      map.current.flyTo([markers[0].pos.lat, markers[0].pos.lng], 16, { duration: 1.5 });
     }
   }, [markers]);
 
@@ -132,19 +123,21 @@ export default function MapaAuditoria({ fichas = [], workCenters = [], employees
     if (!map.current) return;
 
     // Clear old markers
-    Object.values(markersRef.current).forEach(m => m.remove());
+    Object.values(markersRef.current).forEach(m => map.current.removeLayer(m));
     markersRef.current = {};
 
     markers.forEach((m, idx) => {
       const isActive = !m.endTime;
-      const el = document.createElement('div');
-      
-      if (showHeatmap) {
-        el.className = 'w-20 h-20 rounded-full blur-3xl opacity-60 bg-red-600 animate-pulse';
-      } else {
-        el.className = `w-6 h-6 rounded-full border-2 border-white shadow-[0_0_20px_rgba(16,185,129,0.8)] flex items-center justify-center ${isActive ? 'bg-emerald-500' : 'bg-rose-500'}`;
-        el.innerHTML = `<div class="w-2 h-2 bg-white rounded-full ${isActive ? 'animate-ping' : ''}"></div>`;
-      }
+      const iconHtml = showHeatmap
+        ? '<div class="w-20 h-20 rounded-full blur-3xl opacity-60 bg-red-600 animate-pulse"></div>'
+        : `<div class="w-6 h-6 rounded-full border-2 border-white shadow-[0_0_20px_rgba(16,185,129,0.8)] flex items-center justify-center ${isActive ? 'bg-emerald-500' : 'bg-rose-500'}"><div class="w-2 h-2 bg-white rounded-full ${isActive ? 'animate-ping' : ''}"></div></div>`;
+
+      const icon = L.divIcon({
+        html: iconHtml,
+        className: 'custom-marker',
+        iconSize: [24, 24],
+        iconAnchor: [12, 12],
+      });
 
       // Generate popup HTML
       const badgeHtml = isActive 
@@ -180,11 +173,12 @@ export default function MapaAuditoria({ fichas = [], workCenters = [], employees
         </div>
       `;
 
-      const popup = new mapboxgl.Popup({ offset: 15, closeButton: false, className: 'premium-mapbox-popup' }).setHTML(popupHtml);
-
-      const marker = new mapboxgl.Marker(el)
-        .setLngLat([m.pos.lng, m.pos.lat])
-        .setPopup(popup)
+      const marker = L.marker([m.pos.lat, m.pos.lng], { icon })
+        .bindPopup(popupHtml, {
+          offset: L.point(0, -12),
+          className: 'premium-leaflet-popup',
+          closeButton: false,
+        })
         .addTo(map.current);
       
       markersRef.current[m.id || idx] = marker;
@@ -194,50 +188,28 @@ export default function MapaAuditoria({ fichas = [], workCenters = [], employees
   // Render Geofences
   useEffect(() => {
     if (!map.current) return;
-    
-    const renderFences = () => {
-      // Clear old sources/layers
-      geofenceLayersRef.current.forEach(id => {
-        if (map.current.getLayer(`geofence-fill-${id}`)) map.current.removeLayer(`geofence-fill-${id}`);
-        if (map.current.getLayer(`geofence-line-${id}`)) map.current.removeLayer(`geofence-line-${id}`);
-        if (map.current.getSource(`geofence-${id}`)) map.current.removeSource(`geofence-${id}`);
-      });
-      geofenceLayersRef.current = [];
 
-      if (!showGeofence) return;
+    // Clear old circles
+    geofenceLayersRef.current.forEach(c => map.current.removeLayer(c));
+    geofenceLayersRef.current = [];
 
-      workCenters.forEach((wc, idx) => {
-        if (wc && wc.latitude && wc.longitude) {
-          const id = wc.id || idx;
-          geofenceLayersRef.current.push(id);
-          
-          if (!map.current.getSource(`geofence-${id}`)) {
-            map.current.addSource(`geofence-${id}`, {
-              type: 'geojson',
-              data: createGeoJSONCircle([Number(wc.longitude), Number(wc.latitude)], (Number(wc.radiusMeters) || 500) / 1000)
-            });
-            map.current.addLayer({
-              id: `geofence-fill-${id}`,
-              type: 'fill',
-              source: `geofence-${id}`,
-              paint: { 'fill-color': '#10b981', 'fill-opacity': 0.08 }
-            });
-            map.current.addLayer({
-              id: `geofence-line-${id}`,
-              type: 'line',
-              source: `geofence-${id}`,
-              paint: { 'line-color': '#10b981', 'line-width': 1.5, 'line-dasharray': [4, 4] }
-            });
-          }
-        }
-      });
-    };
+    if (!showGeofence) return;
 
-    if (map.current.isStyleLoaded()) {
-      renderFences();
-    } else {
-      map.current.once('style.load', renderFences);
-    }
+    workCenters.forEach((wc, idx) => {
+      if (wc && wc.latitude && wc.longitude) {
+        const id = wc.id || idx;
+        const radius = Number(wc.radiusMeters) || 500;
+        const circle = L.circle([Number(wc.latitude), Number(wc.longitude)], {
+          radius,
+          color: '#10b981',
+          fillColor: '#10b981',
+          fillOpacity: 0.08,
+          weight: 1.5,
+          dashArray: '4 4',
+        }).addTo(map.current);
+        geofenceLayersRef.current.push(circle);
+      }
+    });
   }, [workCenters, showGeofence]);
 
   const toggleFullscreen = useCallback(() => setIsFullscreen(v => !v), []);
@@ -258,20 +230,25 @@ export default function MapaAuditoria({ fichas = [], workCenters = [], employees
         setUserLocation(newLoc);
         
         if (map.current) {
-          map.current.flyTo({ center: [longitude, latitude], zoom: 16, essential: true });
+          map.current.flyTo([latitude, longitude], 16, { duration: 1.5 });
           
-          // User marker
-          if (markersRef.current['user-loc']) markersRef.current['user-loc'].remove();
-          const el = document.createElement('div');
-          el.innerHTML = `
-            <div class="relative flex items-center justify-center">
-              <div class="absolute w-12 h-12 bg-blue-500/20 rounded-full animate-ping"></div>
-              <div class="relative w-5 h-5 bg-blue-500 border-2 border-white rounded-full shadow-[0_0_15px_rgba(59,130,246,0.8)]"></div>
-            </div>
-          `;
-          markersRef.current['user-loc'] = new mapboxgl.Marker(el)
-            .setLngLat([longitude, latitude])
-            .addTo(map.current);
+          // Remove old user marker
+          if (markersRef.current['user-loc']) {
+            map.current.removeLayer(markersRef.current['user-loc']);
+          }
+
+          const userIcon = L.divIcon({
+            html: `
+              <div class="relative flex items-center justify-center">
+                <div class="absolute w-12 h-12 bg-blue-500/20 rounded-full animate-ping"></div>
+                <div class="relative w-5 h-5 bg-blue-500 border-2 border-white rounded-full shadow-[0_0_15px_rgba(59,130,246,0.8)]"></div>
+              </div>
+            `,
+            className: 'user-location-marker',
+            iconSize: [48, 48],
+            iconAnchor: [24, 24],
+          });
+          markersRef.current['user-loc'] = L.marker([latitude, longitude], { icon: userIcon }).addTo(map.current);
         }
         setIsLocating(false);
       },
@@ -333,7 +310,7 @@ export default function MapaAuditoria({ fichas = [], workCenters = [], employees
 
   useEffect(() => {
     if (map.current) {
-      setTimeout(() => map.current.resize(), 100);
+      setTimeout(() => map.current.invalidateSize(), 100);
     }
   }, [isFullscreen]);
 
@@ -458,16 +435,39 @@ export default function MapaAuditoria({ fichas = [], workCenters = [], employees
         </div>
       </div>
       
-      {/* Mapbox Container */}
+      {/* Leaflet Container */}
       <div className="absolute inset-0 z-[1000] overflow-hidden rounded-[40px]">
         <div ref={mapContainer} className="w-full h-full" />
       </div>
       
       <style>{`
-        .premium-mapbox-popup .mapboxgl-popup-content { background: transparent !important; border: none !important; box-shadow: none !important; padding: 0 !important; }
-        .premium-mapbox-popup .mapboxgl-popup-tip { display: none !important; }
-        .mapboxgl-canvas-container { cursor: crosshair !important; }
-        .mapboxgl-canvas { filter: invert(90%) hue-rotate(180deg) brightness(0.85); }
+        .premium-leaflet-popup .leaflet-popup-content-wrapper {
+          background: transparent !important;
+          box-shadow: none !important;
+          border-radius: 24px !important;
+          padding: 0 !important;
+          overflow: visible !important;
+        }
+        .premium-leaflet-popup .leaflet-popup-content {
+          margin: 0 !important;
+          width: auto !important;
+        }
+        .premium-leaflet-popup .leaflet-popup-tip {
+          display: none !important;
+        }
+        .custom-marker {
+          background: none !important;
+          border: none !important;
+        }
+        .user-location-marker {
+          background: none !important;
+          border: none !important;
+        }
+        .leaflet-container {
+          cursor: crosshair !important;
+          background: #0a0a0c !important;
+        }
+        .leaflet-control-zoom { display: none !important; }
         .zoom-slider-v-final { -webkit-appearance: none; appearance: none; writing-mode: vertical-lr; direction: rtl; width: 6px; height: 110px; background: rgba(255,255,255,0.1); border-radius: 10px; outline: none; }
         .zoom-slider-v-final::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; background: #3b82f6; border-radius: 50%; cursor: pointer; box-shadow: 0 0 15px rgba(59,130,246,0.6); }
       `}</style>

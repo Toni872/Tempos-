@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Crown, ArrowRight, ShieldCheck, Lock } from 'lucide-react';
+import { Crown, ArrowRight, ShieldCheck, Lock } from '@phosphor-icons/react';
 
 export default function TrialExpiredOverlay({ trialExpiresAt }) {
   return (
@@ -43,7 +43,7 @@ export default function TrialExpiredOverlay({ trialExpiresAt }) {
           </div>
 
           <button 
-            onClick={() => window.location.href = '/contacto'}
+            onClick={() => window.location.href = '/'}
             className="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl font-semibold transition-all flex items-center justify-center gap-2 group shadow-lg shadow-blue-600/20"
           >
             Ver Planes Profesionales
@@ -51,7 +51,7 @@ export default function TrialExpiredOverlay({ trialExpiresAt }) {
           </button>
 
           <p className="mt-6 text-xs text-zinc-500">
-            ¿Tienes dudas? <a href="/contacto" className="text-zinc-300 hover:underline">Habla con un asesor</a>
+            ¿Tienes dudas? <a href="/" className="text-zinc-300 hover:underline">Volver al inicio</a>
           </p>
         </div>
       </motion.div>
