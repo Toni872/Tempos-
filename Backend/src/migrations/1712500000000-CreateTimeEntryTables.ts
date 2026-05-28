@@ -70,6 +70,9 @@ export class CreateTimeEntryTables1712500000000 implements MigrationInterface {
         IF EXISTS(
           SELECT 1 FROM information_schema.columns
           WHERE table_name='time_entries' AND column_name='ficha_id'
+        ) AND EXISTS(
+          SELECT 1 FROM information_schema.columns
+          WHERE table_name='time_entries' AND column_name='type'
         ) THEN
           EXECUTE 'CREATE INDEX IF NOT EXISTS idx_time_entries_ficha_type ON time_entries(ficha_id, type)';
         END IF;
@@ -81,6 +84,9 @@ export class CreateTimeEntryTables1712500000000 implements MigrationInterface {
         IF EXISTS(
           SELECT 1 FROM information_schema.columns
           WHERE table_name='time_entries' AND column_name='user_id'
+        ) AND EXISTS(
+          SELECT 1 FROM information_schema.columns
+          WHERE table_name='time_entries' AND column_name='timestamp_utc'
         ) THEN
           EXECUTE 'CREATE INDEX IF NOT EXISTS idx_time_entries_user_timestamp ON time_entries(user_id, timestamp_utc)';
         END IF;
@@ -92,6 +98,9 @@ export class CreateTimeEntryTables1712500000000 implements MigrationInterface {
         IF EXISTS(
           SELECT 1 FROM information_schema.columns
           WHERE table_name='time_entries' AND column_name='user_id'
+        ) AND EXISTS(
+          SELECT 1 FROM information_schema.columns
+          WHERE table_name='time_entries' AND column_name='created_at'
         ) THEN
           EXECUTE 'CREATE INDEX IF NOT EXISTS idx_time_entries_user_created ON time_entries(user_id, created_at)';
         END IF;
@@ -124,6 +133,9 @@ export class CreateTimeEntryTables1712500000000 implements MigrationInterface {
         IF EXISTS(
           SELECT 1 FROM information_schema.columns
           WHERE table_name='time_entry_change_logs' AND column_name='time_entry_id'
+        ) AND EXISTS(
+          SELECT 1 FROM information_schema.columns
+          WHERE table_name='time_entry_change_logs' AND column_name='created_at'
         ) THEN
           EXECUTE 'CREATE INDEX IF NOT EXISTS idx_change_logs_time_entry_created ON time_entry_change_logs(time_entry_id, created_at)';
         END IF;
@@ -135,6 +147,9 @@ export class CreateTimeEntryTables1712500000000 implements MigrationInterface {
         IF EXISTS(
           SELECT 1 FROM information_schema.columns
           WHERE table_name='time_entry_change_logs' AND column_name='changed_by'
+        ) AND EXISTS(
+          SELECT 1 FROM information_schema.columns
+          WHERE table_name='time_entry_change_logs' AND column_name='created_at'
         ) THEN
           EXECUTE 'CREATE INDEX IF NOT EXISTS idx_change_logs_user_created ON time_entry_change_logs(changed_by, created_at)';
         END IF;
@@ -146,6 +161,9 @@ export class CreateTimeEntryTables1712500000000 implements MigrationInterface {
         IF EXISTS(
           SELECT 1 FROM information_schema.columns
           WHERE table_name='time_entry_change_logs' AND column_name='action'
+        ) AND EXISTS(
+          SELECT 1 FROM information_schema.columns
+          WHERE table_name='time_entry_change_logs' AND column_name='created_at'
         ) THEN
           EXECUTE 'CREATE INDEX IF NOT EXISTS idx_change_logs_action_created ON time_entry_change_logs(action, created_at)';
         END IF;
