@@ -1,0 +1,79 @@
+name: Deploy to GKE
+
+on:
+  push:
+    branches:
+      - main
+      # Descomentar para incluir tags
+      # tags:
+      #   - 'v*.*.*'
+
+env:
+  PROJECT_ID: tempos-project
+  GKE_CLUSTER: tempos-cluster    # TODO: Actualizar con nombre real
+  GKE_ZONE: europe-southwest1-a  # TODO: Actualizar con zona real
+  IMAGE_BACKEND: tempos-backend
+  IMAGE_WORKER: tempos-worker
+  GAR_LOCATION: europe-southwest1-docker.pkg.dev/tempos-project/tempos-repo # TODO: Actualizar repo real si se usa Artifact Registry
+
+jobs:
+  setup-build-publish-deploy:
+    name: Setup, Build, Publish, and Deploy
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    # Setup gcloud CLI (Recomendado usar Workload Identity Federation)
+    - id: 'auth'
+      uses: 'google-github-actions/auth@v2'
+      with:
+        credentials_json: '${{ secrets.GCP_CREDENTIALS }}'
+        # workload_identity_provider: 'projects/123456789/locations/global/workloadIdentityPools/my-pool/providers/my-provider'
+        # service_account: 'tempos-deployer@tempos-project.iam.gserviceaccount.com'
+
+    # Get the GKE credentials so we can deploy to the cluster
+    - name: Set up GKE credentials
+      uses: google-github-actions/get-gke-credentials@v2
+      with:
+        cluster_name: ${{ env.GKE_CLUSTER }}
+        location: ${{ env.GKE_ZONE }}
+
+    # Build the Docker image
+    - name: Build Backend Image
+      run: |-
+        docker build \
+          --tag "gcr.io/$PROJECT_ID/$IMAGE_BACKEND:${{ github.sha }}" \
+          --tag "gcr.io/$PROJECT_ID/$IMAGE_BACKEND:latest" \
+          ./Backend
+
+    # Configure Docker to use the gcloud command-line tool as a credential
+    # helper for authentication
+    - name: Configure Docker
+      run: gcloud auth configure-docker gcr.io --quiet
+
+    # Push the Docker image to Google Container Registry
+    - name: Publish Backend Image
+      run: |-
+        docker push "gcr.io/$PROJECT_ID/$IMAGE_BACKEND:${{ github.sha }}"
+        docker push "gcr.io/$PROJECT_ID/$IMAGE_BACKEND:latest"
+
+    # Set up Kustomize (opcional, si usamos kustomize en k8s/kustomization.yaml)
+    # - name: Set up Kustomize
+    #   run: |-
+    #     curl -sfLo kustomize https://github.com/kubernetes-sigs/kustomize/releases/download/v3.1.0/kustomize_3.1.0_linux_amd64
+    #     chmod u+x ./kustomize
+
+    # Deploy the Docker image to the GKE cluster
+    - name: Deploy
+      run: |-
+        # Aquí reemplazamos la imagen temporal en el deployment con la recién construida
+        sed -i "s|image: gcr.io/$PROJECT_ID/$IMAGE_BACKEND:latest|image: gcr.io/$PROJECT_ID/$IMAGE_BACKEND:${{ github.sha }}|g" k8s/backend/deployment.yaml
+        kubectl apply -f k8s/base/
+        kubectl apply -f k8s/backend/
+        kubectl apply -f k8s/ingress/
+        # kubectl apply -f k8s/worker/
+        
+        kubectl rollout status deployment/$IMAGE_BACKEND -n tempos

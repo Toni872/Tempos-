@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tempos-config
+  namespace: tempos
+data:
+  NODE_ENV: "production"
+  PORT: "8080"
+  FRONTEND_URL: "https://tempos.script-9.com"
+  # Agrega aquí otras variables de entorno no sensibles
