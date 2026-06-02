@@ -1,0 +1,26 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: tempos-ingress
+  namespace: tempos
+  annotations:
+    # Si se usa GKE Ingress:
+    kubernetes.io/ingress.class: "gce"
+    # Para certificado gestionado por Google:
+    # networking.gke.io/managed-certificates: "tempos-cert"
+    
+    # Si se usa NGINX:
+    # kubernetes.io/ingress.class: "nginx"
+    # cert-manager.io/cluster-issuer: "letsencrypt-prod"
+spec:
+  rules:
+  - host: api.tempos.script-9.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: tempos-backend
+            port:
+              number: 80

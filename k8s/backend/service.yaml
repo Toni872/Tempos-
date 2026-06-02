@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: tempos-backend
+  namespace: tempos
+  labels:
+    app: tempos-backend
+spec:
+  type: ClusterIP
+  selector:
+    app: tempos-backend
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8080
