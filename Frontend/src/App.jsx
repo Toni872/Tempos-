@@ -12,6 +12,7 @@ const TrialPage = lazy(() => import('@/pages/TrialPage'))
 const MarketingPage = lazy(() => import('@/pages/MarketingPage'))
 const PrivacyPolicy = lazy(() => import('@/pages/PrivacyPolicy'))
 const TermsOfService = lazy(() => import('@/pages/TermsOfService'))
+const ActivateAccount = lazy(() => import('@/pages/ActivateAccount'))
 
 function App() {
   const [installPrompt, setInstallPrompt] = useState(null)
@@ -79,6 +80,7 @@ function App() {
               <Route path="/kiosk" element={<PageWrapper><KioskPage /></PageWrapper>} />
               <Route path="/invite/:token" element={<PageWrapper><AcceptInvitationPage /></PageWrapper>} />
               <Route path="/trial" element={<PageWrapper><TrialPage /></PageWrapper>} />
+              <Route path="/activate" element={<PageWrapper><ActivateAccount /></PageWrapper>} />
               <Route path="/legal/privacidad" element={<PageWrapper><PrivacyPolicy /></PageWrapper>} />
               <Route path="/legal/terminos" element={<PageWrapper><TermsOfService /></PageWrapper>} />
             </Routes>

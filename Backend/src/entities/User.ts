@@ -115,6 +115,9 @@ export class User {
   @Column({ type: "timestamp", nullable: true })
   invitationExpiresAt?: Date;
 
+  @Column({ type: "timestamp", nullable: true })
+  activatedAt?: Date;
+
   // Campos de WebAuthn
   @Column({ type: "varchar", nullable: true })
   currentChallenge?: string;
