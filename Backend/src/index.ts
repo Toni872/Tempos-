@@ -22,6 +22,10 @@ import webauthnRoutes from "./routes/webauthn.routes.js";
 import logRoutes from "./controllers/log.controller.js";
 import systemRoutes from "./controllers/system.controller.js";
 import invitationsRoutes from "./controllers/invitations.controller.js";
+import {
+  inviteRouter as employeeInviteRouter,
+  activationRouter as employeeActivationRouter,
+} from "./controllers/employee-invitation.controller.js";
 import { GdprController } from "./controllers/gdpr.controller.js";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler.js";
 import {
@@ -158,7 +162,9 @@ app.get("/status", async (_req: Request, res: Response) => {
 // ─── Routes ────────────────────────────────────────────────────────────────────
 app.use("/api/v1", apiRateLimiter);
 app.use("/api/v1/auth", authRateLimiter, authRoutes);
+app.use("/api/v1/auth", authRateLimiter, employeeActivationRouter);
 app.use("/api/v1/fichas", firebaseAuthMiddleware, appUserContextMiddleware, requireEmailVerified, requireActiveSubscription, fichaRoutes);
+app.use("/api/v1/employees", firebaseAuthMiddleware, appUserContextMiddleware, employeeInviteRouter);
 app.use("/api/v1/employees", firebaseAuthMiddleware, appUserContextMiddleware, requireEmailVerified, requireActiveSubscription, employeesRoutes);
 app.use("/api/v1/documents", firebaseAuthMiddleware, appUserContextMiddleware, requireEmailVerified, requireActiveSubscription, documentsRoutes);
 app.use("/api/v1/absences", firebaseAuthMiddleware, appUserContextMiddleware, requireEmailVerified, requireActiveSubscription, absencesRoutes);

@@ -332,6 +332,18 @@ export async function createEmployee(token, data) {
   return request('/api/v1/employees', { method: 'POST', token, body: JSON.stringify(data) });
 }
 
+export async function inviteEmployee(token, data) {
+  return request('/api/v1/employees/invite', { method: 'POST', token, body: JSON.stringify(data) });
+}
+
+export async function validateActivationToken(token) {
+  return request('/api/v1/auth/validate-token', { method: 'POST', body: JSON.stringify({ token }) });
+}
+
+export async function activateAccount(token, password) {
+  return request('/api/v1/auth/activate', { method: 'POST', body: JSON.stringify({ token, password }) });
+}
+
 export async function getInvitation(token) {
   try {
     const res = await request(`/api/v1/invitations/${token}`, { method: 'GET' });

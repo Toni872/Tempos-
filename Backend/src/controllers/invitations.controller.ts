@@ -1,4 +1,5 @@
 import { Router, Request, Response } from "express";
+import crypto from "crypto";
 import { AppDataSource } from "../database.js";
 import { User } from "../entities/User.js";
 import { asyncHandler } from "../middleware/errorHandler.js";
@@ -12,6 +13,10 @@ router.use(authRateLimiter);
  * GET /api/v1/invitations/:token
  * Validate an invitation token and return invitation details.
  * Public endpoint — no auth required (the invited user doesn't have an account yet).
+ *
+ * Since the migration to SHA-256 hashed tokens, the lookup uses SHA-256(input)
+ * to match the stored hash. Existing raw-UUID tokens from the legacy flow
+ * become inert — admins can regenerate tokens via the new invite endpoint.
  */
 router.get(
   "/:token",
@@ -28,8 +33,11 @@ router.get(
 
     const userRepository = AppDataSource.getRepository(User);
 
+    // SHA-256 hash the input token to match stored hash
+    const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
+
     const user = await userRepository.findOne({
-      where: { invitationToken: token },
+      where: { invitationToken: tokenHash },
     });
 
     if (!user) {
