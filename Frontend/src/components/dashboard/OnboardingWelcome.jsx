@@ -82,7 +82,7 @@ export default function OnboardingWelcome({ isOpen, onDismiss, onAction }) {
                   Comenzar
                 </button>
                 <p className="text-[10px] text-zinc-600 mt-3">
-                  Podés retomar estos pasos más tarde desde el panel lateral
+                  Puedes retomar estos pasos más tarde desde el panel lateral
                 </p>
               </div>
             </div>

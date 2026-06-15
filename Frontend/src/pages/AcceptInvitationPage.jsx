@@ -81,7 +81,7 @@ export default function AcceptInvitationPage() {
       setState('valid');
       setIsSubmitting(false);
       if (err.code === 'auth/email-already-in-use') {
-        setErrorMsg('Este correo ya tiene una cuenta. Iniciá sesión desde la página de login.');
+        setErrorMsg('Este correo ya tiene una cuenta. Inicia sesión desde la página de login.');
       } else {
         setErrorMsg(err?.response?.data?.error || err.message || 'Error al aceptar la invitación.');
       }
@@ -152,7 +152,7 @@ export default function AcceptInvitationPage() {
             </div>
             <h1 className="text-xl font-bold text-white mb-3">Invitación ya utilizada</h1>
             <p className="text-zinc-400 text-sm leading-relaxed mb-6">
-              Esta invitación ya fue aceptada. Podés iniciar sesión desde la página de login.
+              Esta invitación ya fue aceptada. Puedes iniciar sesión desde la página de login.
             </p>
             <a
               href="/login"
@@ -237,7 +237,7 @@ export default function AcceptInvitationPage() {
 
             <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5 text-center">
               <p className="text-zinc-400 text-sm leading-relaxed">
-                Para aceptar la invitación y empezar a usar <strong className="text-white">Tempos</strong>, creá una contraseña.
+                Para aceptar la invitación y empezar a usar <strong className="text-white">Tempos</strong>, crea una contraseña.
               </p>
             </div>
 
@@ -278,7 +278,7 @@ export default function AcceptInvitationPage() {
             </button>
 
             <p className="text-center text-[10px] text-zinc-600">
-              Al registrarte, aceptás los{' '}
+              Al registrarte, aceptas los{' '}
               <a href="/legal/terminos" className="text-blue-500 hover:text-blue-400 underline">términos de servicio</a>
               {' '}y la{' '}
               <a href="/legal/privacidad" className="text-blue-500 hover:text-blue-400 underline">política de privacidad</a>.

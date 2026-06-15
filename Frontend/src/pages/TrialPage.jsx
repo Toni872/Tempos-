@@ -2,11 +2,12 @@ import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import Logo from '@/components/ui/Logo';
 import ErrorText from '@/components/ui/ErrorText';
-import { signUpAndGetIdToken } from '@/lib/firebaseClient';
-import { registerMe, getMe, setClientSession } from '@/lib/api';
+import { signUpAndGetIdToken, signOutUser } from '@/lib/firebaseClient';
+import { validateRegistration, registerMe, requestVerificationEmail } from '@/lib/api';
 import { z } from 'zod';
 
 const PHONE_REGEX = /^[+]?[(]?[0-9\s-]{6,20}$/;
+const CIF_REGEX = /^[a-zA-Z][0-9]{7}[a-zA-Z0-9]$|^[0-9]{8}[a-zA-Z]$|^[XYZxyz][0-9]{7}[a-zA-Z]$/;
 const TRIAL_FIELD_IDS = {
   company: 'trial-company',
   cif: 'trial-cif',
@@ -86,6 +87,7 @@ export default function TrialPage() {
     phone: z.string().min(1, "El teléfono de contacto es obligatorio.").regex(PHONE_REGEX, "Introduce un teléfono válido."),
     firstName: z.string().min(1, "El nombre es obligatorio."),
     lastName: z.string().min(1, "Los apellidos son obligatorios."),
+    cif: z.string().optional().refine(val => !val || CIF_REGEX.test(val), "El formato del CIF/NIF no es válido."),
     email: z.string().min(1, "El email profesional es obligatorio.").email("Introduce un email profesional válido."),
     password: z.string().min(1, "La contraseña es obligatoria.").min(8, "Debe tener al menos 8 caracteres."),
     acceptedPrivacy: z.literal(true, {
@@ -104,6 +106,18 @@ export default function TrialPage() {
     }
     return {};
   };
+
+  const FREE_EMAIL_DOMAINS = [
+    'gmail.com', 'hotmail.com', 'outlook.com', 'live.com',
+    'yahoo.com', 'proton.me', 'protonmail.com', 'icloud.com',
+    'aol.com', 'mail.com', 'msn.com', 'zoho.com',
+    'yandex.com', 'tutanota.com', 'gmx.com',
+  ];
+
+  function isFreeEmail(email) {
+    const domain = email.split('@')[1]?.toLowerCase();
+    return domain ? FREE_EMAIL_DOMAINS.includes(domain) : false;
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -133,16 +147,46 @@ export default function TrialPage() {
     setFormError('');
     setIsSubmitting(true);
 
+    // Block free email domains for business registration
+    if (isFreeEmail(formData.email.trim())) {
+      setErrors(prev => ({ ...prev, email: 'Debes usar un email corporativo. No se admiten direcciones de correo gratuitas (Gmail, Hotmail, Outlook, etc.).' }));
+      setFormError('Correo electrónico no válido para registro empresarial.');
+      setIsSubmitting(false);
+      return;
+    }
+
     try {
-      // Timeout de seguridad: si Firebase tarda más de 15s, liberamos el botón
+      // Paso 1: Validar con backend ANTES de crear cualquier cosa
+      try {
+        await validateRegistration({
+          email: formData.email.trim(),
+          password: formData.password,
+          companyName: formData.company.trim(),
+          phone: formData.phone.trim(),
+          firstName: formData.firstName.trim(),
+          lastName: formData.lastName.trim(),
+          cif: formData.cif.trim() || undefined,
+        });
+      } catch (validationErr) {
+        const msg = validationErr?.details?.join('. ') || validationErr.message || 'Datos de registro no válidos.';
+        setFormError(msg);
+        setIsSubmitting(false);
+        return;
+      }
+
+      // Paso 2: Recién ahora crear el usuario en Firebase
       const idToken = await Promise.race([
         signUpAndGetIdToken(formData.email.trim(), formData.password),
         new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Tiempo de espera agotado. Reintentá.')), 15000)
+          setTimeout(() => reject(new Error('Tiempo de espera agotado. Reintenta.')), 15000)
         ),
       ]);
       if (!idToken) throw new Error('Error de validación o usuario ya existente.');
 
+      // Paso 3: Enviar email de verificación (custom vía Resend, desde nuestro backend)
+      await requestVerificationEmail(formData.email.trim());
+
+      // Paso 4: Registrar en backend (ya existe en Firebase)
       await registerMe(idToken, {
         role: 'admin',
         companyName: formData.company.trim(),
@@ -151,15 +195,15 @@ export default function TrialPage() {
         phone: formData.phone.trim(),
       });
 
-      const profile = await getMe(idToken);
-      setClientSession({
-        token: idToken,
-        isAdmin: true,
-        localMode: false,
-        profile
-      });
+      // Paso 5: Guardar credenciales en sessionStorage para poder reenviar email en verify-email
+      sessionStorage.setItem('pending_verification_email', formData.email.trim());
+      sessionStorage.setItem('pending_verification_password', formData.password);
 
-      navigate('/dashboard', { replace: true });
+      // Paso 6: Cerrar sesión para que el usuario entre fresh después de verificar
+      await signOutUser();
+
+      // Ir a pantalla de verificación
+      navigate(`/verify-email?email=${encodeURIComponent(formData.email.trim())}`, { replace: true });
     } catch (err) {
       console.error(err);
       setFormError(err.message?.includes('already-in-use') ? 'Este email ya está registrado. Inicia sesión.' : (err.message || 'Hubo un error en el registro.'));

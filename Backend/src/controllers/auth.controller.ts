@@ -1,6 +1,9 @@
 import { Router, Request, Response } from "express";
+import { z } from "zod";
+import admin from "firebase-admin";
 import { AppDataSource } from "../database.js";
 import { User, type UserRole } from "../entities/User.js";
+import { EmailVerification } from "../entities/EmailVerification.js";
 import {
   firebaseAuthMiddleware,
   DEFAULT_COMPANY_ID,
@@ -15,9 +18,10 @@ import {
   isFreeEmail,
   registerSchema,
   updateAuthProfileSchema,
+  validateCIF,
 } from "../utils/validation.js";
-import { Like } from "typeorm";
-import { randomUUID } from "crypto";
+import { Like, MoreThanOrEqual } from "typeorm";
+import { randomBytes, randomUUID } from "crypto";
 import { EmailService } from "../services/EmailService.js";
 import { registerRateLimiter } from "../middleware/rate-limit.middleware.js";
 
@@ -684,6 +688,158 @@ router.post(
         subscriptionPlan: user.subscriptionPlan,
       },
     });
+  }),
+);
+
+/**
+ * POST /api/v1/auth/validate-registration
+ * Valida los datos de registro ANTES de crear el usuario en Firebase.
+ * No crea nada, solo valida. Previene Firebase users huérfanos.
+ */
+const validateRegistrationSchema = z.object({
+  email: z.string().email("Introduce un email profesional válido."),
+  password: z.string().min(8, "La contraseña debe tener al menos 8 caracteres."),
+  companyName: z.string().min(2, "Nombre de empresa demasiado corto").max(200, "Nombre de empresa demasiado largo"),
+  phone: z.string().min(6, "Introduce un teléfono válido."),
+  firstName: z.string().min(1, "El nombre es obligatorio."),
+  lastName: z.string().min(1, "Los apellidos son obligatorios."),
+  cif: z.string().optional().refine(val => !val || validateCIF(val), {
+    message: "El CIF/NIF no tiene un formato válido"
+  }),
+});
+
+router.post(
+  "/validate-registration",
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const parseResult = validateRegistrationSchema.safeParse(req.body);
+    if (!parseResult.success) {
+      res.status(400).json({
+        error: "validation_error",
+        details: parseResult.error.issues.map(i => i.message),
+      });
+      return;
+    }
+
+    // Check free email
+    if (isFreeEmail(parseResult.data.email)) {
+      res.status(400).json({
+        error: "free_email_not_allowed",
+        details: ["No puedes registrarte con un email gratuito. Usá un email corporativo."],
+      });
+      return;
+    }
+
+    // All validations passed
+    res.json({ valid: true });
+  }),
+);
+
+/**
+ * POST /api/v1/auth/request-verification
+ * Genera un token propio de verificación y envía email desde nuestro dominio (Resend).
+ * No usa Firebase para el link de verificación — todo es nuestro.
+ */
+router.post(
+  "/request-verification",
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const { email } = req.body;
+
+    if (!email || typeof email !== "string") {
+      res.status(400).json({ error: "Email requerido." });
+      return;
+    }
+
+    const apiUrl = process.env.API_URL || "http://localhost:8081";
+    const emailVerificationRepo = AppDataSource.getRepository(EmailVerification);
+
+    // Obtener el UID de Firebase del usuario ya existente (creado por TrialPage antes de llamar a este endpoint)
+    let firebaseUid: string;
+    try {
+      const userRecord = await admin.auth().getUserByEmail(email);
+      firebaseUid = userRecord.uid;
+    } catch (err: any) {
+      console.error("❌ [AUTH] No se encontró usuario de Firebase para:", email, err.message);
+      res.status(400).json({ error: "No se encontró un usuario de Firebase para este email. Regístrate primero." });
+      return;
+    }
+
+    // Invalidar tokens anteriores no usados para este email
+    await emailVerificationRepo.update(
+      { email, used: false },
+      { used: true }
+    );
+
+    // Generar token seguro
+    const token = randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 horas
+
+    // Guardar token en BD
+    const verification = emailVerificationRepo.create({
+      uid: firebaseUid,
+      email,
+      token,
+      expiresAt,
+      used: false,
+    });
+    await emailVerificationRepo.save(verification);
+
+    // Generar enlace de verificación apuntando a nuestro backend
+    const verificationLink = `${apiUrl}/api/v1/auth/verify?token=${token}`;
+
+    // Enviar email vía Resend con nuestro template
+    await EmailService.sendVerificationEmail(email, verificationLink);
+
+    res.json({ ok: true });
+  }),
+);
+
+/**
+ * GET /api/v1/auth/verify?token=xxx
+ * Valida el token propio, marca email como verificado en Firebase,
+ * y redirige al login. Todo sin depender de Firebase para el flujo de email.
+ */
+router.get(
+  "/verify",
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const { token } = req.query;
+    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+
+    if (!token || typeof token !== "string") {
+      res.redirect(`${frontendUrl}/verify-email?error=invalid`);
+      return;
+    }
+
+    const emailVerificationRepo = AppDataSource.getRepository(EmailVerification);
+
+    // Buscar token válido
+    const verification = await emailVerificationRepo.findOne({
+      where: {
+        token,
+        used: false,
+        expiresAt: MoreThanOrEqual(new Date()),
+      },
+    });
+
+    if (!verification) {
+      console.error("❌ [AUTH] Token de verificación inválido o expirado:", token);
+      res.redirect(`${frontendUrl}/verify-email?error=expired`);
+      return;
+    }
+
+    try {
+      // Marcar email como verificado en Firebase usando Admin SDK (sin restricciones de referer)
+      await admin.auth().updateUser(verification.uid, { emailVerified: true });
+
+      // Marcar token como usado
+      verification.used = true;
+      await emailVerificationRepo.save(verification);
+
+      console.log(`✅ [AUTH] Email verificado para uid=${verification.uid}, email=${verification.email}`);
+      res.redirect(`${frontendUrl}/login?verified=1`);
+    } catch (err: any) {
+      console.error("❌ [AUTH] Error actualizando usuario en Firebase:", err);
+      res.redirect(`${frontendUrl}/verify-email?error=invalid`);
+    }
   }),
 );
 
