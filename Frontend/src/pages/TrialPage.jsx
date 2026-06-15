@@ -7,10 +7,9 @@ import { validateRegistration, registerMe, requestVerificationEmail } from '@/li
 import { z } from 'zod';
 
 const PHONE_REGEX = /^[+]?[(]?[0-9\s-]{6,20}$/;
-const CIF_REGEX = /^[a-zA-Z][0-9]{7}[a-zA-Z0-9]$|^[0-9]{8}[a-zA-Z]$|^[XYZxyz][0-9]{7}[a-zA-Z]$/;
+
 const TRIAL_FIELD_IDS = {
   company: 'trial-company',
-  cif: 'trial-cif',
   phone: 'trial-phone',
   firstName: 'trial-firstName',
   lastName: 'trial-lastName',
@@ -44,7 +43,6 @@ export default function TrialPage() {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
     company: '',
-    cif: '',
     firstName: '',
     lastName: '',
     email: '',
@@ -87,7 +85,6 @@ export default function TrialPage() {
     phone: z.string().min(1, "El teléfono de contacto es obligatorio.").regex(PHONE_REGEX, "Introduce un teléfono válido."),
     firstName: z.string().min(1, "El nombre es obligatorio."),
     lastName: z.string().min(1, "Los apellidos son obligatorios."),
-    cif: z.string().optional().refine(val => !val || CIF_REGEX.test(val), "El formato del CIF/NIF no es válido."),
     email: z.string().min(1, "El email profesional es obligatorio.").email("Introduce un email profesional válido."),
     password: z.string().min(1, "La contraseña es obligatoria.").min(8, "Debe tener al menos 8 caracteres."),
     acceptedPrivacy: z.literal(true, {
@@ -165,7 +162,6 @@ export default function TrialPage() {
           phone: formData.phone.trim(),
           firstName: formData.firstName.trim(),
           lastName: formData.lastName.trim(),
-          cif: formData.cif.trim() || undefined,
         });
       } catch (validationErr) {
         const msg = validationErr?.details?.join('. ') || validationErr.message || 'Datos de registro no válidos.';
@@ -190,7 +186,6 @@ export default function TrialPage() {
       await registerMe(idToken, {
         role: 'admin',
         companyName: formData.company.trim(),
-        cif: formData.cif.trim() || undefined,
         name: `${formData.firstName.trim()} ${formData.lastName.trim()}`,
         phone: formData.phone.trim(),
       });
@@ -274,11 +269,6 @@ export default function TrialPage() {
                 </div>
               </div>
               
-              <div>
-                <label style={{ display: 'block', fontSize: 13, color: 'var(--t2)', marginBottom: 8 }}>CIF/NIF <span style={{ color: 'var(--t3)', fontWeight: 400 }}>(opcional)</span></label>
-                <input id={TRIAL_FIELD_IDS.cif} name="cif" value={formData.cif} onChange={handleChange} type="text" autoComplete="off" placeholder="B12345678" style={getTrialInputStyle(false)} />
-              </div>
-
               <div style={{ 
                 display: 'grid', 
                 gridTemplateColumns: window.innerWidth < 640 ? '1fr' : '1fr 1fr', 
