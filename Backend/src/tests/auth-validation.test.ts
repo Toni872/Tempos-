@@ -84,8 +84,8 @@ test("validateCIF: wrong control digit returns false", () => {
   assert.equal(validateCIF("B12345678"), false);
 });
 
-test("validateCIF: NIF format starting with digit returns false", () => {
-  assert.equal(validateCIF("12345678Z"), false);
+test("validateCIF: NIF format starting with digit returns true (valid DNI)", () => {
+  assert.equal(validateCIF("12345678Z"), true);
 });
 
 test("validateCIF: double letter prefix (PQ) returns false", () => {
