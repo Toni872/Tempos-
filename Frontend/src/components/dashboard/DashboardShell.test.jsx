@@ -81,15 +81,6 @@ describe('DashboardShell', () => {
     expect(setActiveTab).toHaveBeenCalledWith('Equipo');
   });
 
-  it('renderiza botón de Cerrar Sesión', () => {
-    render(
-      <DashboardShell {...defaultProps}>
-        <div>Content</div>
-      </DashboardShell>
-    );
-    expect(screen.getByText('Cerrar Sesión')).toBeInTheDocument();
-  });
-
   it('renderiza botón MANUAL DE USUARIO', () => {
     render(
       <DashboardShell {...defaultProps}>

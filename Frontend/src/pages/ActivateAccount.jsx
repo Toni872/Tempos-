@@ -20,7 +20,7 @@ export default function ActivateAccount() {
   const handleValidateToken = async (e) => {
     e.preventDefault();
     if (!token.trim()) {
-      setError('Ingresá el código de activación.');
+      setError('Ingresa el código de activación.');
       return;
     }
 
@@ -47,13 +47,13 @@ export default function ActivateAccount() {
       setErrorCode(code);
 
       if (status === 410 && (code === 'TOKEN_EXPIRED' || msg.includes('expiro') || msg.includes('expiró'))) {
-        setError('Este código expiró. Pedile uno nuevo a tu administrador.');
+        setError('Este código expiró. Pídele uno nuevo a tu administrador.');
         setStep('error');
       } else if (status === 410) {
-        setError('Este código ya fue usado. Intentá iniciar sesión.');
+        setError('Este código ya fue usado. Intenta iniciar sesión.');
         setStep('error');
       } else if (status === 404 || code === 'INVALID_TOKEN_FORMAT') {
-        setError('Código inválido. Revisalo e intentá de nuevo.');
+        setError('Código no válido. Revísalo e inténtalo de nuevo.');
       } else {
         setError(msg);
       }
@@ -88,15 +88,15 @@ export default function ActivateAccount() {
       const msg = err?.message || 'Error al activar la cuenta.';
 
       if (status === 410 && err?.code === 'TOKEN_EXPIRED') {
-        setError('Este código expiró. Pedile uno nuevo a tu administrador.');
+        setError('Este código expiró. Pídele uno nuevo a tu administrador.');
         setStep('error');
       } else if (status === 410) {
-        setError('Este código ya fue usado. Intentá iniciar sesión.');
+        setError('Este código ya fue usado. Intenta iniciar sesión.');
         setStep('error');
       } else if (status === 409) {
-        setError('Este correo ya tiene una cuenta. Intentá iniciar sesión.');
+        setError('Este correo ya tiene una cuenta. Intenta iniciar sesión.');
       } else if (status === 502) {
-        setError('Error al crear la cuenta. Intentá de nuevo más tarde.');
+        setError('Error al crear la cuenta. Inténtalo de nuevo más tarde.');
       } else {
         setError(msg);
       }
@@ -128,10 +128,10 @@ export default function ActivateAccount() {
                     <Key className="w-10 h-10 text-white" weight="duotone" />
                   </div>
                   <h1 className="text-2xl font-black text-white tracking-tight mb-2">
-                    Activá tu cuenta
+                    Activa tu cuenta
                   </h1>
                   <p className="text-zinc-400 text-sm">
-                    Ingresá el código de activación que te dio tu administrador.
+                    Ingresa el código de activación que te dio tu administrador.
                   </p>
                 </div>
 
@@ -194,7 +194,7 @@ export default function ActivateAccount() {
                     Casi listo
                   </h1>
                   <p className="text-zinc-400 text-sm">
-                    Creá una contraseña para tu cuenta de <strong className="text-white">{validation?.email}</strong>
+                    Crea una contraseña para tu cuenta de <strong className="text-white">{validation?.email}</strong>
                   </p>
                 </div>
 
@@ -280,7 +280,7 @@ export default function ActivateAccount() {
                   </h1>
                   <p className="text-zinc-400 text-sm mb-8 leading-relaxed">
                     Tu cuenta fue activada correctamente. <br />
-                    Ya podés iniciar sesión con tu correo y contraseña.
+                    Ya puedes iniciar sesión con tu correo y contraseña.
                   </p>
                   <button
                     onClick={() => navigate('/login')}

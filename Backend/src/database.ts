@@ -14,6 +14,12 @@ import { Shift } from "./entities/Shift.js";
 import { Message } from "./entities/Message.js";
 import { Credential } from "./entities/Credential.js";
 import { PushSubscription } from "./entities/PushSubscription.js";
+import { Plan } from "./entities/Plan.js";
+import { Subscription } from "./entities/Subscription.js";
+import { UsageRecord } from "./entities/UsageRecord.js";
+import { SubscriptionInvoice } from "./entities/SubscriptionInvoice.js";
+import { FeatureFlag } from "./entities/FeatureFlag.js";
+import { EmailVerification } from "./entities/EmailVerification.js";
 
 const dbUrl = process.env.DATABASE_URL;
 if (!dbUrl) {
@@ -66,6 +72,12 @@ export const AppDataSource = new DataSource({
     Message,
     Credential,
     PushSubscription,
+    Plan,
+    Subscription,
+    UsageRecord,
+    SubscriptionInvoice,
+    FeatureFlag,
+    EmailVerification,
   ],
   migrations: useDistMigrations
       ? ["dist/migrations/**/*.js"]

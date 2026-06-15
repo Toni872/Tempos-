@@ -234,6 +234,20 @@ async function requestBlob(path, options = {}) {
 
 export { getClientSession, setClientSession, clearClientSession, getDeviceId } from './api/session';
 
+export async function validateRegistration(data = {}) {
+  return request('/api/v1/auth/validate-registration', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+export async function requestVerificationEmail(email) {
+  return request('/api/v1/auth/request-verification', {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+  });
+}
+
 export async function registerMe(token, data = {}) {
   if (!authRateLimiter.canMakeRequest()) throw new Error("Tasa de auth excedida. Por favor, espera.");
   return request('/api/v1/auth/register', {
