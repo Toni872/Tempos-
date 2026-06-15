@@ -473,15 +473,20 @@ export const verifyPeriodSchema = z
   });
 
 const CIF_REGEX = /^[ABCDEFGHJNPQRSUVW]\d{7}[0-9A-J]$/;
+const DNI_REGEX = /^[0-9]{8}[A-Z]$/;
+const DNI_LETTERS = "TRWAGMYFPDXBNJZSQVHLCKE";
 
-export function validateCIF(cif: string): boolean {
-  if (!cif || typeof cif !== "string") return false;
+function validateDNI(dni: string): boolean {
+  const digits = parseInt(dni.slice(0, 8), 10);
+  const letter = dni[8].toUpperCase(); // normalización defensiva
+  return DNI_LETTERS[digits % 23] === letter;
+}
 
-  const normalized = cif.toUpperCase().trim();
-  if (!CIF_REGEX.test(normalized)) return false;
+function validateCompanyCIF(cif: string): boolean {
+  if (!CIF_REGEX.test(cif)) return false;
 
-  const digits = normalized.slice(1, 8);
-  const controlChar = normalized[8];
+  const digits = cif.slice(1, 8);
+  const controlChar = cif[8];
 
   let evenSum = 0;
   let oddSum = 0;
@@ -500,12 +505,26 @@ export function validateCIF(cif: string): boolean {
   const controlDigit = (10 - (total % 10)) % 10;
 
   const letterEntities = ["P", "Q", "S", "R", "W", "N"];
-  if (letterEntities.includes(normalized[0])) {
+  if (letterEntities.includes(cif[0])) {
     const controlLetter = String.fromCharCode(64 + controlDigit);
     return controlChar === controlLetter;
   }
 
   return parseInt(controlChar, 10) === controlDigit;
+}
+
+export function validateCIF(cif: string): boolean {
+  if (!cif || typeof cif !== "string") return false;
+
+  const normalized = cif.toUpperCase().trim();
+
+  // Personal DNI: 8 dígitos + letra de control
+  if (DNI_REGEX.test(normalized)) {
+    return validateDNI(normalized);
+  }
+
+  // Company CIF: letra + 7 dígitos + dígito/letra de control
+  return validateCompanyCIF(normalized);
 }
 
 const FREE_EMAIL_DOMAINS = new Set([
