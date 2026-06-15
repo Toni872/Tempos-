@@ -18,7 +18,6 @@ import {
   isFreeEmail,
   registerSchema,
   updateAuthProfileSchema,
-  validateCIF,
 } from "../utils/validation.js";
 import { Like, MoreThanOrEqual } from "typeorm";
 import { randomBytes, randomUUID } from "crypto";
@@ -162,11 +161,6 @@ router.post(
       typeof body.companyDomain === "string"
         ? body.companyDomain.trim()
         : "";
-    const cif =
-      typeof body.cif === "string"
-        ? body.cif.trim()
-        : "";
-
     if (requestedRole === "admin" && !skipDomainCheck) {
       // Free email domains are not allowed for admin registration
       const email = firebaseUser.email ?? "";
@@ -179,16 +173,7 @@ router.post(
       }
 
       const emailDomain = email.split("@")[1]?.toLowerCase();
-
-      if (cif) {
-        if (emailDomain && companyDomain && emailDomain === companyDomain.toLowerCase()) {
-          registrationStatus = "active";
-        } else {
-          registrationStatus = "pending";
-        }
-      } else if (!companyDomain) {
-        registrationStatus = "pending";
-      } else if (emailDomain && emailDomain !== companyDomain.toLowerCase()) {
+      if (!companyDomain || (emailDomain && emailDomain !== companyDomain.toLowerCase())) {
         registrationStatus = "pending";
       }
     }
@@ -227,7 +212,6 @@ router.post(
       role: requestedRole,
       status: registrationStatus,
       authorizedDeviceId: deviceId,
-      cif: cif || undefined,
       companyDomain: companyDomain || undefined,
       isTrial: requestedRole === "admin",
       trialExpiresAt: requestedRole === "admin" ? new Date(Date.now() + 14 * 24 * 60 * 60 * 1000) : undefined,
@@ -703,9 +687,6 @@ const validateRegistrationSchema = z.object({
   phone: z.string().min(6, "Introduce un teléfono válido."),
   firstName: z.string().min(1, "El nombre es obligatorio."),
   lastName: z.string().min(1, "Los apellidos son obligatorios."),
-  cif: z.string().optional().refine(val => !val || validateCIF(val), {
-    message: "El CIF/NIF no tiene un formato válido"
-  }),
 });
 
 router.post(

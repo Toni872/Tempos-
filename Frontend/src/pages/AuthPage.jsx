@@ -10,13 +10,11 @@ import { z } from 'zod';
 
 const MIN_PASSWORD_LENGTH = 8;
 const FREE_EMAIL_DOMAINS = ['gmail.com', 'hotmail.com', 'outlook.com', 'live.com', 'yahoo.com', 'proton.me', 'protonmail.com', 'icloud.com', 'aol.com', 'mail.com'];
-const CIF_REGEX = /^[a-zA-Z][0-9]{7}[a-zA-Z0-9]$|^[0-9]{8}[a-zA-Z]$|^[XYZxyz][0-9]{7}[a-zA-Z]$/;
 const AUTH_FIELD_IDS = {
   companyName: 'auth-companyName',
   name: 'auth-name',
   email: 'auth-email',
   password: 'auth-password',
-  cif: 'auth-cif'
 };
 
 const inputBaseStyle = {
@@ -62,7 +60,6 @@ export default function AuthPage({ mode }) {
   const role = Capacitor.isNativePlatform() ? 'employee' : 'admin';
   const [companyName, setCompanyName] = useState(() => trialState?.company || '');
   const [companyDomain, setCompanyDomain] = useState('');
-  const [cif, setCif] = useState('');
   const companyDomainManuallyEdited = useRef(false);
   const [freeEmailWarning, setFreeEmailWarning] = useState('');
   const [errors, setErrors] = useState({});
@@ -151,7 +148,6 @@ export default function AuthPage({ mode }) {
   const registerSchema = z.object({
     companyName: z.string().min(2, "El nombre de la empresa debe tener al menos 2 caracteres."),
     companyDomain: z.string().optional(),
-    cif: z.string().optional().refine(val => !val || CIF_REGEX.test(val), "El formato del CIF/NIF no es válido."),
     name: z.string().min(2, "El nombre completo debe tener al menos 2 caracteres."),
     email: z.string().min(1, "El correo electrónico es obligatorio.").email("Introduce un correo electrónico válido."),
     password: z.string().min(1, "La contraseña es obligatoria.").min(MIN_PASSWORD_LENGTH, `La contraseña debe tener al menos ${MIN_PASSWORD_LENGTH} caracteres.`)
@@ -159,7 +155,7 @@ export default function AuthPage({ mode }) {
 
   const validateForm = () => {
     try {
-      const data = { email, password, name, companyName, companyDomain, cif };
+      const data = { email, password, name, companyName, companyDomain };
       const schema = isLogin ? loginSchema : registerSchema;
       
       const result = schema.safeParse(data);
@@ -235,7 +231,6 @@ export default function AuthPage({ mode }) {
             role, 
             companyName: role === 'admin' ? companyName.trim() || undefined : undefined,
             companyDomain: role === 'admin' ? companyDomain.trim() || undefined : undefined,
-            cif: role === 'admin' ? cif.trim() || undefined : undefined,
             name: name || undefined 
           });
         } catch (err) {
@@ -406,24 +401,6 @@ export default function AuthPage({ mode }) {
                     placeholder="miempresa.com"
                     style={getInputStyle(false)}
                   />
-
-                  <label style={{ display: 'block', fontSize: 13, color: 'var(--t2)', marginBottom: 6, fontWeight: 500, marginTop: 16 }}>CIF/NIF <span style={{ color: 'var(--t3)', fontWeight: 400 }}>(opcional)</span></label>
-                  <input
-                    id={AUTH_FIELD_IDS.cif}
-                    type="text"
-                    value={cif}
-                    onChange={e => {
-                      setCif(e.target.value);
-                      clearFieldError('cif');
-                      setFormError('');
-                    }}
-                    autoComplete="off"
-                    aria-invalid={!!errors.cif}
-                    aria-describedby={errors.cif ? 'cif-error' : undefined}
-                    placeholder="B12345678"
-                    style={getInputStyle(!!errors.cif)}
-                  />
-                  <ErrorText id="cif-error" message={errors.cif} />
                 </div>
               )}
 
