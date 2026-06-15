@@ -75,10 +75,14 @@ if (process.env.VERBOSE_LOG === "true") {
 const allowedOrigins = [
   "http://localhost:5173",
   "http://localhost:5174",
+  "http://localhost:8081",
   "http://127.0.0.1:5173",
   "http://127.0.0.1:5174",
+  "http://127.0.0.1:8081",
   "https://discerning-emotion-production-4044.up.railway.app",
   "https://tempos-production.up.railway.app",
+  "https://tempos.script-9.com",
+  "https://api.tempos.script-9.com",
 ];
 
 if (process.env.FRONTEND_URL) {
