@@ -1,4 +1,5 @@
 # Multi-stage Dockerfile para Tempos API
+# Build: $(date -u +%Y%m%d%H%M%S) — cache bust
 # Stage 1: Build
 FROM node:20-alpine AS builder
 
