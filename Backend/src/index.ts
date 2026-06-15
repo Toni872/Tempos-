@@ -1,3 +1,5 @@
+// Tempos API — Backend entry point
+// Last rebuild: 2026-06-15 — forcing Railway cache invalidation
 import "reflect-metadata";
 import "dotenv/config";
 import express, { Express, Request, Response } from "express";
