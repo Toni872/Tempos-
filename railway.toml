@@ -1,0 +1,22 @@
+# =====================================================
+# Railway Service Configuration for Tempos Backend
+#
+# Este archivo define la topología de servicios para que
+# Railway muestre la conexión visual (flecha) entre el
+# backend y PostgreSQL en el panel de arquitectura.
+#
+# EXPERIMENTAL — Railway v2 usa el dashboard para definir
+# conexiones de servicios. Este archivo sirve como
+# referencia y documentación.
+# =====================================================
+
+# Plugin: PostgreSQL (base de datos relacional)
+# El backend se conecta via DATABASE_URL
+[plugins.postgresql]
+# Railway provisiona automáticamente la URL de conexión
+# y la inyecta como variable de entorno al servicio
+# que la reference en su configuración.
+
+# Servicio: tempos-api
+# Desplegado desde el directorio Backend/
+# Depende de: postgresql
