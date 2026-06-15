@@ -13,19 +13,13 @@
     "ignore": [
       "firebase.json",
       "**/.*",
-      "**/node_modules/**"
+      "**/node_modules/**",
+      "**/*.apk"
     ],
     "rewrites": [
       {
         "source": "**",
         "destination": "/index.html"
-      }
-    ],
-    "redirects": [
-      {
-        "source": "**",
-        "destination": "https://tempos-production.up.railway.app",
-        "type": 301
       }
     ],
     "headers": [
