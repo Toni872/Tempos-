@@ -83,6 +83,8 @@ const allowedOrigins = [
   "https://tempos-production.up.railway.app",
   "https://tempos.script-9.com",
   "https://api.tempos.script-9.com",
+  "https://tempos-project-f1e77.web.app",
+  "https://tempos-project-f1e77.firebaseapp.com",
 ];
 
 if (process.env.FRONTEND_URL) {
